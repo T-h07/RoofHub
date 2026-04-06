@@ -4,15 +4,14 @@ Map-first real estate marketplace for rental and sale listings.
 
 ## Current Stage
 
-`NM-PT03 Supabase Project Integration` is established:
+`NM-PT04 Database Schema v1` is established:
 
 - Next.js App Router + TypeScript scaffold
-- Supabase libraries wired for App Router SSR (`@supabase/supabase-js`, `@supabase/ssr`)
-- explicit browser and server Supabase client helpers in `src/lib/supabase/`
-- proxy-based session refresh foundation for SSR-safe auth cookies (`proxy.ts`)
-- typed database scaffold in `src/types/database.ts`
-- internal connectivity probe route at `/api/internal/supabase`
-- existing PT02 design system and shell preserved
+- Supabase App Router SSR integration (`@supabase/supabase-js`, `@supabase/ssr`)
+- SQL migration setup under `supabase/migrations/`
+- MVP relational schema (profiles, listings, listing_images, favorites, conversations, messages, listing_reports)
+- generated TypeScript database types in `src/types/database.ts`
+- existing PT02 shell and PT03 integration structure preserved
 
 This stage intentionally excludes business features (auth, listings, map provider logic, messaging, dashboards, moderation).
 
@@ -52,6 +51,21 @@ Connectivity check:
 
 - run `npm run dev`
 - open `/api/internal/supabase` to verify server-side Supabase wiring
+
+## Database Schema (PT04)
+
+Schema migrations live in `supabase/migrations`.
+
+Local migration workflow:
+
+```bash
+npx supabase start
+npx supabase db reset --local
+npx supabase db lint --local
+npx supabase gen types typescript --local > src/types/database.ts
+```
+
+See `docs/database-schema-v1.md` for table-level scope and schema decisions.
 
 ## Local Development
 
