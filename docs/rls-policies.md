@@ -70,19 +70,15 @@ Note: profile fields include potentially sensitive values (`phone`, `bio`), so p
 - Reporters can read their own reports.
 - Admin can read/update/delete all reports.
 
-## Storage Policy Direction (PT06)
+## Storage Policy Status (PT06)
 
-Storage policy implementation is intentionally deferred to PT06, but the access model is fixed:
+PT06 now implements storage access control on `storage.buckets` and `storage.objects` for listing images.
 
-- Bucket scope: dedicated listing image bucket (for example `listing-images`).
-- Object key convention: `listings/{owner_id}/{listing_id}/{filename}`.
-- Upload/update/delete: owner-only (or admin), validated against listing ownership.
-- Public read:
-  - only if product keeps listing images publicly viewable for published listings
-  - never allow public write
-- No browser usage of service-role keys in normal app flows.
+See:
 
-PT06 should implement `storage.objects` policies using this path convention and listing ownership checks to match database RLS guarantees.
+- `docs/storage-images-foundation.md`
+
+for bucket choice, object path conventions, and upload/delete policy behavior.
 
 ## PT05 Validation Snapshot
 

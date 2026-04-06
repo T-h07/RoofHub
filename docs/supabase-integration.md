@@ -34,6 +34,9 @@ Vercel usage:
 - `src/lib/supabase/client.ts`: browser-safe Supabase client
 - `src/lib/supabase/server.ts`: server-safe Supabase client with cookie integration
 - `src/lib/supabase/proxy.ts`: session refresh helper used by `proxy.ts`
+- `src/lib/supabase/storage/listing-images.ts`: storage upload/delete/signed-url helper layer
+- `src/lib/storage/listing-images.ts`: image path + validation + DB mapping utilities
+- `src/hooks/use-listing-image-upload-state.ts`: local preview/cover/order/cleanup state helper
 - `src/types/database.ts`: generated Supabase database types (from local schema)
 - `src/app/api/internal/supabase/route.ts`: internal connectivity probe
 - `supabase/migrations/`: SQL-first schema migrations
@@ -51,5 +54,7 @@ Vercel usage:
 - PT05 enables RLS on all user-facing public tables.
 - Access control is enforced in DB policies for anon/authenticated/admin flows.
 - Policy details and storage policy direction are documented in `docs/rls-policies.md`.
+- PT06 implements storage bucket + `storage.objects` policies for listing images.
+- Storage behavior is documented in `docs/storage-images-foundation.md`.
 
 Schema details and migration workflow remain documented in `docs/database-schema-v1.md`.

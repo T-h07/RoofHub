@@ -70,5 +70,5 @@ npx supabase gen types typescript --local > src/types/database.ts
 ## Notes for PT05+
 
 - PT05 RLS policies are now defined in `docs/rls-policies.md` and applied via migration.
-- PT06 can layer Supabase Storage usage on `listing_images.storage_path`.
+- PT06 storage foundation is defined in `docs/storage-images-foundation.md` and uses `listing_images.storage_path` as canonical object reference.
 - PT07+ auth flows can rely on the `profiles` linkage to `auth.users`.

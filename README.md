@@ -4,13 +4,15 @@ Map-first real estate marketplace for rental and sale listings.
 
 ## Current Stage
 
-`NM-PT05 Row Level Security and Access Policies` is established:
+`NM-PT06 Storage and Image Upload Foundation` is established:
 
 - Next.js App Router + TypeScript scaffold
 - Supabase App Router SSR integration (`@supabase/supabase-js`, `@supabase/ssr`)
 - SQL migration setup under `supabase/migrations/`
 - MVP relational schema (profiles, listings, listing_images, favorites, conversations, messages, listing_reports)
 - RLS enabled on all user-facing tables with owner/participant/admin policy boundaries
+- private `listing-images` bucket strategy with storage object path and policy rules
+- upload/validation/preview/cover/order/cleanup helper foundation for listing images
 - generated TypeScript database types in `src/types/database.ts` (schema + policy helper functions)
 - existing PT02 shell and PT03 integration structure preserved
 
@@ -82,6 +84,16 @@ npx supabase db reset --local
 npx supabase db lint --local
 npx supabase gen types typescript --local > src/types/database.ts
 ```
+
+## Storage Foundation (PT06)
+
+Storage foundation details are documented in:
+
+- `docs/storage-images-foundation.md`
+
+The storage model uses a private Supabase bucket (`listing-images`) and ownership-aware object paths:
+
+- `owner/{owner_id}/listing/{listing_id}/{filename}`
 
 ## Local Development
 
