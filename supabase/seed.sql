@@ -1,0 +1,2 @@
+-- NM-PT04 seed placeholder.
+-- Keep this file intentionally minimal until deterministic local seed data is needed.
