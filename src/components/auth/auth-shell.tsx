@@ -1,0 +1,64 @@
+import type { ReactNode } from "react";
+import { ShieldCheck, Sparkles } from "lucide-react";
+
+import { MainContainer } from "@/components/layout/main-container";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+
+type AuthShellProps = {
+  badge: string;
+  title: string;
+  description: string;
+  children: ReactNode;
+  footer?: ReactNode;
+};
+
+const trustNotes = [
+  "Session-aware navigation and route protection for signed-in areas.",
+  "Cookie-based Supabase SSR auth aligned with Vercel deployment flows.",
+  "Stable foundation for provider dashboard, favorites, and messages PTs.",
+];
+
+export function AuthShell({ badge, title, description, children, footer }: AuthShellProps) {
+  return (
+    <MainContainer size="content" className="space-y-8">
+      <div className="grid gap-6 lg:grid-cols-[1.08fr_1fr]">
+        <section className="border-border/80 bg-card/62 relative overflow-hidden rounded-2xl border p-6 shadow-[0_20px_46px_-34px_rgba(4,10,26,0.98)] sm:p-7">
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_4%,rgba(110,151,255,0.22),transparent_42%)]" />
+          <div className="relative space-y-5">
+            <Badge variant="primary">{badge}</Badge>
+            <div className="space-y-2.5">
+              <h1 className="type-page-title max-w-xl">{title}</h1>
+              <p className="type-body-muted max-w-lg">{description}</p>
+            </div>
+            <div className="space-y-2.5">
+              {trustNotes.map((note) => (
+                <div
+                  key={note}
+                  className="border-border/70 bg-background/46 text-muted-foreground flex items-start gap-2.5 rounded-lg border px-3.5 py-2.5 text-sm"
+                >
+                  <ShieldCheck className="text-primary mt-0.5 size-4 shrink-0" />
+                  <span>{note}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <Card className="bg-card/78 h-full">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <span className="bg-primary/18 text-primary inline-flex size-7 items-center justify-center rounded-md">
+                <Sparkles className="size-4" />
+              </span>
+              Account access
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6 pb-6">{children}</CardContent>
+        </Card>
+      </div>
+
+      {footer ? <div className="type-caption text-center">{footer}</div> : null}
+    </MainContainer>
+  );
+}

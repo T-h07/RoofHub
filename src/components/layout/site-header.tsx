@@ -3,8 +3,10 @@
 import Link from "next/link";
 import { Compass, MapPinned, Sparkles } from "lucide-react";
 
+import { SignOutButton } from "@/components/auth/sign-out-button";
 import { buttonVariants } from "@/components/ui/button";
 import { useActiveRoute } from "@/hooks/use-active-route";
+import { signOutAction } from "@/lib/auth/actions";
 import { siteConfig } from "@/lib/config/site";
 import { cn } from "@/lib/utils";
 
@@ -28,8 +30,17 @@ function HeaderLink({ href, label, active }: { href: string; label: string; acti
   );
 }
 
-export function SiteHeader() {
+type SiteHeaderProps = {
+  authState: {
+    isAuthenticated: boolean;
+    email: string | null;
+  };
+};
+
+export function SiteHeader({ authState }: SiteHeaderProps) {
   const { isActive } = useActiveRoute();
+  const isAuthenticated = authState.isAuthenticated;
+  const userEmail = authState.email;
 
   return (
     <header className="border-border/70 bg-background/90 sticky top-0 z-40 border-b backdrop-blur-md">
@@ -63,17 +74,43 @@ export function SiteHeader() {
               <Compass className="size-3.5" aria-hidden="true" />
               Vercel + Supabase ready
             </span>
-            <Link
-              href={siteConfig.ctaHref}
-              className={cn(buttonVariants({ size: "sm" }), "gap-1.5")}
-            >
-              {siteConfig.ctaLabel}
-              <Sparkles className="size-4" aria-hidden="true" />
-            </Link>
+            {isAuthenticated ? (
+              <>
+                <span className="border-border/70 bg-background/70 text-muted-foreground max-w-[180px] truncate rounded-md border px-2.5 py-1.5 text-xs">
+                  {userEmail ?? "Signed in"}
+                </span>
+                <Link
+                  href={siteConfig.ctaHref}
+                  className={cn(buttonVariants({ size: "sm" }), "gap-1.5")}
+                >
+                  {siteConfig.ctaLabel}
+                  <Sparkles className="size-4" aria-hidden="true" />
+                </Link>
+                <form action={signOutAction}>
+                  <SignOutButton compact />
+                </form>
+              </>
+            ) : (
+              <>
+                <Link
+                  href="/auth/sign-in"
+                  className={buttonVariants({ variant: "outline", size: "sm" })}
+                >
+                  Sign in
+                </Link>
+                <Link
+                  href="/auth/sign-up"
+                  className={cn(buttonVariants({ size: "sm" }), "gap-1.5")}
+                >
+                  Create account
+                  <Sparkles className="size-4" aria-hidden="true" />
+                </Link>
+              </>
+            )}
           </div>
 
           <div className="lg:hidden">
-            <MobileNavSheet />
+            <MobileNavSheet authState={authState} />
           </div>
         </div>
       </MainContainer>

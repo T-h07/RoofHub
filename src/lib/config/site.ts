@@ -34,9 +34,9 @@ export const footerLinkGroups: FooterLinkGroup[] = [
 
 export const siteConfig = {
   name: "NestMap",
-  title: "NestMap | Design System and Global Shell",
+  title: "NestMap | Auth and Marketplace Foundation",
   description:
-    "Map-first real estate platform scaffold with a reusable dark design system and global shell tuned for Vercel and future Supabase integration.",
+    "Map-first real estate platform scaffold with a reusable dark shell, Supabase-first foundation, and SSR-safe authentication flows.",
   repositoryUrl: "https://github.com/T-h07/nestmap",
   ctaLabel: "List a property",
   ctaHref: "/dashboard",

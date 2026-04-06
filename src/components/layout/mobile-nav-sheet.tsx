@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Compass, LayoutGrid, Menu, Sparkles } from "lucide-react";
 
+import { SignOutButton } from "@/components/auth/sign-out-button";
 import { buttonVariants } from "@/components/ui/button";
 import {
   Sheet,
@@ -13,6 +14,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { useActiveRoute } from "@/hooks/use-active-route";
+import { signOutAction } from "@/lib/auth/actions";
 import { siteConfig } from "@/lib/config/site";
 import { cn } from "@/lib/utils";
 
@@ -53,8 +55,16 @@ function MobileNavLink({
   );
 }
 
-export function MobileNavSheet() {
+type MobileNavSheetProps = {
+  authState: {
+    isAuthenticated: boolean;
+    email: string | null;
+  };
+};
+
+export function MobileNavSheet({ authState }: MobileNavSheetProps) {
   const { isActive } = useActiveRoute();
+  const isAuthenticated = authState.isAuthenticated;
 
   return (
     <Sheet>
@@ -108,15 +118,41 @@ export function MobileNavSheet() {
           <div className="border-border/70 bg-muted/25 rounded-lg border p-3">
             <div className="text-foreground mb-3 flex items-center gap-2 text-sm font-medium">
               <LayoutGrid className="text-primary size-4" />
-              Provider workflow placeholder
+              {isAuthenticated ? "Provider workflow placeholder" : "Account access"}
             </div>
-            <Link
-              href={siteConfig.ctaHref}
-              className={cn(buttonVariants({ size: "sm" }), "w-full justify-center")}
-            >
-              {siteConfig.ctaLabel}
-              <Sparkles className="size-4" aria-hidden="true" />
-            </Link>
+            {isAuthenticated ? (
+              <div className="space-y-2">
+                <Link
+                  href={siteConfig.ctaHref}
+                  className={cn(buttonVariants({ size: "sm" }), "w-full justify-center")}
+                >
+                  {siteConfig.ctaLabel}
+                  <Sparkles className="size-4" aria-hidden="true" />
+                </Link>
+                <form action={signOutAction} className="w-full">
+                  <SignOutButton className="w-full" />
+                </form>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Link
+                  href="/auth/sign-in"
+                  className={cn(
+                    buttonVariants({ variant: "outline", size: "sm" }),
+                    "w-full justify-center"
+                  )}
+                >
+                  Sign in
+                </Link>
+                <Link
+                  href="/auth/sign-up"
+                  className={cn(buttonVariants({ size: "sm" }), "w-full justify-center")}
+                >
+                  Create account
+                  <Sparkles className="size-4" aria-hidden="true" />
+                </Link>
+              </div>
+            )}
           </div>
         </div>
       </SheetContent>
