@@ -4,13 +4,14 @@ Map-first real estate marketplace for rental and sale listings.
 
 ## Current Stage
 
-`NM-PT04 Database Schema v1` is established:
+`NM-PT05 Row Level Security and Access Policies` is established:
 
 - Next.js App Router + TypeScript scaffold
 - Supabase App Router SSR integration (`@supabase/supabase-js`, `@supabase/ssr`)
 - SQL migration setup under `supabase/migrations/`
 - MVP relational schema (profiles, listings, listing_images, favorites, conversations, messages, listing_reports)
-- generated TypeScript database types in `src/types/database.ts`
+- RLS enabled on all user-facing tables with owner/participant/admin policy boundaries
+- generated TypeScript database types in `src/types/database.ts` (schema + policy helper functions)
 - existing PT02 shell and PT03 integration structure preserved
 
 This stage intentionally excludes business features (auth, listings, map provider logic, messaging, dashboards, moderation).
@@ -66,6 +67,21 @@ npx supabase gen types typescript --local > src/types/database.ts
 ```
 
 See `docs/database-schema-v1.md` for table-level scope and schema decisions.
+
+## RLS Security Layer (PT05)
+
+RLS and access policies are implemented in SQL migrations and documented in:
+
+- `docs/rls-policies.md`
+
+Quick local validation flow:
+
+```bash
+npx supabase start
+npx supabase db reset --local
+npx supabase db lint --local
+npx supabase gen types typescript --local > src/types/database.ts
+```
 
 ## Local Development
 

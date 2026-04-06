@@ -46,4 +46,10 @@ Vercel usage:
 - reserve service-role/privileged keys for explicit server-only workflows in future PTs
 - fail early on missing required environment variables
 
-Schema details and migration workflow are documented in `docs/database-schema-v1.md`.
+## RLS and authorization
+
+- PT05 enables RLS on all user-facing public tables.
+- Access control is enforced in DB policies for anon/authenticated/admin flows.
+- Policy details and storage policy direction are documented in `docs/rls-policies.md`.
+
+Schema details and migration workflow remain documented in `docs/database-schema-v1.md`.
