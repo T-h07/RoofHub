@@ -14,8 +14,8 @@ export function SiteFooter() {
           <div className="space-y-2">
             <p className="text-base font-semibold tracking-tight">{siteConfig.name}</p>
             <p className="type-body-muted max-w-sm">
-              Map-first real estate platform shell built for staged delivery on Vercel with
-              Supabase-backed workflows.
+              Map-first marketplace for rentals and homes for sale, designed for clean discovery and
+              provider publishing workflows.
             </p>
           </div>
 
