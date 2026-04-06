@@ -4,7 +4,7 @@ Map-first real estate marketplace for rental and sale listings.
 
 ## Current Stage
 
-`NM-PT08 Profile and Role Bootstrapping` is established:
+`NM-PT09 Public Home Page` is established:
 
 - Next.js App Router + TypeScript scaffold
 - Supabase App Router SSR integration (`@supabase/supabase-js`, `@supabase/ssr`)
@@ -20,6 +20,7 @@ Map-first real estate marketplace for rental and sale listings.
 - editable profile page for public-facing fields (`/profile`)
 - role-aware desktop/mobile navigation visibility
 - route protection for `/dashboard`, `/favorites`, `/messages`, and `/profile`
+- public homepage foundation with hero, search CTA, intent entry points, featured listing placeholders, and provider CTA
 - generated TypeScript database types in `src/types/database.ts` (schema + policy helper functions)
 - existing PT02 shell and PT03 integration structure preserved
 
@@ -133,6 +134,12 @@ Profile and role documentation:
 Implemented profile route:
 
 - `/profile`
+
+## Public Home Page Foundation (PT09)
+
+Homepage foundation documentation:
+
+- `docs/home-page-foundation.md`
 
 ## Local Development
 
