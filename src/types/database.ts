@@ -420,6 +420,15 @@ export type Database = {
     }
     Functions: {
       is_admin: { Args: never; Returns: boolean }
+      is_valid_listing_image_path: {
+        Args: { object_name: string }
+        Returns: boolean
+      }
+      listing_image_listing_id: {
+        Args: { object_name: string }
+        Returns: string
+      }
+      listing_image_owner_id: { Args: { object_name: string }; Returns: string }
     }
     Enums: {
       app_role: "seeker" | "provider" | "admin"
