@@ -4,7 +4,7 @@ Map-first real estate marketplace for rental and sale listings.
 
 ## Current Stage
 
-`NM-PT06 Storage and Image Upload Foundation` is established:
+`NM-PT07 Auth Flows and Session UX` is established:
 
 - Next.js App Router + TypeScript scaffold
 - Supabase App Router SSR integration (`@supabase/supabase-js`, `@supabase/ssr`)
@@ -13,10 +13,13 @@ Map-first real estate marketplace for rental and sale listings.
 - RLS enabled on all user-facing tables with owner/participant/admin policy boundaries
 - private `listing-images` bucket strategy with storage object path and policy rules
 - upload/validation/preview/cover/order/cleanup helper foundation for listing images
+- auth routes and flows: sign up, sign in, sign out, forgot password, reset password
+- callback-based auth redirect handling for SSR-safe session creation
+- route protection for `/dashboard`, `/favorites`, and `/messages`
 - generated TypeScript database types in `src/types/database.ts` (schema + policy helper functions)
 - existing PT02 shell and PT03 integration structure preserved
 
-This stage intentionally excludes business features (auth, listings, map provider logic, messaging, dashboards, moderation).
+This stage intentionally excludes business features beyond foundational auth/session plumbing (full role workflows, listings CRUD, map logic, moderation, and messaging product behavior).
 
 ## Stack
 
@@ -41,6 +44,7 @@ Create `.env.local` in the project root:
 NEXT_PUBLIC_SUPABASE_URL=your-project-url
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
 NEXT_PUBLIC_MAP_STYLE_URL=your-map-style-url
+NEXT_PUBLIC_SITE_URL=your-base-url
 ```
 
 Rules:
@@ -49,6 +53,7 @@ Rules:
 - do not hardcode keys in source
 - do not expose privileged keys (for example service role) to browser code
 - configure the same variables in Vercel for Development, Preview, and Production environments
+- `NEXT_PUBLIC_SITE_URL` is optional as a fallback; request-origin headers are used first for auth redirects
 
 Connectivity check:
 
@@ -94,6 +99,26 @@ Storage foundation details are documented in:
 The storage model uses a private Supabase bucket (`listing-images`) and ownership-aware object paths:
 
 - `owner/{owner_id}/listing/{listing_id}/{filename}`
+
+## Auth Foundation (PT07)
+
+Auth flow documentation:
+
+- `docs/auth-flows.md`
+
+Implemented routes:
+
+- `/auth/sign-in`
+- `/auth/sign-up`
+- `/auth/forgot-password`
+- `/auth/reset-password`
+- `/auth/callback`
+
+Protected routes:
+
+- `/dashboard`
+- `/favorites`
+- `/messages`
 
 ## Local Development
 

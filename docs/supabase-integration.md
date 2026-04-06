@@ -56,5 +56,7 @@ Vercel usage:
 - Policy details and storage policy direction are documented in `docs/rls-policies.md`.
 - PT06 implements storage bucket + `storage.objects` policies for listing images.
 - Storage behavior is documented in `docs/storage-images-foundation.md`.
+- PT07 adds SSR-safe auth flows and callback handling for sign-up/sign-in/password reset.
+- Auth flow details are documented in `docs/auth-flows.md`.
 
 Schema details and migration workflow remain documented in `docs/database-schema-v1.md`.
