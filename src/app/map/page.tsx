@@ -3,9 +3,9 @@ import { PlaceholderScreen } from "@/components/layout/placeholder-screen";
 export default function MapPage() {
   return (
     <PlaceholderScreen
-      eyebrow="Route Foundation"
-      title="Map workspace is prepared but intentionally empty."
-      description="NM-PT01 defines the route and shell only. Interactive map rendering, markers, clustering, and geospatial behavior will be introduced in later PTs."
+      eyebrow="Map scaffold"
+      title="Map workspace composition is prepared for geospatial PTs."
+      description="Global shell, spacing rhythm, and feedback components are already in place. Later map logic can focus on interaction and data, not shell rewrites."
       upcoming={[
         "Map provider integration with environment-driven configuration",
         "Marker and cluster rendering pipeline",
