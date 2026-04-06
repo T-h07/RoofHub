@@ -24,6 +24,7 @@ Protected route prefixes are defined in `src/lib/auth/routing.ts` and enforced i
 - `/dashboard`
 - `/favorites`
 - `/messages`
+- `/profile`
 
 Behavior:
 

@@ -4,7 +4,7 @@ Map-first real estate marketplace for rental and sale listings.
 
 ## Current Stage
 
-`NM-PT07 Auth Flows and Session UX` is established:
+`NM-PT08 Profile and Role Bootstrapping` is established:
 
 - Next.js App Router + TypeScript scaffold
 - Supabase App Router SSR integration (`@supabase/supabase-js`, `@supabase/ssr`)
@@ -15,7 +15,11 @@ Map-first real estate marketplace for rental and sale listings.
 - upload/validation/preview/cover/order/cleanup helper foundation for listing images
 - auth routes and flows: sign up, sign in, sign out, forgot password, reset password
 - callback-based auth redirect handling for SSR-safe session creation
-- route protection for `/dashboard`, `/favorites`, and `/messages`
+- profile bootstrap on authenticated access with trusted `profiles` linkage
+- role model foundation: `seeker`, `provider`, `admin`
+- editable profile page for public-facing fields (`/profile`)
+- role-aware desktop/mobile navigation visibility
+- route protection for `/dashboard`, `/favorites`, `/messages`, and `/profile`
 - generated TypeScript database types in `src/types/database.ts` (schema + policy helper functions)
 - existing PT02 shell and PT03 integration structure preserved
 
@@ -119,6 +123,16 @@ Protected routes:
 - `/dashboard`
 - `/favorites`
 - `/messages`
+
+## Profile and Role Foundation (PT08)
+
+Profile and role documentation:
+
+- `docs/profile-role-foundation.md`
+
+Implemented profile route:
+
+- `/profile`
 
 ## Local Development
 

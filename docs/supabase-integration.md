@@ -58,5 +58,7 @@ Vercel usage:
 - Storage behavior is documented in `docs/storage-images-foundation.md`.
 - PT07 adds SSR-safe auth flows and callback handling for sign-up/sign-in/password reset.
 - Auth flow details are documented in `docs/auth-flows.md`.
+- PT08 adds profile bootstrap + role model wiring aligned with `profiles` and RLS policy hardening.
+- Profile/role details are documented in `docs/profile-role-foundation.md`.
 
 Schema details and migration workflow remain documented in `docs/database-schema-v1.md`.
