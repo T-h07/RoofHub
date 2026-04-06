@@ -7,7 +7,9 @@ import { SignOutButton } from "@/components/auth/sign-out-button";
 import { buttonVariants } from "@/components/ui/button";
 import { useActiveRoute } from "@/hooks/use-active-route";
 import { signOutAction } from "@/lib/auth/actions";
+import { getRoleLabel, type AppRole } from "@/lib/auth/roles";
 import { siteConfig } from "@/lib/config/site";
+import { getCtaForViewer, getPrimaryNavForViewer } from "@/lib/navigation/role-navigation";
 import { cn } from "@/lib/utils";
 
 import { MainContainer } from "./main-container";
@@ -34,13 +36,24 @@ type SiteHeaderProps = {
   authState: {
     isAuthenticated: boolean;
     email: string | null;
+    displayName: string | null;
+    role: AppRole | null;
+    profileError: string | null;
   };
 };
 
 export function SiteHeader({ authState }: SiteHeaderProps) {
   const { isActive } = useActiveRoute();
   const isAuthenticated = authState.isAuthenticated;
-  const userEmail = authState.email;
+  const primaryNav = getPrimaryNavForViewer({
+    isAuthenticated,
+    role: authState.role,
+  });
+  const cta = getCtaForViewer({
+    isAuthenticated,
+    role: authState.role,
+  });
+  const accountLabel = authState.displayName || authState.email || "Signed in";
 
   return (
     <header className="border-border/70 bg-background/90 sticky top-0 z-40 border-b backdrop-blur-md">
@@ -59,7 +72,7 @@ export function SiteHeader({ authState }: SiteHeaderProps) {
           </Link>
 
           <nav className="hidden items-center gap-1 lg:flex" aria-label="Primary navigation">
-            {siteConfig.primaryNav.map((item) => (
+            {primaryNav.map((item) => (
               <HeaderLink
                 key={item.href}
                 href={item.href}
@@ -72,18 +85,22 @@ export function SiteHeader({ authState }: SiteHeaderProps) {
           <div className="hidden items-center gap-2 lg:flex">
             <span className="text-muted-foreground border-border/70 bg-muted/30 inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs">
               <Compass className="size-3.5" aria-hidden="true" />
-              Vercel + Supabase ready
+              {isAuthenticated && authState.role
+                ? `${getRoleLabel(authState.role)} account`
+                : "Vercel + Supabase ready"}
             </span>
+            {isAuthenticated && authState.profileError ? (
+              <span className="border-destructive/40 bg-destructive/10 text-destructive rounded-md border px-2.5 py-1.5 text-xs">
+                Profile setup issue
+              </span>
+            ) : null}
             {isAuthenticated ? (
               <>
                 <span className="border-border/70 bg-background/70 text-muted-foreground max-w-[180px] truncate rounded-md border px-2.5 py-1.5 text-xs">
-                  {userEmail ?? "Signed in"}
+                  {accountLabel}
                 </span>
-                <Link
-                  href={siteConfig.ctaHref}
-                  className={cn(buttonVariants({ size: "sm" }), "gap-1.5")}
-                >
-                  {siteConfig.ctaLabel}
+                <Link href={cta.href} className={cn(buttonVariants({ size: "sm" }), "gap-1.5")}>
+                  {cta.label}
                   <Sparkles className="size-4" aria-hidden="true" />
                 </Link>
                 <form action={signOutAction}>
@@ -102,7 +119,7 @@ export function SiteHeader({ authState }: SiteHeaderProps) {
                   href="/auth/sign-up"
                   className={cn(buttonVariants({ size: "sm" }), "gap-1.5")}
                 >
-                  Create account
+                  {cta.label}
                   <Sparkles className="size-4" aria-hidden="true" />
                 </Link>
               </>

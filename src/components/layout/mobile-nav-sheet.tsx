@@ -15,7 +15,9 @@ import {
 } from "@/components/ui/sheet";
 import { useActiveRoute } from "@/hooks/use-active-route";
 import { signOutAction } from "@/lib/auth/actions";
+import { getRoleLabel, type AppRole } from "@/lib/auth/roles";
 import { siteConfig } from "@/lib/config/site";
+import { getCtaForViewer, getPrimaryNavForViewer } from "@/lib/navigation/role-navigation";
 import { cn } from "@/lib/utils";
 
 function MobileNavLink({
@@ -59,12 +61,23 @@ type MobileNavSheetProps = {
   authState: {
     isAuthenticated: boolean;
     email: string | null;
+    displayName: string | null;
+    role: AppRole | null;
+    profileError: string | null;
   };
 };
 
 export function MobileNavSheet({ authState }: MobileNavSheetProps) {
   const { isActive } = useActiveRoute();
   const isAuthenticated = authState.isAuthenticated;
+  const primaryNav = getPrimaryNavForViewer({
+    isAuthenticated,
+    role: authState.role,
+  });
+  const cta = getCtaForViewer({
+    isAuthenticated,
+    role: authState.role,
+  });
 
   return (
     <Sheet>
@@ -81,7 +94,9 @@ export function MobileNavSheet({ authState }: MobileNavSheetProps) {
             {siteConfig.name}
           </SheetTitle>
           <SheetDescription className="text-muted-foreground text-sm">
-            Route shell for preview and production workflows on Vercel.
+            {isAuthenticated && authState.role
+              ? `${getRoleLabel(authState.role)} workspace`
+              : "Route shell for preview and production workflows on Vercel."}
           </SheetDescription>
         </SheetHeader>
 
@@ -89,7 +104,7 @@ export function MobileNavSheet({ authState }: MobileNavSheetProps) {
           <div className="space-y-2">
             <p className="type-label">Primary navigation</p>
             <nav className="space-y-2" aria-label="Mobile primary navigation">
-              {siteConfig.primaryNav.map((item) => (
+              {primaryNav.map((item) => (
                 <MobileNavLink
                   key={item.href}
                   href={item.href}
@@ -100,33 +115,25 @@ export function MobileNavSheet({ authState }: MobileNavSheetProps) {
             </nav>
           </div>
 
-          <div className="space-y-2">
-            <p className="type-label">Planned routes</p>
-            <div className="space-y-2">
-              {siteConfig.futureNav.map((item) => (
-                <MobileNavLink
-                  key={item.href}
-                  href={item.href}
-                  label={item.title}
-                  active={false}
-                  disabled
-                />
-              ))}
-            </div>
-          </div>
-
           <div className="border-border/70 bg-muted/25 rounded-lg border p-3">
             <div className="text-foreground mb-3 flex items-center gap-2 text-sm font-medium">
               <LayoutGrid className="text-primary size-4" />
-              {isAuthenticated ? "Provider workflow placeholder" : "Account access"}
+              {isAuthenticated
+                ? authState.profileError
+                  ? "Profile setup issue"
+                  : "Account access"
+                : "Account access"}
             </div>
             {isAuthenticated ? (
               <div className="space-y-2">
+                {authState.profileError ? (
+                  <p className="text-destructive text-xs leading-5">{authState.profileError}</p>
+                ) : null}
                 <Link
-                  href={siteConfig.ctaHref}
+                  href={cta.href}
                   className={cn(buttonVariants({ size: "sm" }), "w-full justify-center")}
                 >
-                  {siteConfig.ctaLabel}
+                  {cta.label}
                   <Sparkles className="size-4" aria-hidden="true" />
                 </Link>
                 <form action={signOutAction} className="w-full">
