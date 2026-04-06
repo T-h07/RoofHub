@@ -2,31 +2,53 @@
 
 Map-first real estate marketplace for rental and sale listings.
 
-## Repository Status
+## Current Stage
 
-This repository is currently in pre-feature setup mode.  
-Current focus: repository governance, Git workflow, and contribution rules.
+`NM-PT01 App Foundation` is established:
 
-## Branch Model
+- Next.js App Router + TypeScript scaffold
+- Tailwind CSS + shadcn/ui baseline setup
+- foundational app shell (`header`, `container`, `footer`)
+- starter route structure for `/`, `/explore`, `/map`, and `/dashboard`
+- shared utilities and config for future PT work
 
-- `main`: stable, release-ready only.
-- `dev`: integration branch for upcoming work.
-- `feature/*`: feature development branches.
-- `fix/*`: bugfix branches.
-- `chore/*`: repository/setup/maintenance branches.
-- `docs/*`: documentation-only branches.
+This stage intentionally excludes business features (auth, listings, map provider logic, messaging, dashboards, moderation).
 
-## Contribution Workflow (Current)
+## Stack
 
-1. Branch from `dev`.
-2. Use the naming convention: `feature|fix|chore|docs/nm-ptXX-short-slug`.
-3. Commit only complete, atomic units.
-4. Push only your working branch (not `main`).
-5. Merges into `dev`/`main` are handled manually by the repository owner.
+- Next.js
+- TypeScript
+- Tailwind CSS
+- shadcn/ui
+- ESLint
+- Prettier
+- clsx + tailwind-merge
+- lucide-react
 
-`main` is conceptually protected as stable-only.
+## Local Development
 
-## Documentation
+```bash
+npm install
+npm run dev
+```
 
-- Repository workflow: `docs/repository-workflow.md`
-- Commit conventions: `docs/commit-conventions.md`
+Open [http://localhost:3000](http://localhost:3000).
+
+Useful scripts:
+
+- `npm run lint`
+- `npm run typecheck`
+- `npm run build`
+- `npm run format`
+
+## Branch Workflow
+
+- Branch from `dev`.
+- Use naming: `feature|fix|chore|docs/nm-ptXX-short-slug`.
+- Do not commit directly to `main`.
+- Merges into `dev` and `main` are manual by the repository owner.
+
+See:
+
+- `docs/repository-workflow.md`
+- `docs/commit-conventions.md`
