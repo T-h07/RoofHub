@@ -4,13 +4,14 @@ Map-first real estate marketplace for rental and sale listings.
 
 ## Current Stage
 
-`NM-PT01 App Foundation` is established:
+`NM-PT02 Design System and Global UI Shell` is established:
 
 - Next.js App Router + TypeScript scaffold
-- Tailwind CSS + shadcn/ui baseline setup
-- foundational app shell (`header`, `container`, `footer`)
-- starter route structure for `/`, `/explore`, `/map`, and `/dashboard`
-- shared utilities and config for future PT work
+- Tailwind CSS + shadcn/ui baseline setup with reusable primitives
+- locked dark theme with semantic tokens and typography hierarchy
+- refined global shell (`header`, responsive nav, `footer`, container system)
+- global feedback foundations (dialog, sheet/drawer, toast, empty state, field pattern)
+- starter route structure for `/`, `/explore`, `/map`, and `/dashboard` using shared shell components
 
 This stage intentionally excludes business features (auth, listings, map provider logic, messaging, dashboards, moderation).
 
@@ -24,6 +25,10 @@ This stage intentionally excludes business features (auth, listings, map provide
 - Prettier
 - clsx + tailwind-merge
 - lucide-react
+
+Theme direction:
+
+- default dark mode is intentionally locked for NestMap’s product shell at this stage.
 
 ## Local Development
 
