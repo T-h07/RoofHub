@@ -11,9 +11,9 @@ import MapLibre, {
   ScaleControl,
   type MapRef,
 } from "react-map-gl/maplibre";
-import maplibregl from "maplibre-gl";
 
 import { buttonVariants } from "@/components/ui/button";
+import { DEFAULT_PUBLIC_MAP_STYLE_URL } from "@/lib/config/map";
 import type { PublicMapListing } from "@/lib/listings/public-map";
 import { cn } from "@/lib/utils";
 
@@ -123,6 +123,8 @@ export function PublicListingsMap({ mapStyleUrl, listings }: PublicListingsMapPr
   const mapRef = useRef<MapRef | null>(null);
   const initialViewState = useMemo(() => getInitialViewState(listings), [listings]);
   const [selectedListingId, setSelectedListingId] = useState<string | null>(listings[0]?.id ?? null);
+  const [activeStyleUrl, setActiveStyleUrl] = useState(mapStyleUrl);
+  const [didFallbackStyle, setDidFallbackStyle] = useState(false);
   const [isMapReady, setIsMapReady] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
   const [mapRenderKey, setMapRenderKey] = useState(0);
@@ -134,6 +136,14 @@ export function PublicListingsMap({ mapStyleUrl, listings }: PublicListingsMapPr
 
     return listings.find((listing) => listing.id === selectedListingId) ?? null;
   }, [listings, selectedListingId]);
+
+  useEffect(() => {
+    setActiveStyleUrl(mapStyleUrl);
+    setDidFallbackStyle(false);
+    setIsMapReady(false);
+    setMapError(null);
+    setMapRenderKey((value) => value + 1);
+  }, [mapStyleUrl]);
 
   useEffect(() => {
     if (!isMapReady || !mapRef.current || listings.length === 0) {
@@ -150,13 +160,19 @@ export function PublicListingsMap({ mapStyleUrl, listings }: PublicListingsMapPr
       return;
     }
 
-    const bounds = new maplibregl.LngLatBounds();
+    const longitudes = listings.map((listing) => listing.longitude);
+    const latitudes = listings.map((listing) => listing.latitude);
+    const minLongitude = Math.min(...longitudes);
+    const maxLongitude = Math.max(...longitudes);
+    const minLatitude = Math.min(...latitudes);
+    const maxLatitude = Math.max(...latitudes);
 
-    for (const listing of listings) {
-      bounds.extend([listing.longitude, listing.latitude]);
-    }
-
-    mapRef.current.fitBounds(bounds, {
+    mapRef.current.fitBounds(
+      [
+        [minLongitude, minLatitude],
+        [maxLongitude, maxLatitude],
+      ],
+      {
       duration: 0,
       maxZoom: 12.5,
       padding: {
@@ -165,7 +181,8 @@ export function PublicListingsMap({ mapStyleUrl, listings }: PublicListingsMapPr
         bottom: 72,
         left: 56,
       },
-    });
+    }
+    );
   }, [isMapReady, listings, mapRenderKey]);
 
   useEffect(() => {
@@ -192,8 +209,8 @@ export function PublicListingsMap({ mapStyleUrl, listings }: PublicListingsMapPr
       <MapLibre
         key={`public-map-${mapRenderKey}`}
         ref={mapRef}
-        mapLib={maplibregl}
-        mapStyle={mapStyleUrl}
+        mapLib={import("maplibre-gl")}
+        mapStyle={activeStyleUrl}
         initialViewState={initialViewState}
         style={{ width: "100%", height: "100%" }}
         dragRotate={false}
@@ -203,12 +220,34 @@ export function PublicListingsMap({ mapStyleUrl, listings }: PublicListingsMapPr
           setIsMapReady(true);
           setMapError(null);
         }}
+        onStyleData={() => {
+          if (mapRef.current?.isStyleLoaded()) {
+            setIsMapReady(true);
+            setMapError(null);
+          }
+        }}
         onIdle={() => {
           setIsMapReady(true);
           setMapError(null);
         }}
-        onError={() => {
-          setMapError("The map surface failed to load.");
+        onError={(event) => {
+          const eventErrorMessage =
+            event?.error && typeof event.error === "object" && "message" in event.error
+              ? String(event.error.message)
+              : "The map surface failed to load.";
+
+          console.error("[Map] runtime error", event?.error ?? event);
+
+          if (!didFallbackStyle && activeStyleUrl !== DEFAULT_PUBLIC_MAP_STYLE_URL) {
+            setDidFallbackStyle(true);
+            setActiveStyleUrl(DEFAULT_PUBLIC_MAP_STYLE_URL);
+            setMapError(null);
+            setIsMapReady(false);
+            setMapRenderKey((value) => value + 1);
+            return;
+          }
+
+          setMapError(eventErrorMessage);
           setIsMapReady(false);
         }}
       >
