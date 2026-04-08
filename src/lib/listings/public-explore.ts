@@ -74,6 +74,13 @@ const PUBLIC_EXPLORE_LISTINGS_SELECT = `
   )
 `;
 
+function sanitizeKeywordForOrQuery(keyword: string) {
+  return keyword
+    .replace(/[,%()]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function getCoverImagePath(
   images: PublicExploreListingRow["listing_images"]
 ): string | null {
@@ -142,8 +149,69 @@ export async function loadPublicExploreListings(state: ExploreSearchState): Prom
       query = query.eq("property_type", state.propertyType);
     }
 
+    if (state.keyword) {
+      const keyword = sanitizeKeywordForOrQuery(state.keyword);
+
+      if (keyword.length > 0) {
+        query = query.or(
+          [
+            `title.ilike.%${keyword}%`,
+            `description.ilike.%${keyword}%`,
+            `city.ilike.%${keyword}%`,
+            `neighborhood.ilike.%${keyword}%`,
+            `property_type.ilike.%${keyword}%`,
+          ].join(",")
+        );
+      }
+    }
+
     if (state.city) {
       query = query.ilike("city", `%${state.city}%`);
+    }
+
+    if (state.neighborhood) {
+      query = query.ilike("neighborhood", `%${state.neighborhood}%`);
+    }
+
+    if (state.priceMin !== null) {
+      query = query.gte("price_amount", state.priceMin);
+    }
+
+    if (state.priceMax !== null) {
+      query = query.lte("price_amount", state.priceMax);
+    }
+
+    if (state.areaMin !== null) {
+      query = query.gte("area_m2", state.areaMin);
+    }
+
+    if (state.areaMax !== null) {
+      query = query.lte("area_m2", state.areaMax);
+    }
+
+    if (state.bedsMin !== null) {
+      query = query.gte("bedrooms", state.bedsMin);
+    }
+
+    if (state.bathsMin !== null) {
+      query = query.gte("bathrooms", state.bathsMin);
+    }
+
+    if (state.furnished) {
+      query = query.eq("furnished", true);
+    }
+
+    if (state.parking) {
+      query = query.eq("parking", true);
+    }
+
+    if (state.pets) {
+      query = query.eq("pets_allowed", true);
+    }
+
+    if (state.availableNow) {
+      const todayIso = new Date().toISOString().slice(0, 10);
+      query = query.lte("available_from", todayIso);
     }
 
     if (state.sort === "price_asc") {
