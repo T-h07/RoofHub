@@ -4,7 +4,7 @@ Map-first real estate marketplace for rental and sale listings.
 
 ## Current Stage
 
-`NM-PT10 Explore/List View Foundation` is established:
+`NM-PT11 Search and Filter System` is established:
 
 - Next.js App Router + TypeScript scaffold
 - Supabase App Router SSR integration (`@supabase/supabase-js`, `@supabase/ssr`)
@@ -22,7 +22,8 @@ Map-first real estate marketplace for rental and sale listings.
 - route protection for `/dashboard`, `/favorites`, `/messages`, and `/profile`
 - public homepage foundation with hero, search CTA, intent entry points, featured listing placeholders, and provider CTA
 - public explore browse route (`/explore`) with server-rendered published listings
-- URL-driven sort/filter/pagination controls for browse state
+- URL-driven search/filter/sort/pagination controls for browse state
+- server-side filter model with keyword, location, numeric ranges, room minimums, and amenity toggles
 - reusable listing card component for map/list/detail-adjacent surfaces
 - generated TypeScript database types in `src/types/database.ts` (schema + policy helper functions)
 - existing PT02 shell and PT03 integration structure preserved
@@ -54,6 +55,27 @@ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
 NEXT_PUBLIC_MAP_STYLE_URL=your-map-style-url
 NEXT_PUBLIC_SITE_URL=your-base-url
 ```
+
+Quick local setup (Windows PowerShell):
+
+```powershell
+cd C:\Users\taulanth\Desktop\nestmap
+Copy-Item .env.example .env.local
+```
+
+Then set `.env.local` to:
+
+```bash
+NEXT_PUBLIC_SUPABASE_URL=https://<your-project-ref>.supabase.co
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<your-supabase-anon-publishable-key>
+NEXT_PUBLIC_MAP_STYLE_URL=https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json
+NEXT_PUBLIC_SITE_URL=http://localhost:3000
+```
+
+Where to get the Supabase values:
+
+- `NEXT_PUBLIC_SUPABASE_URL`: Supabase Dashboard -> Project Settings -> Data API -> Project URL
+- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`: Supabase Dashboard -> Project Settings -> Data API -> Project API keys -> `anon` / publishable key
 
 Rules:
 
@@ -149,6 +171,12 @@ Homepage foundation documentation:
 Explore browse foundation documentation:
 
 - `docs/explore-listings-foundation.md`
+
+## Search and Filter System (PT11)
+
+Search/filter documentation:
+
+- `docs/search-filter-system.md`
 
 ## Local Development
 
