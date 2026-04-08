@@ -67,7 +67,8 @@ export default async function ExplorePage({ searchParams }: ExplorePageProps) {
         </h1>
         <p className="type-body-muted max-w-3xl">
           This list view is server-rendered from public listings, with URL-driven search,
-          filtering, sorting, and pagination ready for PT12/PT13 map/list synchronization.
+          filtering, sorting, and pagination aligned with `/map` and ready for PT13 bounds and
+          clustering workflows.
         </p>
       </section>
 

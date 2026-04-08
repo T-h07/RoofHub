@@ -1,9 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Filter, Search, SlidersHorizontal, X } from "lucide-react";
+import { Filter, MapPinned, Search, SlidersHorizontal, X } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -24,6 +25,7 @@ import {
   EXPLORE_LISTING_TYPE_LABELS,
   EXPLORE_PROPERTY_TYPE_LABELS,
   EXPLORE_SORT_LABELS,
+  buildMapHref,
   hasActiveExploreFilters,
   type ExploreSearchState,
   type ExploreSortOption,
@@ -791,6 +793,20 @@ export function ExploreResultsShell({
             </form>
 
             <div className="flex items-center gap-2">
+              <Link
+                href={buildMapHref(state)}
+                className={cn(
+                  buttonVariants({
+                    variant: "outline",
+                    size: "default",
+                  }),
+                  "hidden md:inline-flex"
+                )}
+              >
+                <MapPinned className="size-4" aria-hidden="true" />
+                Map view
+              </Link>
+
               <label htmlFor="explore-sort" className="sr-only">
                 Sort listings
               </label>
@@ -896,4 +912,3 @@ export function ExploreResultsShell({
     </div>
   );
 }
-
