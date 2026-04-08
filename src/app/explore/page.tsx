@@ -1,16 +1,131 @@
-import { PlaceholderScreen } from "@/components/layout/placeholder-screen";
+import Link from "next/link";
+import { AlertTriangle, SearchX } from "lucide-react";
 
-export default function ExplorePage() {
+import { ExplorePagination } from "@/components/explore/explore-pagination";
+import { ExploreResultsShell } from "@/components/explore/explore-results-shell";
+import { MainContainer } from "@/components/layout/main-container";
+import { ListingCard } from "@/components/listings/listing-card";
+import { Badge } from "@/components/ui/badge";
+import { buttonVariants } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
+import {
+  buildExploreHref,
+  parseExploreSearchParams,
+  type ExploreSearchState,
+} from "@/lib/listings/explore-search-params";
+import { loadPublicExploreListings } from "@/lib/listings/public-explore";
+import { cn } from "@/lib/utils";
+
+type ExplorePageProps = {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+};
+
+function clearExploreFilters(state: ExploreSearchState): ExploreSearchState {
+  return {
+    ...state,
+    page: 1,
+    listingType: null,
+    propertyType: null,
+    city: null,
+  };
+}
+
+export default async function ExplorePage({ searchParams }: ExplorePageProps) {
+  const resolvedSearchParams = await searchParams;
+  const searchState = parseExploreSearchParams(resolvedSearchParams);
+  const listingsResult = await loadPublicExploreListings(searchState);
+
+  const hasActiveFilters = Boolean(
+    searchState.listingType || searchState.propertyType || searchState.city
+  );
+  const isOutOfRangePage =
+    listingsResult.ok &&
+    listingsResult.totalCount > 0 &&
+    listingsResult.listings.length === 0 &&
+    searchState.page > 1;
+
+  const resetFiltersHref = buildExploreHref(clearExploreFilters(searchState));
+  const firstPageHref = buildExploreHref({ ...searchState, page: 1 });
+
   return (
-    <PlaceholderScreen
-      eyebrow="Explore scaffold"
-      title="Explore route is ready for list-first discovery flows."
-      description="The PT02 shell and primitives are now applied here so search, filters, and listing density controls can be added without rebuilding composition."
-      upcoming={[
-        "Listing cards and list virtualization for high-density results",
-        "Search and filter controls connected to query state",
-        "Selection model shared with map and detail panes",
-      ]}
-    />
+    <MainContainer size="wide" className="space-y-6">
+      <section className="border-border/75 bg-card/60 space-y-3 rounded-xl border p-5 sm:p-6">
+        <Badge variant="primary">Explore listings</Badge>
+        <h1 className="type-page-title max-w-4xl">
+          Browse published rentals and homes for sale across NestMap.
+        </h1>
+        <p className="type-body-muted max-w-3xl">
+          This list view is server-rendered from public listings, with URL-driven sorting,
+          filtering, and pagination designed to scale into PT11 filters and PT12/PT13 map sync.
+        </p>
+      </section>
+
+      <ExploreResultsShell
+        state={searchState}
+        totalCount={listingsResult.totalCount}
+        cityOptions={listingsResult.cityOptions}
+      >
+        {!listingsResult.ok ? (
+          <EmptyState
+            icon={AlertTriangle}
+            title="Listings couldn’t load right now"
+            description={listingsResult.message}
+            action={
+              <Link
+                href={buildExploreHref(searchState)}
+                className={buttonVariants({ variant: "outline", size: "sm" })}
+              >
+                Retry
+              </Link>
+            }
+          />
+        ) : isOutOfRangePage ? (
+          <EmptyState
+            icon={SearchX}
+            title="This page has no listings"
+            description="The current result page is out of range for your selected filters. Return to page one to continue browsing."
+            action={
+              <Link href={firstPageHref} className={buttonVariants({ variant: "outline", size: "sm" })}>
+                Go to page 1
+              </Link>
+            }
+          />
+        ) : listingsResult.listings.length === 0 ? (
+          <EmptyState
+            icon={SearchX}
+            title="No listings match these filters"
+            description={
+              hasActiveFilters
+                ? "Try resetting one or more filters to widen the result set."
+                : "Published listings will appear here as inventory goes live."
+            }
+            action={
+              hasActiveFilters ? (
+                <Link href={resetFiltersHref} className={buttonVariants({ variant: "outline", size: "sm" })}>
+                  Reset filters
+                </Link>
+              ) : (
+                <Link
+                  href="/"
+                  className={cn(buttonVariants({ variant: "outline", size: "sm" }), "gap-1.5")}
+                >
+                  Back to home
+                </Link>
+              )
+            }
+          />
+        ) : (
+          <>
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {listingsResult.listings.map((listing) => (
+                <ListingCard key={listing.id} listing={listing} />
+              ))}
+            </div>
+
+            <ExplorePagination state={searchState} totalPages={listingsResult.totalPages} />
+          </>
+        )}
+      </ExploreResultsShell>
+    </MainContainer>
   );
 }
