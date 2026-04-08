@@ -80,16 +80,20 @@ export default async function MapPage({ searchParams }: MapPageProps) {
             <p className="text-sm font-semibold tracking-tight">
               {mapErrorMessage
                 ? "Map data unavailable"
-                : `${markerCount} map ${markerCount === 1 ? "marker" : "markers"} shown`}
+                : totalCount === 0
+                  ? "No mapped listings available yet"
+                  : `${markerCount} map ${markerCount === 1 ? "marker" : "markers"} shown`}
             </p>
             <p className="text-muted-foreground text-xs">
               {mapErrorMessage
                 ? "Map style or listing data could not be loaded."
-                : `Discovery state is URL-synced. ${
+                : totalCount === 0
+                  ? "Map is live. Add and publish listings to see markers."
+                  : `Discovery state is URL-synced. ${
                     totalCount === markerCount
                       ? "All matching listings are mapped."
                       : `${totalCount} match your filters.`
-                  }`}
+                    }`}
             </p>
           </div>
 
@@ -129,36 +133,38 @@ export default async function MapPage({ searchParams }: MapPageProps) {
             </div>
           }
         />
-      ) : mapResult.markerCount === 0 ? (
-        <EmptyState
-          icon={SearchX}
-          title="No mapped listings for this filter set"
-          description={
-            hasActiveFilters
-              ? "Try clearing one or more filters, then refresh the map results."
-              : "Published listings with public map visibility will appear here as inventory goes live."
-          }
-          action={
-            <div className="flex flex-wrap items-center justify-center gap-2">
-              {hasActiveFilters ? (
-                <Link href={resetFiltersHref} className={buttonVariants({ variant: "outline", size: "sm" })}>
-                  Reset filters
-                </Link>
-              ) : null}
-              <Link href={exploreHref} className={buttonVariants({ size: "sm" })}>
-                Browse list view
-              </Link>
-            </div>
-          }
-        />
       ) : (
         <div className="space-y-3">
           <PublicListingsMap mapStyleUrl={mapStyleUrl} listings={mapResult.listings} />
 
-          <p className={cn("text-muted-foreground inline-flex items-center gap-1.5 text-xs")}>
-            <Compass className="size-3.5" aria-hidden="true" />
-            Marker popups stay compact by design. Listing detail pages land in PT14.
-          </p>
+          {mapResult.markerCount === 0 ? (
+            <EmptyState
+              icon={SearchX}
+              title="No mapped listings for this filter set"
+              description={
+                hasActiveFilters
+                  ? "Try clearing one or more filters, then refresh the map results."
+                  : "Published listings with public map visibility will appear here as inventory goes live."
+              }
+              action={
+                <div className="flex flex-wrap items-center justify-center gap-2">
+                  {hasActiveFilters ? (
+                    <Link href={resetFiltersHref} className={buttonVariants({ variant: "outline", size: "sm" })}>
+                      Reset filters
+                    </Link>
+                  ) : null}
+                  <Link href={exploreHref} className={buttonVariants({ size: "sm" })}>
+                    Browse list view
+                  </Link>
+                </div>
+              }
+            />
+          ) : (
+            <p className={cn("text-muted-foreground inline-flex items-center gap-1.5 text-xs")}>
+              <Compass className="size-3.5" aria-hidden="true" />
+              Marker popups stay compact by design. Listing detail pages land in PT14.
+            </p>
+          )}
         </div>
       )}
     </MainContainer>
