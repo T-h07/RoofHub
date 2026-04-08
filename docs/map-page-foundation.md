@@ -19,9 +19,9 @@ This document describes the first production map foundation for NestMap.
 
 ## Environment Configuration
 
-Required env value:
+Supported env value:
 
-- `NEXT_PUBLIC_MAP_STYLE_URL`
+- `NEXT_PUBLIC_MAP_STYLE_URL` (optional override)
 
 Config helper:
 
@@ -29,8 +29,8 @@ Config helper:
 
 Behavior:
 
-- validates `NEXT_PUBLIC_MAP_STYLE_URL` as a URL
-- returns a clean configuration error state on `/map` if missing/invalid
+- validates `NEXT_PUBLIC_MAP_STYLE_URL` as a URL when provided
+- falls back to a public default MapLibre style URL when missing/invalid
 - keeps style URL deployment-safe for local, Vercel Development, Preview, and Production
 
 ## Public Listing Marker Data

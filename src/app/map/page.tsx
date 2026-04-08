@@ -55,19 +55,9 @@ export default async function MapPage({ searchParams }: MapPageProps) {
   const mapHref = buildMapHref(searchState);
   const resetFiltersHref = buildMapHref(clearMapFilters(searchState));
 
-  let mapStyleUrl: string | null = null;
-  let mapStyleMessage: string | null = null;
-
-  try {
-    mapStyleUrl = getMapStyleUrl();
-  } catch {
-    mapStyleMessage =
-      "Map is not configured yet. Set NEXT_PUBLIC_MAP_STYLE_URL and restart the app.";
-  }
-
-  const mapResult = mapStyleUrl ? await loadPublicMapListings(searchState) : null;
-  const mapErrorMessage =
-    mapStyleMessage ?? (mapResult && !mapResult.ok ? mapResult.message : null);
+  const mapStyleUrl = getMapStyleUrl();
+  const mapResult = await loadPublicMapListings(searchState);
+  const mapErrorMessage = mapResult.ok ? null : mapResult.message;
   const markerCount = mapResult?.ok ? mapResult.markerCount : 0;
   const totalCount = mapResult?.ok ? mapResult.totalCount : 0;
 
@@ -123,11 +113,11 @@ export default async function MapPage({ searchParams }: MapPageProps) {
         ) : null}
       </section>
 
-      {mapErrorMessage ? (
+      {!mapResult.ok ? (
         <EmptyState
           icon={AlertTriangle}
           title="Map couldn’t load right now"
-          description={mapErrorMessage}
+          description={mapResult.message}
           action={
             <div className="flex flex-wrap items-center justify-center gap-2">
               <Link href={mapHref} className={buttonVariants({ size: "sm" })}>
@@ -139,7 +129,7 @@ export default async function MapPage({ searchParams }: MapPageProps) {
             </div>
           }
         />
-      ) : mapResult && mapResult.ok && mapResult.markerCount === 0 ? (
+      ) : mapResult.markerCount === 0 ? (
         <EmptyState
           icon={SearchX}
           title="No mapped listings for this filter set"
@@ -161,16 +151,16 @@ export default async function MapPage({ searchParams }: MapPageProps) {
             </div>
           }
         />
-      ) : mapResult && mapResult.ok ? (
+      ) : (
         <div className="space-y-3">
-          <PublicListingsMap mapStyleUrl={mapStyleUrl!} listings={mapResult.listings} />
+          <PublicListingsMap mapStyleUrl={mapStyleUrl} listings={mapResult.listings} />
 
           <p className={cn("text-muted-foreground inline-flex items-center gap-1.5 text-xs")}>
             <Compass className="size-3.5" aria-hidden="true" />
             Marker popups stay compact by design. Listing detail pages land in PT14.
           </p>
         </div>
-      ) : null}
+      )}
     </MainContainer>
   );
 }

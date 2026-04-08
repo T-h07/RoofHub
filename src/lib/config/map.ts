@@ -1,27 +1,30 @@
 const MAP_STYLE_URL_ENV = "NEXT_PUBLIC_MAP_STYLE_URL";
+export const DEFAULT_PUBLIC_MAP_STYLE_URL =
+  "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
 
-function requireEnv(name: string) {
-  const value = process.env[name];
-
-  if (!value) {
-    throw new Error(
-      `[Map] Missing required environment variable: ${name}. Set it in .env.local (local) or Vercel Environment Variables (Development/Preview/Production).`
-    );
+function isValidUrl(value: string) {
+  try {
+    new URL(value);
+    return true;
+  } catch {
+    return false;
   }
-
-  return value;
 }
 
 export function getMapStyleUrl() {
-  const styleUrl = requireEnv(MAP_STYLE_URL_ENV);
+  const configuredStyleUrl = process.env[MAP_STYLE_URL_ENV]?.trim();
 
-  try {
-    new URL(styleUrl);
-  } catch {
-    throw new Error(
-      `[Map] Invalid ${MAP_STYLE_URL_ENV}. Provide a valid map style URL for MapLibre.`
-    );
+  if (!configuredStyleUrl) {
+    return DEFAULT_PUBLIC_MAP_STYLE_URL;
   }
 
-  return styleUrl;
+  if (isValidUrl(configuredStyleUrl)) {
+    return configuredStyleUrl;
+  }
+
+  console.warn(
+    `[Map] Invalid ${MAP_STYLE_URL_ENV}. Falling back to default public map style URL.`
+  );
+
+  return DEFAULT_PUBLIC_MAP_STYLE_URL;
 }

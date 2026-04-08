@@ -79,6 +79,7 @@ Where to get the Supabase values:
 
 - `NEXT_PUBLIC_SUPABASE_URL`: Supabase Dashboard -> Project Settings -> Data API -> Project URL
 - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`: Supabase Dashboard -> Project Settings -> Data API -> Project API keys -> `anon` / publishable key
+- `NEXT_PUBLIC_MAP_STYLE_URL`: optional override. If omitted or invalid, NestMap falls back to a public dark MapLibre style.
 
 Rules:
 
