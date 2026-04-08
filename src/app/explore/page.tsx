@@ -10,6 +10,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import {
   buildExploreHref,
+  hasActiveExploreFilters,
   parseExploreSearchParams,
   type ExploreSearchState,
 } from "@/lib/listings/explore-search-params";
@@ -24,9 +25,21 @@ function clearExploreFilters(state: ExploreSearchState): ExploreSearchState {
   return {
     ...state,
     page: 1,
+    keyword: null,
+    city: null,
+    neighborhood: null,
     listingType: null,
     propertyType: null,
-    city: null,
+    priceMin: null,
+    priceMax: null,
+    areaMin: null,
+    areaMax: null,
+    bedsMin: null,
+    bathsMin: null,
+    furnished: false,
+    parking: false,
+    pets: false,
+    availableNow: false,
   };
 }
 
@@ -35,9 +48,7 @@ export default async function ExplorePage({ searchParams }: ExplorePageProps) {
   const searchState = parseExploreSearchParams(resolvedSearchParams);
   const listingsResult = await loadPublicExploreListings(searchState);
 
-  const hasActiveFilters = Boolean(
-    searchState.listingType || searchState.propertyType || searchState.city
-  );
+  const hasActiveFilters = hasActiveExploreFilters(searchState);
   const isOutOfRangePage =
     listingsResult.ok &&
     listingsResult.totalCount > 0 &&
@@ -55,8 +66,8 @@ export default async function ExplorePage({ searchParams }: ExplorePageProps) {
           Browse published rentals and homes for sale across NestMap.
         </h1>
         <p className="type-body-muted max-w-3xl">
-          This list view is server-rendered from public listings, with URL-driven sorting,
-          filtering, and pagination designed to scale into PT11 filters and PT12/PT13 map sync.
+          This list view is server-rendered from public listings, with URL-driven search,
+          filtering, sorting, and pagination ready for PT12/PT13 map/list synchronization.
         </p>
       </section>
 
