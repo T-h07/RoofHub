@@ -367,6 +367,23 @@ export function buildExploreHref(state: ExploreSearchState) {
   return queryString ? `/explore?${queryString}` : "/explore";
 }
 
+export function buildMapHref(
+  state: ExploreSearchState,
+  options: {
+    includePage?: boolean;
+  } = {}
+) {
+  const params = toExploreSearchParams(state);
+
+  if (!(options.includePage ?? false)) {
+    params.delete("page");
+  }
+
+  const queryString = params.toString();
+
+  return queryString ? `/map?${queryString}` : "/map";
+}
+
 export function hasActiveExploreFilters(state: ExploreSearchState) {
   return Boolean(
     state.keyword ||

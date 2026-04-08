@@ -5,6 +5,7 @@ import { createServerSupabaseClient } from "@/lib/supabase";
 import type { Tables } from "@/types/database";
 
 import { EXPLORE_PAGE_SIZE, type ExploreSearchState } from "./explore-search-params";
+import { applyPublicListingFilters } from "./public-listing-filters";
 
 type PublicExploreListingRow = Pick<
   Tables<"listings">,
@@ -74,13 +75,6 @@ const PUBLIC_EXPLORE_LISTINGS_SELECT = `
   )
 `;
 
-function sanitizeKeywordForOrQuery(keyword: string) {
-  return keyword
-    .replace(/[,%()]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
 function getCoverImagePath(
   images: PublicExploreListingRow["listing_images"]
 ): string | null {
@@ -136,83 +130,12 @@ export async function loadPublicExploreListings(state: ExploreSearchState): Prom
     const rangeStart = (state.page - 1) * EXPLORE_PAGE_SIZE;
     const rangeEnd = rangeStart + EXPLORE_PAGE_SIZE - 1;
 
-    let query = supabase
-      .from("listings")
-      .select(PUBLIC_EXPLORE_LISTINGS_SELECT, { count: "exact" })
-      .eq("listing_status", "published");
-
-    if (state.listingType) {
-      query = query.eq("listing_type", state.listingType);
-    }
-
-    if (state.propertyType) {
-      query = query.eq("property_type", state.propertyType);
-    }
-
-    if (state.keyword) {
-      const keyword = sanitizeKeywordForOrQuery(state.keyword);
-
-      if (keyword.length > 0) {
-        query = query.or(
-          [
-            `title.ilike.%${keyword}%`,
-            `description.ilike.%${keyword}%`,
-            `city.ilike.%${keyword}%`,
-            `neighborhood.ilike.%${keyword}%`,
-            `property_type.ilike.%${keyword}%`,
-          ].join(",")
-        );
-      }
-    }
-
-    if (state.city) {
-      query = query.ilike("city", `%${state.city}%`);
-    }
-
-    if (state.neighborhood) {
-      query = query.ilike("neighborhood", `%${state.neighborhood}%`);
-    }
-
-    if (state.priceMin !== null) {
-      query = query.gte("price_amount", state.priceMin);
-    }
-
-    if (state.priceMax !== null) {
-      query = query.lte("price_amount", state.priceMax);
-    }
-
-    if (state.areaMin !== null) {
-      query = query.gte("area_m2", state.areaMin);
-    }
-
-    if (state.areaMax !== null) {
-      query = query.lte("area_m2", state.areaMax);
-    }
-
-    if (state.bedsMin !== null) {
-      query = query.gte("bedrooms", state.bedsMin);
-    }
-
-    if (state.bathsMin !== null) {
-      query = query.gte("bathrooms", state.bathsMin);
-    }
-
-    if (state.furnished) {
-      query = query.eq("furnished", true);
-    }
-
-    if (state.parking) {
-      query = query.eq("parking", true);
-    }
-
-    if (state.pets) {
-      query = query.eq("pets_allowed", true);
-    }
-
-    if (state.availableNow) {
-      const todayIso = new Date().toISOString().slice(0, 10);
-      query = query.lte("available_from", todayIso);
-    }
+    let query = applyPublicListingFilters(
+      supabase
+        .from("listings")
+        .select(PUBLIC_EXPLORE_LISTINGS_SELECT, { count: "exact" }),
+      state
+    );
 
     if (state.sort === "price_asc") {
       query = query.order("price_amount", { ascending: true }).order("published_at", {
