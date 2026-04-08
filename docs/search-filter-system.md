@@ -74,12 +74,11 @@ Listings without an `available_from` value are excluded when this toggle is enab
 - Active filters render as removable chips.
 - Filter/sort changes reset pagination to page 1 to avoid stale-page empty states.
 
-## PT12/PT13 Integration Path
+## PT12+ Integration Path
 
-Map/list integration should build on existing URL-driven state:
+Map/list integration builds on this URL-driven state:
 
 - reuse `parseExploreSearchParams` as the canonical filter contract
-- keep `loadPublicExploreListings` as server-side query authority
-- add map-specific params (for example bounds/viewport) into the same URL model
+- keep shared public listing filter logic as server-side query authority
+- add map-specific params (for example bounds/viewport) into the same URL model in PT13
 - avoid parallel client-only filter state paths
-

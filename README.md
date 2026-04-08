@@ -4,7 +4,7 @@ Map-first real estate marketplace for rental and sale listings.
 
 ## Current Stage
 
-`NM-PT11 Search and Filter System` is established:
+`NM-PT12 Map Infrastructure and Public Map Page` is established:
 
 - Next.js App Router + TypeScript scaffold
 - Supabase App Router SSR integration (`@supabase/supabase-js`, `@supabase/ssr`)
@@ -24,11 +24,14 @@ Map-first real estate marketplace for rental and sale listings.
 - public explore browse route (`/explore`) with server-rendered published listings
 - URL-driven search/filter/sort/pagination controls for browse state
 - server-side filter model with keyword, location, numeric ranges, room minimums, and amenity toggles
+- public map route (`/map`) with MapLibre rendering and URL-synced discovery state
+- server-side public marker query aligned with PT11 filter parsing and public listing visibility rules
+- marker and popup foundation with mobile-safe control and loading/error/empty state handling
 - reusable listing card component for map/list/detail-adjacent surfaces
 - generated TypeScript database types in `src/types/database.ts` (schema + policy helper functions)
 - existing PT02 shell and PT03 integration structure preserved
 
-This stage intentionally excludes business features beyond foundational auth/session plumbing (full role workflows, listings CRUD, map logic, moderation, and messaging product behavior).
+This stage intentionally excludes business features beyond foundational auth/session plumbing (full role workflows, listings CRUD, advanced map logic such as clustering/bounds search, moderation, and messaging product behavior).
 
 ## Stack
 
@@ -177,6 +180,12 @@ Explore browse foundation documentation:
 Search/filter documentation:
 
 - `docs/search-filter-system.md`
+
+## Map Infrastructure and Public Map Page (PT12)
+
+Map page documentation:
+
+- `docs/map-page-foundation.md`
 
 ## Local Development
 
