@@ -123,116 +123,130 @@ async function loadPublishedCityOptions() {
 }
 
 export async function loadPublicExploreListings(state: ExploreSearchState): Promise<PublicExploreResult> {
-  const cityOptions = await loadPublishedCityOptions();
-  const supabase = await createServerSupabaseClient();
-  const rangeStart = (state.page - 1) * EXPLORE_PAGE_SIZE;
-  const rangeEnd = rangeStart + EXPLORE_PAGE_SIZE - 1;
+  try {
+    const cityOptions = await loadPublishedCityOptions();
+    const supabase = await createServerSupabaseClient();
+    const rangeStart = (state.page - 1) * EXPLORE_PAGE_SIZE;
+    const rangeEnd = rangeStart + EXPLORE_PAGE_SIZE - 1;
 
-  let query = supabase
-    .from("listings")
-    .select(PUBLIC_EXPLORE_LISTINGS_SELECT, { count: "exact" })
-    .eq("listing_status", "published");
+    let query = supabase
+      .from("listings")
+      .select(PUBLIC_EXPLORE_LISTINGS_SELECT, { count: "exact" })
+      .eq("listing_status", "published");
 
-  if (state.listingType) {
-    query = query.eq("listing_type", state.listingType);
-  }
+    if (state.listingType) {
+      query = query.eq("listing_type", state.listingType);
+    }
 
-  if (state.propertyType) {
-    query = query.eq("property_type", state.propertyType);
-  }
+    if (state.propertyType) {
+      query = query.eq("property_type", state.propertyType);
+    }
 
-  if (state.city) {
-    query = query.ilike("city", `%${state.city}%`);
-  }
+    if (state.city) {
+      query = query.ilike("city", `%${state.city}%`);
+    }
 
-  if (state.sort === "price_asc") {
-    query = query.order("price_amount", { ascending: true }).order("published_at", {
-      ascending: false,
-      nullsFirst: false,
+    if (state.sort === "price_asc") {
+      query = query.order("price_amount", { ascending: true }).order("published_at", {
+        ascending: false,
+        nullsFirst: false,
+      });
+    } else if (state.sort === "price_desc") {
+      query = query.order("price_amount", { ascending: false }).order("published_at", {
+        ascending: false,
+        nullsFirst: false,
+      });
+    } else {
+      query = query.order("published_at", {
+        ascending: false,
+        nullsFirst: false,
+      }).order("created_at", {
+        ascending: false,
+      });
+    }
+
+    const { data, error, count } = await query.range(rangeStart, rangeEnd);
+
+    if (error) {
+      return {
+        ok: false,
+        message: "Listings are temporarily unavailable. Please refresh and try again.",
+        listings: [],
+        totalCount: 0,
+        totalPages: 0,
+        cityOptions,
+      };
+    }
+
+    const listingRows = (data ?? []) as PublicExploreListingRow[];
+    const coverImageUrlEntries = await Promise.all(
+      listingRows.map(async (listing) => {
+        const coverImagePath = getCoverImagePath(listing.listing_images);
+        if (!coverImagePath) {
+          return [listing.id, null, null] as const;
+        }
+
+        try {
+          const signedUrl = await createListingImageSignedUrl(supabase, coverImagePath, 30 * 60);
+          return [listing.id, coverImagePath, signedUrl] as const;
+        } catch {
+          return [listing.id, coverImagePath, null] as const;
+        }
+      })
+    );
+
+    const coverImageMap = new Map(
+      coverImageUrlEntries.map(([listingId, coverImagePath, signedUrl]) => [
+        listingId,
+        {
+          coverImagePath,
+          signedUrl,
+        },
+      ])
+    );
+
+    const listings: PublicExploreListing[] = listingRows.map((listing) => {
+      const coverEntry = coverImageMap.get(listing.id);
+
+      return {
+        id: listing.id,
+        slug: listing.slug,
+        title: listing.title,
+        listing_type: listing.listing_type,
+        property_type: listing.property_type,
+        price_amount: listing.price_amount,
+        currency_code: listing.currency_code,
+        city: listing.city,
+        neighborhood: listing.neighborhood,
+        bedrooms: listing.bedrooms,
+        bathrooms: listing.bathrooms,
+        area_m2: listing.area_m2,
+        published_at: listing.published_at,
+        created_at: listing.created_at,
+        coverImagePath: coverEntry?.coverImagePath ?? null,
+        coverImageUrl: coverEntry?.signedUrl ?? null,
+      };
     });
-  } else if (state.sort === "price_desc") {
-    query = query.order("price_amount", { ascending: false }).order("published_at", {
-      ascending: false,
-      nullsFirst: false,
-    });
-  } else {
-    query = query.order("published_at", { ascending: false, nullsFirst: false }).order("created_at", {
-      ascending: false,
-    });
-  }
 
-  const { data, error, count } = await query.range(rangeStart, rangeEnd);
+    const totalCount = count ?? 0;
+    const totalPages = totalCount > 0 ? Math.ceil(totalCount / EXPLORE_PAGE_SIZE) : 0;
 
-  if (error) {
+    return {
+      ok: true,
+      listings,
+      totalCount,
+      totalPages,
+      cityOptions,
+    };
+  } catch {
     return {
       ok: false,
-      message: "Listings are temporarily unavailable. Please refresh and try again.",
+      message:
+        "Explore is not configured yet. Set Supabase environment variables and restart the app.",
       listings: [],
       totalCount: 0,
       totalPages: 0,
-      cityOptions,
+      cityOptions: [],
     };
   }
-
-  const listingRows = (data ?? []) as PublicExploreListingRow[];
-  const coverImageUrlEntries = await Promise.all(
-    listingRows.map(async (listing) => {
-      const coverImagePath = getCoverImagePath(listing.listing_images);
-      if (!coverImagePath) {
-        return [listing.id, null, null] as const;
-      }
-
-      try {
-        const signedUrl = await createListingImageSignedUrl(supabase, coverImagePath, 30 * 60);
-        return [listing.id, coverImagePath, signedUrl] as const;
-      } catch {
-        return [listing.id, coverImagePath, null] as const;
-      }
-    })
-  );
-
-  const coverImageMap = new Map(
-    coverImageUrlEntries.map(([listingId, coverImagePath, signedUrl]) => [
-      listingId,
-      {
-        coverImagePath,
-        signedUrl,
-      },
-    ])
-  );
-
-  const listings: PublicExploreListing[] = listingRows.map((listing) => {
-    const coverEntry = coverImageMap.get(listing.id);
-
-    return {
-      id: listing.id,
-      slug: listing.slug,
-      title: listing.title,
-      listing_type: listing.listing_type,
-      property_type: listing.property_type,
-      price_amount: listing.price_amount,
-      currency_code: listing.currency_code,
-      city: listing.city,
-      neighborhood: listing.neighborhood,
-      bedrooms: listing.bedrooms,
-      bathrooms: listing.bathrooms,
-      area_m2: listing.area_m2,
-      published_at: listing.published_at,
-      created_at: listing.created_at,
-      coverImagePath: coverEntry?.coverImagePath ?? null,
-      coverImageUrl: coverEntry?.signedUrl ?? null,
-    };
-  });
-
-  const totalCount = count ?? 0;
-  const totalPages = totalCount > 0 ? Math.ceil(totalCount / EXPLORE_PAGE_SIZE) : 0;
-
-  return {
-    ok: true,
-    listings,
-    totalCount,
-    totalPages,
-    cityOptions,
-  };
 }
-
