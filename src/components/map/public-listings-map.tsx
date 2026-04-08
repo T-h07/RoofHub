@@ -168,6 +168,25 @@ export function PublicListingsMap({ mapStyleUrl, listings }: PublicListingsMapPr
     });
   }, [isMapReady, listings, mapRenderKey]);
 
+  useEffect(() => {
+    if (isMapReady || mapError) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      if (mapRef.current && mapRef.current.isStyleLoaded()) {
+        setIsMapReady(true);
+        return;
+      }
+
+      setMapError("Map surface is taking too long to initialize.");
+    }, 9000);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [isMapReady, mapError, mapRenderKey]);
+
   return (
     <div className="border-border/75 bg-card/55 relative h-[68dvh] min-h-[26rem] overflow-hidden rounded-2xl border">
       <MapLibre
@@ -179,9 +198,12 @@ export function PublicListingsMap({ mapStyleUrl, listings }: PublicListingsMapPr
         style={{ width: "100%", height: "100%" }}
         dragRotate={false}
         touchPitch={false}
-        reuseMaps
         attributionControl={false}
         onLoad={() => {
+          setIsMapReady(true);
+          setMapError(null);
+        }}
+        onIdle={() => {
           setIsMapReady(true);
           setMapError(null);
         }}
