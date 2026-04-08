@@ -4,7 +4,7 @@ Map-first real estate marketplace for rental and sale listings.
 
 ## Current Stage
 
-`NM-PT09 Public Home Page` is established:
+`NM-PT10 Explore/List View Foundation` is established:
 
 - Next.js App Router + TypeScript scaffold
 - Supabase App Router SSR integration (`@supabase/supabase-js`, `@supabase/ssr`)
@@ -21,6 +21,9 @@ Map-first real estate marketplace for rental and sale listings.
 - role-aware desktop/mobile navigation visibility
 - route protection for `/dashboard`, `/favorites`, `/messages`, and `/profile`
 - public homepage foundation with hero, search CTA, intent entry points, featured listing placeholders, and provider CTA
+- public explore browse route (`/explore`) with server-rendered published listings
+- URL-driven sort/filter/pagination controls for browse state
+- reusable listing card component for map/list/detail-adjacent surfaces
 - generated TypeScript database types in `src/types/database.ts` (schema + policy helper functions)
 - existing PT02 shell and PT03 integration structure preserved
 
@@ -140,6 +143,12 @@ Implemented profile route:
 Homepage foundation documentation:
 
 - `docs/home-page-foundation.md`
+
+## Explore/List View Foundation (PT10)
+
+Explore browse foundation documentation:
+
+- `docs/explore-listings-foundation.md`
 
 ## Local Development
 
