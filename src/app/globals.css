@@ -126,3 +126,56 @@
     @apply transition-colors;
   }
 }
+
+@layer components {
+  .maplibregl-ctrl-group {
+    border: 1px solid color-mix(in oklch, var(--border) 78%, transparent) !important;
+    border-radius: calc(var(--radius-md) + 1px) !important;
+    background: color-mix(in oklch, var(--card) 86%, transparent) !important;
+    box-shadow: 0 10px 24px -18px rgba(4, 8, 20, 0.95) !important;
+    backdrop-filter: blur(6px);
+  }
+
+  .maplibregl-ctrl-group button {
+    width: 34px !important;
+    height: 34px !important;
+  }
+
+  .maplibregl-ctrl-group button .maplibregl-ctrl-icon {
+    filter: invert(1) brightness(1.7);
+  }
+
+  .maplibregl-ctrl-scale {
+    border: 1px solid color-mix(in oklch, var(--border) 72%, transparent) !important;
+    border-radius: calc(var(--radius-sm) + 1px);
+    background: color-mix(in oklch, var(--card) 88%, transparent) !important;
+    color: var(--foreground) !important;
+    font-family: var(--font-sans) !important;
+    font-size: 11px !important;
+  }
+
+  .nestmap-map-popup .maplibregl-popup-content {
+    padding: 0 !important;
+    border: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+
+  .nestmap-map-popup .maplibregl-popup-close-button {
+    color: var(--muted-foreground);
+    top: 6px;
+    right: 6px;
+    font-size: 1rem;
+  }
+
+  .nestmap-map-popup .maplibregl-popup-close-button:hover {
+    color: var(--foreground);
+    background: color-mix(in oklch, var(--accent) 52%, transparent);
+    border-radius: 999px;
+  }
+
+  .nestmap-map-popup .maplibregl-popup-tip {
+    border-top-color: color-mix(in oklch, var(--card) 88%, transparent) !important;
+    border-bottom-color: color-mix(in oklch, var(--card) 88%, transparent) !important;
+  }
+}

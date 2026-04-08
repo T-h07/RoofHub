@@ -6,6 +6,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { siteConfig } from "@/lib/config/site";
 
 import "./globals.css";
+import "maplibre-gl/dist/maplibre-gl.css";
 
 const manrope = Manrope({
   variable: "--font-manrope",
