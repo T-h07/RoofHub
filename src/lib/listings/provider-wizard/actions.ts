@@ -146,6 +146,7 @@ async function ensureProviderContext() {
     ok: true as const,
     supabase,
     profile: profileResult.profile,
+    userEmail: profileResult.user.email ?? null,
     isAdmin: isAdminRole(profileResult.profile.role),
   };
 }
@@ -230,7 +231,7 @@ export async function saveProviderWizardStepAction(
     };
   }
 
-  const { supabase, profile, isAdmin } = providerContext;
+  const { supabase, profile, userEmail, isAdmin } = providerContext;
   const candidateDraftId = input.draftId ?? null;
 
   try {
@@ -453,12 +454,15 @@ export async function saveProviderWizardStepAction(
         };
       }
 
+      const usesEmailMethod = contactValidation.payload.contact_methods.includes("email");
+      const effectiveContactEmail = contactValidation.payload.contact_email ?? (usesEmailMethod ? userEmail : null);
+
       let { error } = await supabase
         .from("profiles")
         .update({
           preferred_contact_method: contactValidation.payload.preferred_contact_method,
           contact_methods: contactValidation.payload.contact_methods,
-          contact_email: contactValidation.payload.contact_email,
+          contact_email: effectiveContactEmail,
           phone: contactValidation.payload.phone,
           whatsapp_phone: contactValidation.payload.whatsapp_phone,
           viber_phone: contactValidation.payload.viber_phone,

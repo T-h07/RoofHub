@@ -67,6 +67,7 @@ export default async function NewDashboardListingPage() {
         initialValues={initialValues}
         initialImages={[]}
         providerOwnerId={context.profile.id}
+        providerEmail={context.userEmail}
         mapStyleUrl={mapStyleUrl}
       />
     </MainContainer>

@@ -438,16 +438,12 @@ export function validateContactStep(values: ProviderDraftWizardValues): Validati
     errors.contactPhone = "Add a phone number when phone contact is enabled.";
   }
 
-  if (effectiveMethods.includes("whatsapp") && !whatsappPhone) {
-    errors.whatsappPhone = "Add a WhatsApp number when WhatsApp contact is enabled.";
+  if (effectiveMethods.includes("whatsapp") && !whatsappPhone && !phone) {
+    errors.whatsappPhone = "Add a WhatsApp number or a phone number to reuse for WhatsApp.";
   }
 
-  if (effectiveMethods.includes("viber") && !viberPhone) {
-    errors.viberPhone = "Add a Viber number when Viber contact is enabled.";
-  }
-
-  if (effectiveMethods.includes("email") && !contactEmail) {
-    errors.contactEmail = "Add a contact email when email contact is enabled.";
+  if (effectiveMethods.includes("viber") && !viberPhone && !phone) {
+    errors.viberPhone = "Add a Viber number or a phone number to reuse for Viber.";
   }
 
   if (
@@ -468,8 +464,8 @@ export function validateContactStep(values: ProviderDraftWizardValues): Validati
       contact_methods: effectiveMethods,
       contact_email: contactEmail,
       phone,
-      whatsapp_phone: whatsappPhone,
-      viber_phone: viberPhone,
+      whatsapp_phone: whatsappPhone ?? (effectiveMethods.includes("whatsapp") ? phone : null),
+      viber_phone: viberPhone ?? (effectiveMethods.includes("viber") ? phone : null),
     },
   };
 }

@@ -132,6 +132,7 @@ export default async function EditDashboardListingPage({
         initialValues={values}
         initialImages={imagesResult.ok ? imagesResult.images : []}
         providerOwnerId={context.profile.id}
+        providerEmail={context.userEmail}
         mapStyleUrl={mapStyleUrl}
       />
     </MainContainer>

@@ -37,8 +37,8 @@ export async function getProviderRouteContext(nextPath: string) {
     ok: true as const,
     supabase,
     profile: profileResult.profile,
+    userEmail: user.email ?? null,
     isProvider,
     isAdmin,
   };
 }
-

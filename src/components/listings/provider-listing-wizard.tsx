@@ -49,6 +49,7 @@ type ProviderListingWizardProps = {
   initialValues: ProviderDraftWizardValues;
   initialImages: ProviderDraftImage[];
   providerOwnerId: string;
+  providerEmail: string | null;
   mapStyleUrl: string;
 };
 
@@ -180,6 +181,7 @@ export function ProviderListingWizard({
   initialValues,
   initialImages,
   providerOwnerId,
+  providerEmail,
   mapStyleUrl,
 }: ProviderListingWizardProps) {
   const router = useRouter();
@@ -1252,6 +1254,8 @@ export function ProviderListingWizard({
     const emailIsRequired = effectiveContactMethods.includes("email");
     const whatsappIsRequired = effectiveContactMethods.includes("whatsapp");
     const viberIsRequired = effectiveContactMethods.includes("viber");
+    const defaultPhonePlaceholder = draft.contactPhone || "+49 123 456 789";
+    const defaultEmailPlaceholder = providerEmail || "provider@example.com";
 
     return (
       <div className="space-y-4">
@@ -1345,14 +1349,14 @@ export function ProviderListingWizard({
                 id="wizard-contact-email"
                 value={draft.contactEmail}
                 onChange={(event) => setField("contactEmail", event.currentTarget.value)}
-                placeholder="provider@example.com"
+                placeholder={defaultEmailPlaceholder}
                 inputMode="email"
                 aria-invalid={Boolean(fieldErrors.contactEmail)}
               />
               {fieldErrors.contactEmail ? <FieldError>{fieldErrors.contactEmail}</FieldError> : null}
               <FieldHelp>
                 {emailIsRequired
-                  ? "Required because email contact is enabled."
+                  ? "Required only if you want a custom email; blank falls back to your sign-in email."
                   : "Optional unless email contact is enabled."}
               </FieldHelp>
             </Field>
@@ -1384,13 +1388,13 @@ export function ProviderListingWizard({
                 id="wizard-contact-whatsapp"
                 value={draft.whatsappPhone}
                 onChange={(event) => setField("whatsappPhone", event.currentTarget.value)}
-                placeholder="+49 151 000 000"
+                placeholder={defaultPhonePlaceholder}
                 aria-invalid={Boolean(fieldErrors.whatsappPhone)}
               />
               {fieldErrors.whatsappPhone ? <FieldError>{fieldErrors.whatsappPhone}</FieldError> : null}
               <FieldHelp>
                 {whatsappIsRequired
-                  ? "Required because WhatsApp contact is enabled."
+                  ? "Leave blank to reuse your phone number."
                   : "Optional unless WhatsApp contact is enabled."}
               </FieldHelp>
             </Field>
@@ -1403,13 +1407,13 @@ export function ProviderListingWizard({
                 id="wizard-contact-viber"
                 value={draft.viberPhone}
                 onChange={(event) => setField("viberPhone", event.currentTarget.value)}
-                placeholder="+49 151 000 111"
+                placeholder={defaultPhonePlaceholder}
                 aria-invalid={Boolean(fieldErrors.viberPhone)}
               />
               {fieldErrors.viberPhone ? <FieldError>{fieldErrors.viberPhone}</FieldError> : null}
               <FieldHelp>
                 {viberIsRequired
-                  ? "Required because Viber contact is enabled."
+                  ? "Leave blank to reuse your phone number."
                   : "Optional unless Viber contact is enabled."}
               </FieldHelp>
             </Field>
@@ -1429,21 +1433,15 @@ export function ProviderListingWizard({
       .map((method) => {
         switch (method) {
           case "email":
-            return draft.contactEmail
-              ? `Email: ${draft.contactEmail}`
-              : null;
+            return `Email: ${draft.contactEmail || providerEmail || "Not set"}`;
           case "phone":
             return draft.contactPhone
               ? `Phone: ${draft.contactPhone}`
               : null;
           case "whatsapp":
-            return draft.whatsappPhone
-              ? `WhatsApp: ${draft.whatsappPhone}`
-              : null;
+            return `WhatsApp: ${draft.whatsappPhone || draft.contactPhone || "Not set"}`;
           case "viber":
-            return draft.viberPhone
-              ? `Viber: ${draft.viberPhone}`
-              : null;
+            return `Viber: ${draft.viberPhone || draft.contactPhone || "Not set"}`;
           case "in_app":
             return "In-app messages enabled";
           default:
