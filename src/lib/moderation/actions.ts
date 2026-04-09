@@ -12,6 +12,10 @@ import type {
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const LISTING_MODERATION_ACTIONS = new Set<UpdateListingModerationVisibilityInput["action"]>([
+  "hide",
+  "unhide",
+]);
 
 type ModerationMutationContext =
   | {
@@ -88,10 +92,27 @@ function getRestoreStatusForUnhide(listing: ModerationListingRow): ListingModera
 export async function updateListingModerationVisibilityAction(
   input: UpdateListingModerationVisibilityInput
 ): Promise<UpdateListingModerationVisibilityResult> {
-  if (!isUuid(input.listingId)) {
+  if (!input || typeof input !== "object") {
+    return {
+      ok: false,
+      message: "Moderation action payload is invalid.",
+    };
+  }
+
+  const listingId = typeof input.listingId === "string" ? input.listingId : null;
+  const action = input.action;
+
+  if (!listingId || !isUuid(listingId)) {
     return {
       ok: false,
       message: "Listing reference is invalid.",
+    };
+  }
+
+  if (!LISTING_MODERATION_ACTIONS.has(action)) {
+    return {
+      ok: false,
+      message: "Moderation action type is invalid.",
     };
   }
 
@@ -108,7 +129,7 @@ export async function updateListingModerationVisibilityAction(
   const listingResult = await supabase
     .from("listings")
     .select("id, listing_status, published_at")
-    .eq("id", input.listingId)
+    .eq("id", listingId)
     .maybeSingle();
 
   if (listingResult.error || !listingResult.data) {
@@ -121,7 +142,7 @@ export async function updateListingModerationVisibilityAction(
   const listing = listingResult.data as ModerationListingRow;
   const previousStatus = listing.listing_status;
 
-  if (input.action === "hide") {
+  if (action === "hide") {
     if (listing.listing_status === "hidden_by_admin") {
       return {
         ok: true,

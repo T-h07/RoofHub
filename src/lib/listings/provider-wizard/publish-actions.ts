@@ -22,6 +22,7 @@ import type { ProviderDraftImage, ProviderListingStatus } from "./types";
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const MAX_IMAGE_SORT_ORDER = 10_000;
 
 type ProviderMutationContext =
   | {
@@ -80,6 +81,89 @@ function isUuid(value: string | null | undefined) {
   }
 
   return UUID_PATTERN.test(value);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object";
+}
+
+function normalizePhotoMutationInput(
+  input: SyncProviderListingPhotosInput | unknown
+):
+  | {
+      ok: true;
+      draftId: string;
+      images: ProviderPhotoMutationImage[];
+    }
+  | {
+      ok: false;
+      message: string;
+    } {
+  if (!isRecord(input) || typeof input.draftId !== "string") {
+    return {
+      ok: false,
+      message: "Draft listing payload is invalid.",
+    };
+  }
+
+  if (!Array.isArray(input.images)) {
+    return {
+      ok: false,
+      message: "Photo payload is invalid.",
+    };
+  }
+
+  if (input.images.length > LISTING_IMAGE_MAX_COUNT) {
+    return {
+      ok: false,
+      message: `Only ${LISTING_IMAGE_MAX_COUNT} photos are allowed per listing.`,
+    };
+  }
+
+  const normalizedImages: ProviderPhotoMutationImage[] = [];
+
+  for (const image of input.images) {
+    if (!isRecord(image) || typeof image.storagePath !== "string") {
+      return {
+        ok: false,
+        message: "Photo payload contained an invalid storage path.",
+      };
+    }
+
+    if (typeof image.sortOrder !== "number" || !Number.isFinite(image.sortOrder)) {
+      return {
+        ok: false,
+        message: "Photo payload contained an invalid sort order.",
+      };
+    }
+
+    if (typeof image.isCover !== "boolean") {
+      return {
+        ok: false,
+        message: "Photo payload contained an invalid cover-flag value.",
+      };
+    }
+
+    const sortOrder = Math.trunc(image.sortOrder);
+    if (sortOrder < 0 || sortOrder > MAX_IMAGE_SORT_ORDER) {
+      return {
+        ok: false,
+        message: "Photo payload contained an out-of-range sort order.",
+      };
+    }
+
+    normalizedImages.push({
+      storagePath: image.storagePath.trim(),
+      sortOrder,
+      isCover: image.isCover,
+    });
+  }
+
+  return {
+    ok: true,
+    draftId: input.draftId,
+    images: normalizedImages,
+  };
 }
 
 function normalizeSupabaseError(message: string) {
@@ -258,6 +342,15 @@ function validatePhotoPayload(input: {
 export async function syncProviderListingPhotosAction(
   input: SyncProviderListingPhotosInput
 ): Promise<SyncProviderListingPhotosResult> {
+  const normalizedInput = normalizePhotoMutationInput(input);
+  if (!normalizedInput.ok) {
+    return {
+      ok: false,
+      message: normalizedInput.message,
+      images: [],
+    };
+  }
+
   const context = await ensureProviderMutationContext();
 
   if (!context.ok) {
@@ -268,7 +361,7 @@ export async function syncProviderListingPhotosAction(
     };
   }
 
-  if (!isUuid(input.draftId)) {
+  if (!isUuid(normalizedInput.draftId)) {
     return {
       ok: false,
       message: "Draft listing id is invalid.",
@@ -278,7 +371,7 @@ export async function syncProviderListingPhotosAction(
 
   const { supabase, profile } = context;
   const draftAccess = await ensureDraftAccess(supabase, {
-    draftId: input.draftId,
+    draftId: normalizedInput.draftId,
     userId: profile.id,
   });
 
@@ -290,7 +383,7 @@ export async function syncProviderListingPhotosAction(
     };
   }
 
-  const normalizedImages = normalizeCoverAndOrder(input.images);
+  const normalizedImages = normalizeCoverAndOrder(normalizedInput.images);
   const payloadValidation = validatePhotoPayload({
     images: normalizedImages,
     listingId: draftAccess.listing.id,
@@ -389,12 +482,10 @@ export async function syncProviderListingPhotosAction(
       message: "Listing photos saved.",
       images: refreshedImages.images,
     };
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Listing photos could not be saved.";
-
+  } catch {
     return {
       ok: false,
-      message,
+      message: "Listing photos could not be saved. Please retry.",
       images: [],
     };
   }
@@ -403,6 +494,13 @@ export async function syncProviderListingPhotosAction(
 export async function publishProviderListingDraftAction(
   input: PublishProviderListingDraftInput
 ): Promise<PublishProviderListingDraftResult> {
+  if (!input || typeof input !== "object" || typeof input.draftId !== "string") {
+    return {
+      ok: false,
+      message: "Draft listing payload is invalid.",
+    };
+  }
+
   const context = await ensureProviderMutationContext();
 
   if (!context.ok) {

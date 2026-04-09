@@ -13,6 +13,9 @@ const PREFERRED_CONTACT_METHODS = new Set(["in_app", "phone", "email", "whatsapp
 const PUBLIC_LOCATION_MODES = new Set(["exact", "approximate"]);
 const PHONE_PATTERN = /^[+0-9().\-\s]{6,24}$/;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const STRICT_DECIMAL_PATTERN = /^-?\d+(?:[.,]\d+)?$/;
+const MAX_NUMERIC_TOKEN_LENGTH = 24;
+const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
 function normalizeText(value: string, maxLength: number) {
   return value.trim().replace(/\s+/g, " ").slice(0, maxLength);
@@ -61,6 +64,13 @@ function parseFloatValue(
     return options.allowEmpty ? null : Number.NaN;
   }
 
+  if (
+    trimmed.length > MAX_NUMERIC_TOKEN_LENGTH ||
+    !STRICT_DECIMAL_PATTERN.test(trimmed)
+  ) {
+    return Number.NaN;
+  }
+
   const value = Number.parseFloat(trimmed.replace(",", "."));
   if (!Number.isFinite(value)) {
     return Number.NaN;
@@ -83,12 +93,20 @@ function parseDate(rawValue: string) {
     return null;
   }
 
+  if (!ISO_DATE_PATTERN.test(trimmed)) {
+    return null;
+  }
+
   const parsed = new Date(trimmed);
   if (Number.isNaN(parsed.getTime())) {
     return null;
   }
 
-  return parsed.toISOString().slice(0, 10);
+  if (parsed.toISOString().slice(0, 10) !== trimmed) {
+    return null;
+  }
+
+  return trimmed;
 }
 
 export type BasicsStepPayload = {

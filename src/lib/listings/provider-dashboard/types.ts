@@ -3,6 +3,16 @@ import type { Enums, Tables } from "@/types/database";
 export type ProviderListingType = Enums<"listing_type">;
 export type ProviderListingStatus = Enums<"listing_status">;
 
+export const PROVIDER_LISTING_STATUS_VALUES = [
+  "draft",
+  "published",
+  "paused",
+  "archived",
+  "sold",
+  "rented",
+  "hidden_by_admin",
+] as const satisfies readonly ProviderListingStatus[];
+
 export type ProviderManagedListingRow = Pick<
   Tables<"listings">,
   | "id"
@@ -54,6 +64,13 @@ export const PROVIDER_LISTING_STATUS_FILTERS = [
 ] as const;
 
 export type ProviderListingStatusFilter = (typeof PROVIDER_LISTING_STATUS_FILTERS)[number];
+
+export function isProviderListingStatus(value: unknown): value is ProviderListingStatus {
+  return (
+    typeof value === "string" &&
+    PROVIDER_LISTING_STATUS_VALUES.includes(value as ProviderListingStatus)
+  );
+}
 
 export function isProviderListingStatusFilter(
   value: string | null | undefined

@@ -26,8 +26,20 @@ type PublishReadinessInput = {
   hasCoverImage: boolean;
 };
 
+const STRICT_DECIMAL_PATTERN = /^-?\d+(?:[.,]\d+)?$/;
+const MAX_NUMERIC_TOKEN_LENGTH = 24;
+
 function parsePositiveNumber(rawValue: string) {
-  const parsed = Number.parseFloat(rawValue.trim().replace(",", "."));
+  const trimmed = rawValue.trim();
+  if (
+    !trimmed ||
+    trimmed.length > MAX_NUMERIC_TOKEN_LENGTH ||
+    !STRICT_DECIMAL_PATTERN.test(trimmed)
+  ) {
+    return null;
+  }
+
+  const parsed = Number.parseFloat(trimmed.replace(",", "."));
   if (!Number.isFinite(parsed)) {
     return null;
   }

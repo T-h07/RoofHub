@@ -37,6 +37,25 @@ type AccessibleConversationRow = Pick<
   "id" | "listing_id" | "provider_id" | "seeker_id" | "last_message_at" | "created_at" | "updated_at"
 >;
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object";
+}
+
+function readOptionalLimit(value: unknown): number | undefined {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return Math.trunc(value);
+  }
+
+  if (typeof value === "string" && /^-?\d+$/.test(value.trim())) {
+    const parsed = Number.parseInt(value.trim(), 10);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+
+  return undefined;
+}
+
 function normalizeSupabaseError(
   message: string,
   fallback: string,
@@ -113,9 +132,11 @@ async function loadAccessibleConversationForViewer(
 export async function createOrGetConversationForListingAction(
   input: CreateOrGetConversationInput
 ): Promise<MessagingResult<ConversationCreateResult>> {
-  if (!isUuid(input.listingId)) {
+  if (!isRecord(input) || typeof input.listingId !== "string" || !isUuid(input.listingId)) {
     return toMessagingFailure("invalid_input", "Listing reference is invalid.");
   }
+
+  const listingId = input.listingId;
 
   const contextResult = await getMessagingViewerContext();
   if (!contextResult.ok) {
@@ -128,7 +149,7 @@ export async function createOrGetConversationForListingAction(
     return toMessagingFailure("forbidden", "Only seeker accounts can initiate new listing conversations.");
   }
 
-  const listingResult = await loadConversationEligibilityListing(supabase, input.listingId);
+  const listingResult = await loadConversationEligibilityListing(supabase, listingId);
   if (!listingResult.ok) {
     return listingResult.failure;
   }
@@ -209,8 +230,16 @@ export async function createOrGetConversationForListingAction(
 export async function sendConversationMessageAction(
   input: SendConversationMessageInput
 ): Promise<MessagingResult<ConversationSendMessageResult>> {
+  if (!isRecord(input) || typeof input.conversationId !== "string") {
+    return toMessagingFailure("invalid_input", "Conversation reference is invalid.");
+  }
+
   if (!isUuid(input.conversationId)) {
     return toMessagingFailure("invalid_input", "Conversation reference is invalid.");
+  }
+
+  if (typeof input.body !== "string") {
+    return toMessagingFailure("invalid_input", "Message body is invalid.");
   }
 
   const normalizedBody = normalizeMessageBody(input.body);
@@ -277,7 +306,7 @@ export async function sendConversationMessageAction(
 export async function markConversationReadAction(
   input: MarkConversationReadInput
 ): Promise<MessagingResult<ConversationReadResult>> {
-  if (!isUuid(input.conversationId)) {
+  if (!isRecord(input) || typeof input.conversationId !== "string" || !isUuid(input.conversationId)) {
     return toMessagingFailure("invalid_input", "Conversation reference is invalid.");
   }
 
@@ -336,11 +365,24 @@ export async function markConversationReadAction(
 export async function loadMessagingConversationSummariesAction(
   input: LoadConversationSummariesInput = {}
 ): Promise<MessagingResult<MessagingConversationSummariesResult>> {
-  return loadMessagingConversationSummariesQuery(input);
+  const normalizedInput = isRecord(input)
+    ? {
+        limit: readOptionalLimit(input.limit),
+      }
+    : {};
+
+  return loadMessagingConversationSummariesQuery(normalizedInput);
 }
 
 export async function loadMessagingThreadAction(
   input: LoadConversationThreadInput
 ): Promise<MessagingResult<MessagingThreadResult>> {
-  return loadMessagingThreadQuery(input);
+  if (!isRecord(input) || typeof input.conversationId !== "string") {
+    return toMessagingFailure("invalid_input", "Conversation reference is invalid.");
+  }
+
+  return loadMessagingThreadQuery({
+    conversationId: input.conversationId,
+    limit: readOptionalLimit(input.limit),
+  });
 }

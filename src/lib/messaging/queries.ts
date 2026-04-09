@@ -131,7 +131,9 @@ async function loadLatestMessagesMap(
 export async function loadMessagingConversationSummariesQuery(
   input: LoadConversationSummariesInput = {}
 ): Promise<MessagingResult<MessagingConversationSummariesResult>> {
-  const limit = clampLimit(input.limit, 40, 1, 120);
+  const normalizedInput =
+    input && typeof input === "object" ? (input as LoadConversationSummariesInput) : {};
+  const limit = clampLimit(normalizedInput.limit, 40, 1, 120);
 
   const contextResult = await getMessagingViewerContext();
   if (!contextResult.ok) {
@@ -262,7 +264,7 @@ export async function loadMessagingConversationSummariesQuery(
 export async function loadMessagingThreadQuery(
   input: LoadConversationThreadInput
 ): Promise<MessagingResult<MessagingThreadResult>> {
-  if (!isUuid(input.conversationId)) {
+  if (!input || typeof input !== "object" || !isUuid(input.conversationId)) {
     return toMessagingFailure("invalid_input", "Conversation reference is invalid.");
   }
 

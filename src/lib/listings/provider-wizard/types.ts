@@ -30,6 +30,10 @@ export const PROVIDER_WIZARD_STEP_LABELS: Record<ProviderWizardStep, string> = {
   review: "Review draft",
 };
 
+export function isProviderWizardStep(value: unknown): value is ProviderWizardStep {
+  return typeof value === "string" && PROVIDER_WIZARD_STEPS.includes(value as ProviderWizardStep);
+}
+
 export type ProviderDraftWizardValues = {
   title: string;
   description: string;

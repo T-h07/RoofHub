@@ -12,6 +12,7 @@ import type {
   ModerationReportQueueRow,
   ModerationStatusFilter,
 } from "./types";
+import { isModerationStatusFilter } from "./reporting";
 
 const MODERATION_REPORT_QUEUE_SELECT = `
   id,
@@ -163,8 +164,11 @@ export async function loadModerationReportQueue(
     limit?: number;
   } = {}
 ): Promise<{ ok: true; reports: ModerationReportQueueItem[] } | { ok: false; message: string; reports: [] }> {
-  const statusFilter = input.statusFilter ?? "open";
-  const limit = typeof input.limit === "number" ? Math.max(1, Math.min(200, Math.trunc(input.limit))) : 120;
+  const statusFilter = isModerationStatusFilter(input.statusFilter) ? input.statusFilter : "open";
+  const limit =
+    typeof input.limit === "number" && Number.isFinite(input.limit)
+      ? Math.max(1, Math.min(200, Math.trunc(input.limit)))
+      : 120;
 
   let query = supabase
     .from("listing_reports")

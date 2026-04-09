@@ -4,6 +4,7 @@ import { getCurrentUserProfile } from "@/lib/auth/profile";
 import { isProviderRole } from "@/lib/auth/roles";
 import { createServerSupabaseClient } from "@/lib/supabase";
 import { canTransitionProviderListingStatus } from "@/lib/listings/provider-wizard/status-transitions";
+import { isProviderListingStatus } from "./types";
 
 import type { ProviderListingStatus } from "./types";
 
@@ -178,10 +179,27 @@ async function loadProviderOwnedListing(
 export async function updateProviderListingLifecycleStatusAction(
   input: UpdateProviderListingLifecycleStatusInput
 ): Promise<UpdateProviderListingLifecycleStatusResult> {
-  if (!isUuid(input.listingId)) {
+  if (!input || typeof input !== "object") {
+    return {
+      ok: false,
+      message: "Listing status mutation payload is invalid.",
+    };
+  }
+
+  const listingId = typeof input.listingId === "string" ? input.listingId : null;
+  const nextStatus = input.nextStatus;
+
+  if (!listingId || !isUuid(listingId)) {
     return {
       ok: false,
       message: "Listing id is invalid.",
+    };
+  }
+
+  if (!isProviderListingStatus(nextStatus)) {
+    return {
+      ok: false,
+      message: "Listing status transition target is invalid.",
     };
   }
 
@@ -196,7 +214,7 @@ export async function updateProviderListingLifecycleStatusAction(
 
   const { supabase, profile } = context;
 
-  if (input.nextStatus === "hidden_by_admin") {
+  if (nextStatus === "hidden_by_admin") {
     return {
       ok: false,
       message: "Hidden-by-admin status can only be set by moderation workflows.",
@@ -204,7 +222,7 @@ export async function updateProviderListingLifecycleStatusAction(
   }
 
   const listingResult = await loadProviderOwnedListing(supabase, {
-    listingId: input.listingId,
+    listingId,
     userId: profile.id,
   });
 
@@ -216,7 +234,7 @@ export async function updateProviderListingLifecycleStatusAction(
   }
 
   const currentListing = listingResult.listing;
-  if (currentListing.listing_status === input.nextStatus) {
+  if (currentListing.listing_status === nextStatus) {
     return {
       ok: true,
       message: "Listing already has this status.",
@@ -225,15 +243,15 @@ export async function updateProviderListingLifecycleStatusAction(
     };
   }
 
-  if (!canTransitionProviderListingStatus(currentListing.listing_status, input.nextStatus)) {
+  if (!canTransitionProviderListingStatus(currentListing.listing_status, nextStatus)) {
     return {
       ok: false,
-      message: `Cannot move listing from ${currentListing.listing_status} to ${input.nextStatus}.`,
+      message: `Cannot move listing from ${currentListing.listing_status} to ${nextStatus}.`,
       previousStatus: currentListing.listing_status,
     };
   }
 
-  const patch = buildStatusPatch(input.nextStatus, currentListing);
+  const patch = buildStatusPatch(nextStatus, currentListing);
   const updateQuery = supabase
     .from("listings")
     .update(patch)

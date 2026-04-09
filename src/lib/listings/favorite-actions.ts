@@ -27,12 +27,33 @@ function isUuid(value: string) {
 export async function setFavoriteStatusAction(
   input: SetFavoriteStatusInput
 ): Promise<SetFavoriteStatusResult> {
-  if (!isUuid(input.listingId)) {
+  if (!input || typeof input !== "object") {
+    return {
+      ok: false,
+      isFavorited: false,
+      requiresAuth: false,
+      message: "Favorite action payload is invalid. Refresh and try again.",
+    };
+  }
+
+  const listingId = typeof input.listingId === "string" ? input.listingId : null;
+  const favorited = typeof input.favorited === "boolean" ? input.favorited : null;
+
+  if (!listingId || !isUuid(listingId)) {
     return {
       ok: false,
       isFavorited: false,
       requiresAuth: false,
       message: "Favorite action could not be completed. Refresh and try again.",
+    };
+  }
+
+  if (favorited === null) {
+    return {
+      ok: false,
+      isFavorited: false,
+      requiresAuth: false,
+      message: "Favorite state payload is invalid. Refresh and try again.",
     };
   }
 
@@ -54,7 +75,7 @@ export async function setFavoriteStatusAction(
     const { data: listing, error: listingError } = await supabase
       .from("listings")
       .select("id, slug")
-      .eq("id", input.listingId)
+      .eq("id", listingId)
       .eq("listing_status", PUBLIC_DISCOVERY_STATUS)
       .maybeSingle();
 
@@ -67,10 +88,10 @@ export async function setFavoriteStatusAction(
       };
     }
 
-    if (input.favorited) {
+    if (favorited) {
       const { error } = await supabase.from("favorites").insert({
         user_id: user.id,
-        listing_id: input.listingId,
+        listing_id: listingId,
       });
 
       if (error && error.code !== "23505") {
@@ -86,7 +107,7 @@ export async function setFavoriteStatusAction(
         .from("favorites")
         .delete()
         .eq("user_id", user.id)
-        .eq("listing_id", input.listingId);
+        .eq("listing_id", listingId);
 
       if (error) {
         return {
@@ -103,14 +124,14 @@ export async function setFavoriteStatusAction(
 
     return {
       ok: true,
-      isFavorited: input.favorited,
+      isFavorited: favorited,
       requiresAuth: false,
-      message: input.favorited ? "Saved to favorites." : "Removed from favorites.",
+      message: favorited ? "Saved to favorites." : "Removed from favorites.",
     };
   } catch {
     return {
       ok: false,
-      isFavorited: !input.favorited,
+      isFavorited: !favorited,
       requiresAuth: false,
       message: "Favorite action failed. Please try again.",
     };

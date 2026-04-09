@@ -13,6 +13,7 @@ import type {
   ProviderManagedListing,
   ProviderManagedListingRow,
 } from "./types";
+import { isProviderListingStatusFilter } from "./types";
 
 const PROVIDER_MANAGED_LISTINGS_SELECT = `
   id,
@@ -165,17 +166,25 @@ export async function loadProviderManagedListings(
     limit?: number;
   }
 ) {
+  const normalizedLimit =
+    typeof input.limit === "number" && Number.isFinite(input.limit)
+      ? Math.max(1, Math.min(300, Math.trunc(input.limit)))
+      : 120;
+  const statusFilter = isProviderListingStatusFilter(input.statusFilter)
+    ? input.statusFilter
+    : "all";
+
   let query = supabase
     .from("listings")
     .select(PROVIDER_MANAGED_LISTINGS_SELECT)
     .order("updated_at", { ascending: false })
     .order("created_at", { ascending: false })
-    .limit(input.limit ?? 120);
+    .limit(normalizedLimit);
 
   query = query.eq("owner_id", input.userId);
 
-  if (input.statusFilter && input.statusFilter !== "all") {
-    query = query.eq("listing_status", input.statusFilter);
+  if (statusFilter !== "all") {
+    query = query.eq("listing_status", statusFilter);
   }
 
   const { data, error } = await query;

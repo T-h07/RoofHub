@@ -4,7 +4,13 @@ import { createServerSupabaseClient } from "@/lib/supabase";
 import { getCurrentUserProfile } from "@/lib/auth/profile";
 import { isProviderRole } from "@/lib/auth/roles";
 
-import type { ProviderDraftWizardValues, ProviderWizardFieldErrors, ProviderWizardStep } from "./types";
+import {
+  PROVIDER_WIZARD_DEFAULT_VALUES,
+  isProviderWizardStep,
+  type ProviderDraftWizardValues,
+  type ProviderWizardFieldErrors,
+  type ProviderWizardStep,
+} from "./types";
 import {
   validateAmenitiesStep,
   validateBasicsStep,
@@ -49,12 +55,145 @@ export type SaveProviderWizardStepResult = {
   reviewBlockers?: string[];
 };
 
-function isUuid(value: string | null | undefined) {
+type ProviderWizardStringFieldKey = {
+  [K in keyof ProviderDraftWizardValues]: ProviderDraftWizardValues[K] extends string ? K : never;
+}[keyof ProviderDraftWizardValues];
+
+type ProviderWizardBooleanFieldKey = {
+  [K in keyof ProviderDraftWizardValues]: ProviderDraftWizardValues[K] extends boolean ? K : never;
+}[keyof ProviderDraftWizardValues];
+
+function isUuid(value: string | null | undefined): value is string {
   if (typeof value !== "string") {
     return false;
   }
 
   return UUID_PATTERN.test(value);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object";
+}
+
+function readStringField(
+  record: Record<string, unknown>,
+  key: ProviderWizardStringFieldKey
+): string {
+  const value = record[key];
+  return typeof value === "string" ? value : PROVIDER_WIZARD_DEFAULT_VALUES[key];
+}
+
+function readBooleanField(
+  record: Record<string, unknown>,
+  key: ProviderWizardBooleanFieldKey
+): boolean {
+  const value = record[key];
+  return typeof value === "boolean" ? value : PROVIDER_WIZARD_DEFAULT_VALUES[key];
+}
+
+function readNullableCoordinate(record: Record<string, unknown>, key: "latitude" | "longitude") {
+  const value = record[key];
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+
+  return null;
+}
+
+function sanitizeDraftWizardValues(value: unknown): ProviderDraftWizardValues {
+  if (!isRecord(value)) {
+    return {
+      ...PROVIDER_WIZARD_DEFAULT_VALUES,
+      contactMethods: [...PROVIDER_WIZARD_DEFAULT_VALUES.contactMethods],
+    };
+  }
+
+  const contactMethods = Array.isArray(value.contactMethods)
+    ? Array.from(
+        new Set(
+          value.contactMethods
+            .filter((method): method is string => typeof method === "string")
+            .slice(0, 8)
+        )
+      )
+    : [...PROVIDER_WIZARD_DEFAULT_VALUES.contactMethods];
+
+  return {
+    title: readStringField(value, "title"),
+    description: readStringField(value, "description"),
+    listingType: readStringField(value, "listingType") as ProviderDraftWizardValues["listingType"],
+    propertyType: readStringField(value, "propertyType") as ProviderDraftWizardValues["propertyType"],
+    priceAmount: readStringField(value, "priceAmount"),
+    currencyCode: readStringField(value, "currencyCode"),
+    depositAmount: readStringField(value, "depositAmount"),
+    areaM2: readStringField(value, "areaM2"),
+    bedrooms: readStringField(value, "bedrooms"),
+    bathrooms: readStringField(value, "bathrooms"),
+    floorNumber: readStringField(value, "floorNumber"),
+    totalFloors: readStringField(value, "totalFloors"),
+    city: readStringField(value, "city"),
+    neighborhood: readStringField(value, "neighborhood"),
+    addressText: readStringField(value, "addressText"),
+    latitude: readNullableCoordinate(value, "latitude"),
+    longitude: readNullableCoordinate(value, "longitude"),
+    publicLocationMode: readStringField(
+      value,
+      "publicLocationMode"
+    ) as ProviderDraftWizardValues["publicLocationMode"],
+    availableFrom: readStringField(value, "availableFrom"),
+    furnished: readBooleanField(value, "furnished"),
+    parking: readBooleanField(value, "parking"),
+    petsAllowed: readBooleanField(value, "petsAllowed"),
+    elevator: readBooleanField(value, "elevator"),
+    balcony: readBooleanField(value, "balcony"),
+    internetIncluded: readBooleanField(value, "internetIncluded"),
+    utilitiesIncluded: readBooleanField(value, "utilitiesIncluded"),
+    heatingType: readStringField(value, "heatingType") as ProviderDraftWizardValues["heatingType"],
+    preferredContactMethod: readStringField(
+      value,
+      "preferredContactMethod"
+    ) as ProviderDraftWizardValues["preferredContactMethod"],
+    contactMethods: contactMethods as ProviderDraftWizardValues["contactMethods"],
+    contactEmail: readStringField(value, "contactEmail"),
+    contactPhone: readStringField(value, "contactPhone"),
+    whatsappPhone: readStringField(value, "whatsappPhone"),
+    viberPhone: readStringField(value, "viberPhone"),
+  };
+}
+
+function normalizeSaveStepInput(input: SaveProviderWizardStepInput | unknown):
+  | {
+      ok: true;
+      step: ProviderWizardStep;
+      values: ProviderDraftWizardValues;
+      draftId: string | null;
+      createDraftId: string | null;
+    }
+  | {
+      ok: false;
+      message: string;
+    } {
+  if (!isRecord(input)) {
+    return {
+      ok: false,
+      message: "Draft save payload is invalid.",
+    };
+  }
+
+  if (!isProviderWizardStep(input.step)) {
+    return {
+      ok: false,
+      message: "Draft step is invalid.",
+    };
+  }
+
+  return {
+    ok: true,
+    step: input.step,
+    values: sanitizeDraftWizardValues(input.values),
+    draftId: typeof input.draftId === "string" ? input.draftId : null,
+    createDraftId: typeof input.createDraftId === "string" ? input.createDraftId : null,
+  };
 }
 
 function normalizeSupabaseError(message: string) {
@@ -227,6 +366,15 @@ async function updateDraftListing(
 export async function saveProviderWizardStepAction(
   input: SaveProviderWizardStepInput
 ): Promise<SaveProviderWizardStepResult> {
+  const normalizedInput = normalizeSaveStepInput(input);
+  if (!normalizedInput.ok) {
+    return {
+      ok: false,
+      draftId: null,
+      message: normalizedInput.message,
+    };
+  }
+
   const providerContext = await ensureProviderContext();
 
   if (!providerContext.ok) {
@@ -238,11 +386,12 @@ export async function saveProviderWizardStepAction(
   }
 
   const { supabase, profile, userEmail } = providerContext;
-  const candidateDraftId = input.draftId ?? null;
+  const { step, values, createDraftId } = normalizedInput;
+  const candidateDraftId = normalizedInput.draftId;
 
   try {
-    if (input.step === "basics") {
-      const basicsValidation = validateBasicsStep(input.values);
+    if (step === "basics") {
+      const basicsValidation = validateBasicsStep(values);
       if (!basicsValidation.ok) {
         return {
           ok: false,
@@ -274,7 +423,7 @@ export async function saveProviderWizardStepAction(
         };
       }
 
-      const draftId = isUuid(input.createDraftId) ? input.createDraftId! : crypto.randomUUID();
+      const draftId = isUuid(createDraftId) ? createDraftId : crypto.randomUUID();
       const slug = buildDraftSlug(basicsValidation.payload.title, draftId);
 
       const { error } = await supabase.from("listings").insert({
@@ -329,8 +478,8 @@ export async function saveProviderWizardStepAction(
       };
     }
 
-    if (input.step === "pricing") {
-      const pricingValidation = validatePricingStep(input.values);
+    if (step === "pricing") {
+      const pricingValidation = validatePricingStep(values);
 
       if (!pricingValidation.ok) {
         return {
@@ -368,8 +517,8 @@ export async function saveProviderWizardStepAction(
       };
     }
 
-    if (input.step === "facts") {
-      const factsValidation = validateFactsStep(input.values);
+    if (step === "facts") {
+      const factsValidation = validateFactsStep(values);
 
       if (!factsValidation.ok) {
         return {
@@ -393,8 +542,8 @@ export async function saveProviderWizardStepAction(
       };
     }
 
-    if (input.step === "location") {
-      const locationValidation = validateLocationStep(input.values);
+    if (step === "location") {
+      const locationValidation = validateLocationStep(values);
 
       if (!locationValidation.ok) {
         return {
@@ -418,8 +567,8 @@ export async function saveProviderWizardStepAction(
       };
     }
 
-    if (input.step === "amenities") {
-      const amenitiesValidation = validateAmenitiesStep(input.values);
+    if (step === "amenities") {
+      const amenitiesValidation = validateAmenitiesStep(values);
 
       if (!amenitiesValidation.ok) {
         return {
@@ -443,8 +592,8 @@ export async function saveProviderWizardStepAction(
       };
     }
 
-    if (input.step === "contact") {
-      const contactValidation = validateContactStep(input.values);
+    if (step === "contact") {
+      const contactValidation = validateContactStep(values);
 
       if (!contactValidation.ok) {
         return {
@@ -496,7 +645,7 @@ export async function saveProviderWizardStepAction(
       };
     }
 
-    if (input.step === "photos") {
+    if (step === "photos") {
       return {
         ok: true,
         draftId: candidateDraftId,
@@ -504,7 +653,7 @@ export async function saveProviderWizardStepAction(
       };
     }
 
-    const reviewValidation = validateReviewStep(input.values);
+    const reviewValidation = validateReviewStep(values);
 
     if (!reviewValidation.isReadyForDraft) {
       return {
