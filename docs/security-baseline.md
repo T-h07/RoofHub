@@ -77,6 +77,7 @@ Supply-chain execution details are defined in `docs/supply-chain-guardrails.md`.
 - Keep query parsing typed and bounded (numeric ranges, enums, defaults).
 - Render user-generated content safely; avoid unsafe HTML interpolation.
 - Keep public/private data separation explicit in loaders and projections.
+- Preserve SH-PT04 request/output guardrails documented in `docs/request-output-validation-hardening.md`.
 
 ### 7) Logging and error handling
 

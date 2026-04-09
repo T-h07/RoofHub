@@ -53,11 +53,20 @@
 - Keep moderation-controlled states (for example `hidden_by_admin`) admin-controlled in server mutations.
 - Preserve app-layer ownership/participant checks alongside RLS; do not remove app checks assuming RLS alone is enough.
 
+## Request/data/output invariants
+- Treat all server-action payloads as untrusted at runtime; validate shape and enum values before business logic.
+- Keep strict query/route param parsing for explore, map, and listing/provider route identifiers.
+- Reject malformed UUID/slug/bounds/search inputs early and fail closed.
+- Keep user-generated text surfaces escaped-by-default; do not introduce unsafe HTML rendering.
+- Do not surface raw backend/provider exception messages to users from actions/routes.
+- Preserve and follow `docs/request-output-validation-hardening.md` for request-boundary changes.
+
 ## Required workflow for security-sensitive changes
 - Update `docs/security-baseline.md` when behavior, trust boundaries, or assumptions change.
 - Run and complete `docs/security-checklist.md` before merge for security-sensitive work.
 - Follow `docs/supply-chain-guardrails.md` when changing dependencies, lockfiles, or security workflows.
 - For authz boundary changes, update `docs/authorization-boundary-audit.md`.
+- For input/output boundary changes, update `docs/request-output-validation-hardening.md`.
 - Add tests or explicit validation notes for sensitive behavior changes (authz, ownership, visibility, storage, redirects, moderation).
 - Document newly added route handlers/server actions and their authorization/input-validation approach.
 

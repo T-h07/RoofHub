@@ -21,10 +21,14 @@ For dependency/lockfile/scanner specifics, also follow `docs/supply-chain-guardr
 ## Input and output safety
 
 - [ ] Route params, query params, and form/body payloads are validated and typed.
+- [ ] Sensitive server-action payloads include runtime shape checks (not TypeScript-only assumptions).
+- [ ] Numeric/date parsing uses strict token validation (no permissive partial parse behavior).
 - [ ] Callback and redirect parameters are sanitized and constrained to safe targets.
 - [ ] Unsafe or unbounded parsing paths were not introduced.
 - [ ] User-generated text is rendered safely (no unsafe HTML interpolation).
+- [ ] User-facing errors do not expose raw backend/provider exception text.
 - [ ] Public/private data exposure was reviewed for all changed queries/responses.
+- [ ] Changes preserve `docs/request-output-validation-hardening.md` guardrails.
 
 ## Storage and visibility
 

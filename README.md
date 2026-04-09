@@ -348,6 +348,13 @@ Security-sensitive changes must follow the baseline and complete the checklist b
 - Enforced role/ownership/participant authorization contract: `docs/authorization-boundary-audit.md`
 - Works alongside RLS policy boundaries documented in: `docs/rls-policies.md`
 
+## Input, Output, and Data Validation Hardening (SH-PT04)
+
+- Request-boundary map and validation contract: `docs/request-output-validation-hardening.md`
+- Works alongside baseline guardrails in:
+  - `docs/security-baseline.md`
+  - `docs/security-checklist.md`
+
 ## Supply Chain Guardrails (SH-PT07)
 
 - Repository-level supply-chain policy and scanner response workflow: `docs/supply-chain-guardrails.md`
@@ -388,4 +395,5 @@ See:
 - `docs/security-checklist.md`
 - `docs/auth-session-hardening.md`
 - `docs/authorization-boundary-audit.md`
+- `docs/request-output-validation-hardening.md`
 - `docs/supply-chain-guardrails.md`
