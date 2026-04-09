@@ -100,6 +100,7 @@ export async function loadProviderListingOverviewMetrics(
     archivedResult,
     soldResult,
     rentedResult,
+    hiddenByAdminResult,
   ] = await Promise.all([
     countProviderListingsByStatus(supabase, input),
     countProviderListingsByStatus(supabase, { ...input, status: "published" }),
@@ -108,6 +109,7 @@ export async function loadProviderListingOverviewMetrics(
     countProviderListingsByStatus(supabase, { ...input, status: "archived" }),
     countProviderListingsByStatus(supabase, { ...input, status: "sold" }),
     countProviderListingsByStatus(supabase, { ...input, status: "rented" }),
+    countProviderListingsByStatus(supabase, { ...input, status: "hidden_by_admin" }),
   ]);
 
   const failedResult = [
@@ -118,6 +120,7 @@ export async function loadProviderListingOverviewMetrics(
     archivedResult,
     soldResult,
     rentedResult,
+    hiddenByAdminResult,
   ].find((result) => !result.ok);
 
   if (failedResult && !failedResult.ok) {
@@ -132,6 +135,7 @@ export async function loadProviderListingOverviewMetrics(
         archived: 0,
         sold: 0,
         rented: 0,
+        hiddenByAdmin: 0,
         unreadLeadsPlaceholder: 0,
       } satisfies ProviderListingOverviewMetrics,
     };
@@ -147,6 +151,7 @@ export async function loadProviderListingOverviewMetrics(
       archived: archivedResult.count,
       sold: soldResult.count,
       rented: rentedResult.count,
+      hiddenByAdmin: hiddenByAdminResult.count,
       unreadLeadsPlaceholder: 0,
     } satisfies ProviderListingOverviewMetrics,
   };

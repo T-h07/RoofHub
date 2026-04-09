@@ -115,7 +115,7 @@ export async function loadProviderDraftForEditor(
   if (error || !data) {
     return {
       ok: false as const,
-      message: "Draft listing not found or inaccessible.",
+      message: "Listing not found or inaccessible.",
       draft: null as ProviderDraftEditorRecord | null,
     };
   }

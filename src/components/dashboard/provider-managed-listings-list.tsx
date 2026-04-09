@@ -125,6 +125,10 @@ export function ProviderManagedListingsList({ listings }: ProviderManagedListing
                           View public listing
                           <SquareArrowOutUpRight className="size-3" aria-hidden="true" />
                         </Link>
+                      ) : listing.listing_status === "hidden_by_admin" ? (
+                        <p className="text-destructive text-xs">
+                          Hidden by admin moderation from public discovery.
+                        </p>
                       ) : null}
                     </div>
                   </div>
@@ -184,6 +188,8 @@ export function ProviderManagedListingsList({ listings }: ProviderManagedListing
                   View public listing
                   <SquareArrowOutUpRight className="size-3.5" aria-hidden="true" />
                 </Link>
+              ) : listing.listing_status === "hidden_by_admin" ? (
+                <p className="text-destructive">Hidden by admin moderation.</p>
               ) : null}
             </div>
 

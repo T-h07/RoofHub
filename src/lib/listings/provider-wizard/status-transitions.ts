@@ -4,9 +4,10 @@ const STATUS_TRANSITION_MAP: Record<ProviderListingStatus, ProviderListingStatus
   draft: ["published", "archived"],
   published: ["paused", "archived", "sold", "rented"],
   paused: ["published", "archived", "sold", "rented"],
-  archived: [],
-  sold: [],
-  rented: [],
+  archived: ["draft"],
+  sold: ["archived"],
+  rented: ["archived"],
+  hidden_by_admin: [],
 };
 
 export function getAllowedProviderListingStatusTransitions(

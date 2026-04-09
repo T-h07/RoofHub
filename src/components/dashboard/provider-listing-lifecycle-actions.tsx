@@ -41,8 +41,10 @@ type ProviderListingLifecycleActionsProps = {
   listingId: string;
   listingType: ProviderListingType;
   currentStatus: ProviderListingStatus;
-  editHref: string;
+  editHref?: string;
   className?: string;
+  hideEditAction?: boolean;
+  showUnsavedWarning?: boolean;
 };
 
 function buildLifecycleActions(input: {
@@ -57,8 +59,18 @@ function buildLifecycleActions(input: {
       key: "activate",
       label: "Set active",
       nextStatus: "published",
-      requiresConfirmation: false,
+      requiresConfirmation: true,
       description: "Listing returns to active discovery state.",
+    });
+  }
+
+  if (canTransitionProviderListingStatus(currentStatus, "draft")) {
+    actions.push({
+      key: "restore-draft",
+      label: "Move to draft",
+      nextStatus: "draft",
+      requiresConfirmation: true,
+      description: "Listing returns to draft and leaves active lifecycle states.",
     });
   }
 
@@ -112,6 +124,8 @@ export function ProviderListingLifecycleActions({
   currentStatus,
   editHref,
   className,
+  hideEditAction = false,
+  showUnsavedWarning = false,
 }: ProviderListingLifecycleActionsProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -121,6 +135,7 @@ export function ProviderListingLifecycleActions({
     () => buildLifecycleActions({ listingType, currentStatus }),
     [listingType, currentStatus]
   );
+  const isAdminHidden = currentStatus === "hidden_by_admin";
 
   function runTransition(input: UpdateProviderListingLifecycleStatusInput) {
     startTransition(async () => {
@@ -138,9 +153,11 @@ export function ProviderListingLifecycleActions({
 
   return (
     <div className={cn("flex flex-wrap items-center gap-1.5", className)}>
-      <Link href={editHref} className={buttonVariants({ variant: "outline", size: "sm" })}>
-        Edit
-      </Link>
+      {!hideEditAction && editHref ? (
+        <Link href={editHref} className={buttonVariants({ variant: "outline", size: "sm" })}>
+          Edit
+        </Link>
+      ) : null}
 
       {actions.map((action) => (
         <button
@@ -171,6 +188,10 @@ export function ProviderListingLifecycleActions({
         </button>
       ))}
 
+      {isAdminHidden ? (
+        <p className="text-destructive text-xs">Status locked by admin moderation.</p>
+      ) : null}
+
       <Dialog open={Boolean(confirmAction)} onOpenChange={(open) => !open && setConfirmAction(null)}>
         <DialogContent showClose={!isPending}>
           <DialogHeader>
@@ -187,6 +208,11 @@ export function ProviderListingLifecycleActions({
               <span className="block text-xs">
                 {confirmAction?.description}
               </span>
+              {showUnsavedWarning ? (
+                <span className="block text-xs text-muted-foreground">
+                  Save pending form changes before confirming status updates to avoid losing in-page edits.
+                </span>
+              ) : null}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

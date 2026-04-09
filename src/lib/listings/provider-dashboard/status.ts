@@ -7,6 +7,7 @@ export const PROVIDER_LISTING_STATUS_LABELS: Record<ProviderListingStatus, strin
   archived: "Archived",
   sold: "Sold",
   rented: "Rented",
+  hidden_by_admin: "Hidden by admin",
 };
 
 export const PROVIDER_LISTING_FILTER_LABELS: Record<ProviderListingStatusFilter, string> = {
@@ -17,6 +18,7 @@ export const PROVIDER_LISTING_FILTER_LABELS: Record<ProviderListingStatusFilter,
   sold: "Sold",
   rented: "Rented",
   archived: "Archived",
+  hidden_by_admin: "Hidden by admin",
 };
 
 export function formatProviderListingStatus(value: ProviderListingStatus) {

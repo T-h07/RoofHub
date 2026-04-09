@@ -59,6 +59,7 @@ export default async function NewDashboardListingPage() {
         mode="new"
         initialStep="basics"
         initialDraftId={null}
+        initialListingStatus="draft"
         initialValues={initialValues}
         initialImages={[]}
         providerOwnerId={context.profile.id}

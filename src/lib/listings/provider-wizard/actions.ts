@@ -133,11 +133,13 @@ async function ensureDraftAccess(
     return {
       ok: false as const,
       message: "Draft listing not found or inaccessible.",
+      listing: null as { id: string; owner_id: string; listing_status: string } | null,
     };
   }
 
   return {
     ok: true as const,
+    listing: data as { id: string; owner_id: string; listing_status: string },
   };
 }
 
@@ -280,11 +282,11 @@ export async function saveProviderWizardStepAction(
     }
 
     const accessResult = await ensureDraftAccess(candidateDraftId, profile.id, isAdmin, supabase);
-    if (!accessResult.ok) {
+    if (!accessResult.ok || !accessResult.listing) {
       return {
         ok: false,
         draftId: candidateDraftId,
-        message: accessResult.message,
+        message: accessResult.ok ? "Listing not found or inaccessible." : accessResult.message,
       };
     }
 
@@ -297,6 +299,20 @@ export async function saveProviderWizardStepAction(
           draftId: candidateDraftId,
           message: "Fix pricing fields and retry.",
           fieldErrors: pricingValidation.errors,
+        };
+      }
+
+      if (
+        accessResult.listing.listing_status === "published" &&
+        pricingValidation.payload.price_amount <= 0
+      ) {
+        return {
+          ok: false,
+          draftId: candidateDraftId,
+          message: "Active listings require a price greater than zero.",
+          fieldErrors: {
+            priceAmount: "Set a price greater than zero or pause/archive the listing first.",
+          },
         };
       }
 

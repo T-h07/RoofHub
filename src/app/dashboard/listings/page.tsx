@@ -57,6 +57,7 @@ function formatFilterCount(filter: ProviderListingStatusFilter, counts: {
   sold: number;
   rented: number;
   archived: number;
+  hiddenByAdmin: number;
 }) {
   switch (filter) {
     case "all":
@@ -73,6 +74,8 @@ function formatFilterCount(filter: ProviderListingStatusFilter, counts: {
       return counts.rented;
     case "archived":
       return counts.archived;
+    case "hidden_by_admin":
+      return counts.hiddenByAdmin;
     default:
       return 0;
   }

@@ -5,6 +5,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createListingImageSignedUrl } from "@/lib/supabase/storage/listing-images";
 import { createServerSupabaseClient } from "@/lib/supabase";
 import type { Database, Tables } from "@/types/database";
+import { PUBLIC_DISCOVERY_STATUS } from "./visibility";
 
 type ExploreListingSummaryRow = Pick<
   Tables<"listings">,
@@ -161,7 +162,7 @@ export async function loadViewerFavoriteListings(
         `
         )
         .eq("user_id", userId)
-        .eq("listings.listing_status", "published")
+        .eq("listings.listing_status", PUBLIC_DISCOVERY_STATUS)
         .order("created_at", { ascending: false })
         .limit(200),
     ]);

@@ -38,6 +38,7 @@ export type ProviderListingOverviewMetrics = {
   archived: number;
   sold: number;
   rented: number;
+  hiddenByAdmin: number;
   unreadLeadsPlaceholder: number;
 };
 
@@ -49,6 +50,7 @@ export const PROVIDER_LISTING_STATUS_FILTERS = [
   "sold",
   "rented",
   "archived",
+  "hidden_by_admin",
 ] as const;
 
 export type ProviderListingStatusFilter = (typeof PROVIDER_LISTING_STATUS_FILTERS)[number];

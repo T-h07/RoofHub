@@ -440,6 +440,7 @@ export type Database = {
         | "archived"
         | "sold"
         | "rented"
+        | "hidden_by_admin"
       listing_type: "rent" | "sale"
       preferred_contact_method: "in_app" | "phone" | "email"
       property_type: "apartment" | "house" | "studio" | "land" | "commercial"
@@ -584,7 +585,15 @@ export const Constants = {
     Enums: {
       app_role: ["seeker", "provider", "admin"],
       heating_type: ["central", "electric", "gas", "district", "other"],
-      listing_status: ["draft", "published", "paused", "archived", "sold", "rented"],
+      listing_status: [
+        "draft",
+        "published",
+        "paused",
+        "archived",
+        "sold",
+        "rented",
+        "hidden_by_admin",
+      ],
       listing_type: ["rent", "sale"],
       preferred_contact_method: ["in_app", "phone", "email"],
       property_type: ["apartment", "house", "studio", "land", "commercial"],

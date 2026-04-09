@@ -1,4 +1,5 @@
 import type { ExploreSearchState } from "./explore-search-params";
+import { PUBLIC_DISCOVERY_STATUS } from "./visibility";
 
 type PublicListingFilterQuery<TQuery> = {
   eq(column: string, value: unknown): TQuery;
@@ -19,7 +20,7 @@ export function applyPublicListingFilters<TQuery extends PublicListingFilterQuer
   inputQuery: TQuery,
   state: ExploreSearchState
 ) {
-  let query = inputQuery.eq("listing_status", "published");
+  let query = inputQuery.eq("listing_status", PUBLIC_DISCOVERY_STATUS);
 
   if (state.listingType) {
     query = query.eq("listing_type", state.listingType);

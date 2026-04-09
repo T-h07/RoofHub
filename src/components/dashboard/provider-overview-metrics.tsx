@@ -60,6 +60,13 @@ export function ProviderOverviewMetrics({ metrics }: ProviderOverviewMetricsProp
       detail: `${metrics.sold} sold • ${metrics.rented} rented`,
       icon: Building2,
     },
+    {
+      id: "hidden-by-admin",
+      label: "Hidden by admin",
+      value: metrics.hiddenByAdmin,
+      detail: "Admin-moderated listings hidden from public discovery.",
+      icon: LockKeyhole,
+    },
   ];
 
   return (

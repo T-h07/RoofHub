@@ -69,6 +69,8 @@ function normalizeSupabaseError(message: string) {
 
 function getLifecycleStatusSuccessMessage(nextStatus: ProviderListingStatus) {
   switch (nextStatus) {
+    case "draft":
+      return "Listing restored to draft.";
     case "paused":
       return "Listing paused.";
     case "archived":
@@ -79,7 +81,8 @@ function getLifecycleStatusSuccessMessage(nextStatus: ProviderListingStatus) {
       return "Listing marked as rented.";
     case "published":
       return "Listing set to active.";
-    case "draft":
+    case "hidden_by_admin":
+      return "Listing status updated by admin controls.";
     default:
       return "Listing status updated.";
   }
@@ -89,6 +92,14 @@ function buildStatusPatch(
   nextStatus: ProviderListingStatus,
   currentListing: ProviderOwnedListingStatus
 ) {
+  if (nextStatus === "draft") {
+    return {
+      listing_status: nextStatus,
+      archived_at: null,
+      published_at: null,
+    };
+  }
+
   if (nextStatus === "published") {
     return {
       listing_status: nextStatus,
@@ -190,6 +201,14 @@ export async function updateProviderListingLifecycleStatusAction(
   }
 
   const { supabase, profile, isAdmin } = context;
+
+  if (input.nextStatus === "hidden_by_admin") {
+    return {
+      ok: false,
+      message: "Hidden-by-admin status can only be set by moderation workflows.",
+    };
+  }
+
   const listingResult = await loadProviderOwnedListing(supabase, {
     listingId: input.listingId,
     userId: profile.id,

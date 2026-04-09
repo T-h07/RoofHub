@@ -7,6 +7,7 @@ import type { Tables } from "@/types/database";
 import { EXPLORE_PAGE_SIZE, type ExploreSearchState } from "./explore-search-params";
 import { loadFavoriteListingIdsForUser } from "./favorites";
 import { applyPublicListingFilters } from "./public-listing-filters";
+import { PUBLIC_DISCOVERY_STATUS } from "./visibility";
 
 type PublicExploreListingRow = Pick<
   Tables<"listings">,
@@ -120,7 +121,7 @@ async function loadPublishedCityOptions() {
   const { data } = await supabase
     .from("listings")
     .select("city")
-    .eq("listing_status", "published")
+    .eq("listing_status", PUBLIC_DISCOVERY_STATUS)
     .order("city", { ascending: true })
     .limit(250);
 

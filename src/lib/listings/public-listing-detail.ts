@@ -3,6 +3,7 @@ import "server-only";
 import { createServerSupabaseClient } from "@/lib/supabase";
 import { createListingImageSignedUrl } from "@/lib/supabase/storage/listing-images";
 import type { Tables } from "@/types/database";
+import { PUBLIC_DISCOVERY_STATUS } from "@/lib/listings/visibility";
 
 type PublicListingDetailRow = Pick<
   Tables<"listings">,
@@ -211,7 +212,7 @@ export async function loadPublicListingDetailBySlug(
       .from("listings")
       .select(PUBLIC_LISTING_DETAIL_SELECT)
       .eq("slug", normalizedSlug)
-      .eq("listing_status", "published")
+      .eq("listing_status", PUBLIC_DISCOVERY_STATUS)
       .maybeSingle();
 
     if (error) {

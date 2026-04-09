@@ -32,16 +32,19 @@ import {
   PROVIDER_WIZARD_STEP_LABELS,
   PROVIDER_WIZARD_STEPS,
   type ProviderDraftImage,
+  type ProviderListingStatus,
   type ProviderDraftWizardValues,
   type ProviderWizardFieldErrors,
   type ProviderWizardStep,
 } from "@/lib/listings/provider-wizard/types";
+import { canTransitionProviderListingStatus } from "@/lib/listings/provider-wizard/status-transitions";
 import { cn } from "@/lib/utils";
 
 type ProviderListingWizardProps = {
   mode: "new" | "edit";
   initialStep: ProviderWizardStep;
   initialDraftId: string | null;
+  initialListingStatus?: ProviderListingStatus;
   initialValues: ProviderDraftWizardValues;
   initialImages: ProviderDraftImage[];
   providerOwnerId: string;
@@ -108,6 +111,7 @@ export function ProviderListingWizard({
   mode,
   initialStep,
   initialDraftId,
+  initialListingStatus = "draft",
   initialValues,
   initialImages,
   providerOwnerId,
@@ -117,6 +121,7 @@ export function ProviderListingWizard({
   const [isPending, startTransition] = useTransition();
   const [currentStep, setCurrentStep] = useState<ProviderWizardStep>(initialStep);
   const [draftId, setDraftId] = useState<string | null>(initialDraftId);
+  const [listingStatus, setListingStatus] = useState<ProviderListingStatus>(initialListingStatus);
   const [draft, setDraft] = useState<ProviderDraftWizardValues>(initialValues);
   const [fieldErrors, setFieldErrors] = useState<ProviderWizardFieldErrors>({});
   const [reviewBlockers, setReviewBlockers] = useState<string[]>([]);
@@ -171,6 +176,7 @@ export function ProviderListingWizard({
   const currentStepIndex = PROVIDER_WIZARD_STEPS.indexOf(currentStep);
   const previousStep = getPreviousProviderWizardStep(currentStep);
   const nextStep = getNextProviderWizardStep(currentStep);
+  const canPublishFromCurrentStatus = canTransitionProviderListingStatus(listingStatus, "published");
 
   function setField<K extends keyof ProviderDraftWizardValues>(key: K, value: ProviderDraftWizardValues[K]) {
     setDraft((current) => ({ ...current, [key]: value }));
@@ -420,6 +426,9 @@ export function ProviderListingWizard({
       setStatusTone("success");
       setStatusMessage(publishResult.message);
       setPublishBlockers([]);
+      if (publishResult.nextStatus) {
+        setListingStatus(publishResult.nextStatus);
+      }
       toast.success("Listing is now live.");
       router.push(`/listing/${publishResult.listingSlug}`);
     });
@@ -1009,9 +1018,28 @@ export function ProviderListingWizard({
             <p className="mt-1">{reviewBlockers.join(", ")}</p>
           </div>
         ) : (
-          <div className="border-emerald-500/35 bg-emerald-500/10 rounded-lg border px-4 py-3 text-sm text-emerald-100">
-            Listing is publish-ready. You can publish as soon as you confirm this summary.
-          </div>
+          <>
+            {canPublishFromCurrentStatus ? (
+              <div className="border-emerald-500/35 bg-emerald-500/10 rounded-lg border px-4 py-3 text-sm text-emerald-100">
+                Listing is publish-ready. You can publish as soon as you confirm this summary.
+              </div>
+            ) : listingStatus === "hidden_by_admin" ? (
+              <div className="border-destructive/40 bg-destructive/10 rounded-lg border px-4 py-3 text-sm">
+                <p className="font-semibold">Listing is currently hidden by admin.</p>
+                <p className="mt-1 text-xs text-destructive-foreground">
+                  You can update listing content, but public visibility is locked until moderation state changes.
+                </p>
+              </div>
+            ) : listingStatus === "published" ? (
+              <div className="border-emerald-500/35 bg-emerald-500/10 rounded-lg border px-4 py-3 text-sm text-emerald-100">
+                Listing remains active. Save review updates to keep this public listing up to date.
+              </div>
+            ) : (
+              <div className="border-border/70 bg-muted/25 rounded-lg border px-4 py-3 text-sm text-muted-foreground">
+                Review updates are ready to save.
+              </div>
+            )}
+          </>
         )}
 
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -1129,6 +1157,10 @@ export function ProviderListingWizard({
           <CardDescription>
             Provider posting flow with draft-safe saves, persisted photos, and publish-readiness checks.
           </CardDescription>
+          <p className="text-muted-foreground text-xs">
+            Current status: <span className="font-medium">{listingStatus.replaceAll("_", " ")}</span> • Public
+            visibility: {listingStatus === "published" ? "visible" : "hidden from discovery"}
+          </p>
         </div>
       </CardHeader>
 
@@ -1203,7 +1235,11 @@ export function ProviderListingWizard({
             disabled={isPending}
             onClick={() => {
               if (currentStep === "review") {
-                publishDraft();
+                if (canPublishFromCurrentStatus) {
+                  publishDraft();
+                } else {
+                  persistStep(true);
+                }
                 return;
               }
 
@@ -1212,11 +1248,13 @@ export function ProviderListingWizard({
             className={buttonVariants({ size: "sm" })}
           >
             {isPending ? <LoaderCircle className="size-4 animate-spin" aria-hidden="true" /> : null}
-            {currentStep === "review" ? (
+            {currentStep === "review" && canPublishFromCurrentStatus ? (
               <>
                 <Rocket className="size-4" aria-hidden="true" />
                 Publish listing
               </>
+            ) : currentStep === "review" ? (
+              "Save review"
             ) : (
               <>
                 Save & continue

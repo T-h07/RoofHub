@@ -16,6 +16,8 @@ function getStatusVariant(status: ProviderListingStatus) {
     case "sold":
     case "rented":
       return "primary" as const;
+    case "hidden_by_admin":
+      return "destructive" as const;
     case "archived":
     default:
       return "neutral" as const;

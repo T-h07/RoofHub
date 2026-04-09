@@ -312,6 +312,24 @@ export async function syncProviderListingPhotosAction(
     };
   }
 
+  if (draftAccess.listing.listing_status === "published") {
+    if (normalizedImages.length < 1) {
+      return {
+        ok: false,
+        message: "Active listings must keep at least one photo.",
+        images: [],
+      };
+    }
+
+    if (!normalizedImages.some((image) => image.isCover)) {
+      return {
+        ok: false,
+        message: "Active listings must keep a cover photo.",
+        images: [],
+      };
+    }
+  }
+
   try {
     const { data: existingRows, error: existingError } = await supabase
       .from("listing_images")
@@ -449,6 +467,14 @@ export async function publishProviderListingDraftAction(
   if (
     !canTransitionProviderListingStatus(draftResult.draft.listing_status, "published")
   ) {
+    if (draftResult.draft.listing_status === "hidden_by_admin") {
+      return {
+        ok: false,
+        message:
+          "This listing is hidden by admin moderation and cannot be republished from provider controls.",
+      };
+    }
+
     return {
       ok: false,
       message: `Listing cannot transition from ${draftResult.draft.listing_status} to published.`,
