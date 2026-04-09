@@ -3,18 +3,10 @@
 import { createServerSupabaseClient } from "@/lib/supabase";
 import type { Enums } from "@/types/database";
 import { PUBLIC_DISCOVERY_STATUS } from "@/lib/listings/visibility";
+import { isListingReportReason } from "@/lib/moderation/reporting";
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
-const REPORT_REASON_VALUES: readonly Enums<"report_reason">[] = [
-  "spam",
-  "fraud",
-  "duplicate",
-  "inappropriate",
-  "incorrect_information",
-  "other",
-] as const;
 
 type ActionStatus = "idle" | "success" | "error";
 
@@ -34,19 +26,20 @@ function getString(formData: FormData, key: string) {
   return typeof raw === "string" ? raw.trim() : "";
 }
 
-async function ensurePublicListingVisibility(
+async function loadReportableListing(
   listingId: string
 ) {
   const supabase = await createServerSupabaseClient();
   const { data, error } = await supabase
     .from("listings")
-    .select("id")
+    .select("id, owner_id")
     .eq("id", listingId)
     .eq("listing_status", PUBLIC_DISCOVERY_STATUS)
     .maybeSingle();
 
   return {
     ok: !error && Boolean(data),
+    listing: !error && data ? data : null,
     supabase,
   };
 }
@@ -68,7 +61,7 @@ export async function submitListingReportAction(
     };
   }
 
-  if (!REPORT_REASON_VALUES.includes(reason)) {
+  if (!isListingReportReason(reason)) {
     return {
       status: "error",
       message: "Please choose a valid report reason.",
@@ -87,8 +80,8 @@ export async function submitListingReportAction(
   }
 
   try {
-    const { ok, supabase } = await ensurePublicListingVisibility(listingId);
-    if (!ok) {
+    const { ok, listing, supabase } = await loadReportableListing(listingId);
+    if (!ok || !listing) {
       return {
         status: "error",
         message: "This listing is no longer available for reporting.",
@@ -110,6 +103,15 @@ export async function submitListingReportAction(
       };
     }
 
+    if (listing.owner_id === user.id) {
+      return {
+        status: "error",
+        message: "You cannot submit a report for your own listing.",
+        submitted: false,
+        requiresAuth: false,
+      };
+    }
+
     const { error } = await supabase.from("listing_reports").insert({
       listing_id: listingId,
       reporter_id: user.id,
@@ -118,6 +120,15 @@ export async function submitListingReportAction(
     });
 
     if (error) {
+      if (error.code === "23505") {
+        return {
+          status: "success",
+          message: "You already submitted a report for this listing. Our moderation team will review it.",
+          submitted: true,
+          requiresAuth: false,
+        };
+      }
+
       return {
         status: "error",
         message: "Report submission failed. Please try again.",

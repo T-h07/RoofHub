@@ -65,11 +65,15 @@ export function ListingDetailCtaRail({
             <ShieldAlert className="size-3.5" aria-hidden="true" />
             Safety
           </span>
-          <ReportListingDialog
-            listingId={listingId}
-            isAuthenticated={isAuthenticated}
-            signInHref={signInHref}
-          />
+          {isOwner ? (
+            <span className="text-muted-foreground text-xs">Owner report disabled</span>
+          ) : (
+            <ReportListingDialog
+              listingId={listingId}
+              isAuthenticated={isAuthenticated}
+              signInHref={signInHref}
+            />
+          )}
         </div>
       </CardContent>
     </Card>
