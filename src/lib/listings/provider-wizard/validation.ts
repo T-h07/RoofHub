@@ -388,18 +388,28 @@ export function validateAmenitiesStep(
 
 export function validateContactStep(values: ProviderDraftWizardValues): ValidationResult<ContactStepPayload> {
   const errors: ProviderWizardFieldErrors = {};
-  const preferredContactMethod = values.preferredContactMethod || null;
+  const preferredContactMethod: ProviderPreferredContactMethod | null =
+    typeof values.preferredContactMethod === "string" &&
+    PREFERRED_CONTACT_METHODS.has(values.preferredContactMethod)
+      ? (values.preferredContactMethod as ProviderPreferredContactMethod)
+      : null;
+  const rawContactMethods = Array.isArray(values.contactMethods) ? values.contactMethods : [];
   const contactMethods = Array.from(
     new Set(
-      values.contactMethods.filter((method): method is ProviderPreferredContactMethod =>
+      rawContactMethods.filter((method): method is ProviderPreferredContactMethod =>
         PREFERRED_CONTACT_METHODS.has(method)
       )
     )
   );
-  const phone = normalizeNullableText(values.contactPhone, 24);
-  const whatsappPhone = normalizeNullableText(values.whatsappPhone, 24);
-  const viberPhone = normalizeNullableText(values.viberPhone, 24);
-  const contactEmail = normalizeNullableText(values.contactEmail, 160)?.toLowerCase() ?? null;
+  const phone = normalizeNullableText(typeof values.contactPhone === "string" ? values.contactPhone : "", 24);
+  const whatsappPhone = normalizeNullableText(
+    typeof values.whatsappPhone === "string" ? values.whatsappPhone : "",
+    24
+  );
+  const viberPhone = normalizeNullableText(typeof values.viberPhone === "string" ? values.viberPhone : "", 24);
+  const contactEmail =
+    normalizeNullableText(typeof values.contactEmail === "string" ? values.contactEmail : "", 160)?.toLowerCase() ??
+    null;
 
   if (
     preferredContactMethod !== null &&
