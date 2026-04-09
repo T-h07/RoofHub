@@ -4,7 +4,7 @@ Map-first real estate marketplace for rental and sale listings.
 
 ## Current Stage
 
-`NM-PT19 Provider Dashboard and My Listings` is established:
+`NM-PT20 Listing Edit and Status Management` is established:
 
 - Next.js App Router + TypeScript scaffold
 - Supabase App Router SSR integration (`@supabase/supabase-js`, `@supabase/ssr`)
@@ -62,6 +62,13 @@ Map-first real estate marketplace for rental and sale listings.
 - provider lifecycle actions with backend persistence: pause, archive, set active, mark sold, mark rented
 - listing status model extended with `sold` and `rented` lifecycle states
 - unread leads dashboard placeholder surface reserved for future messaging/leads integration
+- provider listing edit route (`/dashboard/listings/[id]/edit`) now exposes status-aware maintenance controls
+- provider edit flow reuses the existing multi-step wizard and photo-management foundations (no parallel edit stack)
+- status model extended with `hidden_by_admin` moderation state
+- provider-controlled status transitions centralized and guarded against moderation-only status changes
+- hidden-by-admin listings are explicitly represented in provider UI and cannot be cleared by provider controls
+- published edit safety hardening prevents active listings from being left with invalid pricing or missing photo cover sets
+- public listing visibility remains explicitly tied to published state across discovery/detail/favorites/report surfaces
 - generated TypeScript database types in `src/types/database.ts` (schema + policy helper functions)
 - existing PT02 shell and PT03 integration structure preserved
 
@@ -263,6 +270,12 @@ Provider photo/publish documentation:
 Provider dashboard documentation:
 
 - `docs/provider-dashboard-my-listings.md`
+
+## Listing Edit and Status Management (PT20)
+
+Provider listing maintenance documentation:
+
+- `docs/listing-edit-status-management.md`
 
 ## Local Development
 
