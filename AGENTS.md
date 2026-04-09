@@ -29,9 +29,20 @@
 - Keep lockfile changes intentional and scoped to the dependency change.
 - Prefer well-maintained packages; avoid abandoned or low-trust additions without justification.
 
+## Supply-chain guardrails
+- Keep `package-lock.json` as source-of-truth for reproducible installs; do not omit lockfile updates when dependencies change.
+- Do not modify or disable repository security workflows (`security-secrets`, `security-dependencies`, `security-codeql`) without explicit justification and docs updates.
+- Do not suppress dependency/code/secret scanner findings without PR-level reasoning and narrow scope.
+- For new dependencies, document:
+  - why existing dependencies are insufficient
+  - package maintenance/safety signal
+  - security impact on trust boundaries (especially auth/crypto/upload/parsing/rendering/networking)
+- Keep automated dependency updates (`.github/dependabot.yml`) scoped and maintainable; avoid update spam patterns.
+
 ## Required workflow for security-sensitive changes
 - Update `docs/security-baseline.md` when behavior, trust boundaries, or assumptions change.
 - Run and complete `docs/security-checklist.md` before merge for security-sensitive work.
+- Follow `docs/supply-chain-guardrails.md` when changing dependencies, lockfiles, or security workflows.
 - Add tests or explicit validation notes for sensitive behavior changes (authz, ownership, visibility, storage, redirects, moderation).
 - Document newly added route handlers/server actions and their authorization/input-validation approach.
 
