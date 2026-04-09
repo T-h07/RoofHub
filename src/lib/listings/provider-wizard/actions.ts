@@ -31,6 +31,9 @@ const DRAFT_DEFAULTS = {
   public_location_mode: "approximate" as const,
 };
 
+const CONTACT_SCHEMA_OUT_OF_DATE_MESSAGE =
+  "Contact methods schema is out of date. Run Supabase migrations (PT24 contact methods + contact channel details) and retry.";
+
 export type SaveProviderWizardStepInput = {
   step: ProviderWizardStep;
   values: ProviderDraftWizardValues;
@@ -70,6 +73,15 @@ function normalizeSupabaseError(message: string) {
 
   if (normalized.includes("check constraint")) {
     return "Some values do not match listing requirements. Review highlighted fields and retry.";
+  }
+
+  if (
+    isMissingContactMethodsColumnError(message) ||
+    isMissingContactChannelColumnError(message) ||
+    (normalized.includes("invalid input value for enum") &&
+      normalized.includes("preferred_contact_method"))
+  ) {
+    return CONTACT_SCHEMA_OUT_OF_DATE_MESSAGE;
   }
 
   return "Draft save failed. Please retry.";
@@ -457,7 +469,7 @@ export async function saveProviderWizardStepAction(
       const usesEmailMethod = contactValidation.payload.contact_methods.includes("email");
       const effectiveContactEmail = contactValidation.payload.contact_email ?? (usesEmailMethod ? userEmail : null);
 
-      let { error } = await supabase
+      const { data: updatedProfile, error } = await supabase
         .from("profiles")
         .update({
           preferred_contact_method: contactValidation.payload.preferred_contact_method,
@@ -467,36 +479,24 @@ export async function saveProviderWizardStepAction(
           whatsapp_phone: contactValidation.payload.whatsapp_phone,
           viber_phone: contactValidation.payload.viber_phone,
         })
-        .eq("id", profile.id);
-
-      if (error && isMissingContactChannelColumnError(error.message)) {
-        const fallbackResult = await supabase
-          .from("profiles")
-          .update({
-            preferred_contact_method: contactValidation.payload.preferred_contact_method,
-            contact_methods: contactValidation.payload.contact_methods,
-            phone: contactValidation.payload.phone,
-          })
-          .eq("id", profile.id);
-        error = fallbackResult.error;
-      }
-
-      if (error && isMissingContactMethodsColumnError(error.message)) {
-        const legacyResult = await supabase
-          .from("profiles")
-          .update({
-            preferred_contact_method: contactValidation.payload.preferred_contact_method,
-            phone: contactValidation.payload.phone,
-          })
-          .eq("id", profile.id);
-        error = legacyResult.error;
-      }
+        .eq("id", profile.id)
+        .select("id")
+        .limit(1)
+        .maybeSingle();
 
       if (error) {
         return {
           ok: false,
           draftId: candidateDraftId,
           message: normalizeSupabaseError(error.message),
+        };
+      }
+
+      if (!updatedProfile) {
+        return {
+          ok: false,
+          draftId: candidateDraftId,
+          message: "Contact settings could not be persisted for this profile. Refresh and retry.",
         };
       }
 
