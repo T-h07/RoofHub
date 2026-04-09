@@ -1,0 +1,47 @@
+name: Security - Dependency Guardrails
+
+on:
+  pull_request:
+    branches: [main, dev]
+    paths:
+      - package.json
+      - package-lock.json
+      - .github/workflows/security-dependencies.yml
+      - .github/dependabot.yml
+  schedule:
+    - cron: "53 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  dependency-review:
+    name: Dependency Review (PR)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Review dependency changes
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
+
+  audit-lockfile:
+    name: NPM Audit (Scheduled)
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Audit production dependency graph from lockfile
+        run: npm audit --package-lock-only --omit=dev --audit-level=high
