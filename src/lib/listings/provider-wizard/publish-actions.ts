@@ -5,12 +5,13 @@ import { getCurrentUserProfile } from "@/lib/auth/profile";
 import { isProviderRole } from "@/lib/auth/roles";
 import {
   LISTING_IMAGE_MAX_COUNT,
+  LISTING_IMAGE_MAX_PATH_LENGTH,
+  isListingImagePathForOwnerAndListing,
   normalizeCoverAndOrder,
-  parseListingImageObjectPath,
 } from "@/lib/storage/listing-images";
 import {
   createListingImageSignedUrl,
-  syncRemovedListingImages,
+  deleteListingImageObjects,
   toListingImageInsertRows,
 } from "@/lib/supabase/storage/listing-images";
 
@@ -23,6 +24,8 @@ import type { ProviderDraftImage, ProviderListingStatus } from "./types";
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const MAX_IMAGE_SORT_ORDER = 10_000;
+const LISTING_IMAGE_STORAGE_DELETE_WARNING =
+  "Some removed photos could not be cleaned up from storage. Retry save to attempt cleanup again.";
 
 type ProviderMutationContext =
   | {
@@ -306,6 +309,13 @@ function validatePhotoPayload(input: {
       };
     }
 
+    if (normalizedPath.length > LISTING_IMAGE_MAX_PATH_LENGTH) {
+      return {
+        ok: false as const,
+        message: "Photo payload contained an invalid storage path length.",
+      };
+    }
+
     if (uniquePathSet.has(normalizedPath)) {
       return {
         ok: false as const,
@@ -315,17 +325,12 @@ function validatePhotoPayload(input: {
 
     uniquePathSet.add(normalizedPath);
 
-    const parsedPath = parseListingImageObjectPath(normalizedPath);
-    if (!parsedPath) {
-      return {
-        ok: false as const,
-        message: "Photo payload contained an invalid storage path.",
-      };
-    }
-
     if (
-      parsedPath.ownerId !== input.listingOwnerId.toLowerCase() ||
-      parsedPath.listingId !== input.listingId.toLowerCase()
+      !isListingImagePathForOwnerAndListing({
+        path: normalizedPath,
+        ownerId: input.listingOwnerId,
+        listingId: input.listingId,
+      })
     ) {
       return {
         ok: false as const,
@@ -337,6 +342,45 @@ function validatePhotoPayload(input: {
   return {
     ok: true as const,
   };
+}
+
+type ListingImageSnapshotRow = {
+  storage_path: string;
+  sort_order: number;
+  is_cover: boolean;
+};
+
+async function restoreListingImageRows(
+  supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>,
+  input: {
+    listingId: string;
+    snapshotRows: readonly ListingImageSnapshotRow[];
+  }
+) {
+  const { error: clearError } = await supabase
+    .from("listing_images")
+    .delete()
+    .eq("listing_id", input.listingId);
+
+  if (clearError) {
+    return false;
+  }
+
+  if (input.snapshotRows.length === 0) {
+    return true;
+  }
+
+  const restoreRows = toListingImageInsertRows(
+    input.listingId,
+    input.snapshotRows.map((row) => ({
+      storagePath: row.storage_path,
+      sortOrder: row.sort_order,
+      isCover: row.is_cover,
+    }))
+  );
+
+  const { error: restoreError } = await supabase.from("listing_images").insert(restoreRows);
+  return !restoreError;
 }
 
 export async function syncProviderListingPhotosAction(
@@ -419,7 +463,7 @@ export async function syncProviderListingPhotosAction(
   try {
     const { data: existingRows, error: existingError } = await supabase
       .from("listing_images")
-      .select("storage_path")
+      .select("storage_path, sort_order, is_cover")
       .eq("listing_id", draftAccess.listing.id);
 
     if (existingError) {
@@ -430,16 +474,10 @@ export async function syncProviderListingPhotosAction(
       };
     }
 
-    const existingPathSet = new Set((existingRows ?? []).map((row) => row.storage_path));
+    const existingSnapshotRows = (existingRows ?? []) as ListingImageSnapshotRow[];
+    const existingPathSet = new Set(existingSnapshotRows.map((row) => row.storage_path));
     const desiredPathSet = new Set(normalizedImages.map((image) => image.storagePath));
     const pathsToRemove = [...existingPathSet].filter((path) => !desiredPathSet.has(path));
-
-    if (pathsToRemove.length > 0) {
-      await syncRemovedListingImages(supabase, {
-        listingId: draftAccess.listing.id,
-        storagePaths: pathsToRemove,
-      });
-    }
 
     const { error: resetError } = await supabase
       .from("listing_images")
@@ -459,11 +497,32 @@ export async function syncProviderListingPhotosAction(
       const { error: insertError } = await supabase.from("listing_images").insert(rowsToInsert);
 
       if (insertError) {
+        await restoreListingImageRows(supabase, {
+          listingId: draftAccess.listing.id,
+          snapshotRows: existingSnapshotRows,
+        });
+
         return {
           ok: false,
           message: normalizeSupabaseError(insertError.message),
           images: [],
         };
+      }
+    }
+
+    let warningMessage: string | null = null;
+    if (pathsToRemove.length > 0) {
+      try {
+        const deleteResult = await deleteListingImageObjects(supabase, pathsToRemove, {
+          ownerId: draftAccess.listing.owner_id,
+          listingId: draftAccess.listing.id,
+        });
+
+        if (deleteResult.failedPaths.length > 0) {
+          warningMessage = LISTING_IMAGE_STORAGE_DELETE_WARNING;
+        }
+      } catch {
+        warningMessage = LISTING_IMAGE_STORAGE_DELETE_WARNING;
       }
     }
 
@@ -479,7 +538,9 @@ export async function syncProviderListingPhotosAction(
 
     return {
       ok: true,
-      message: "Listing photos saved.",
+      message: warningMessage
+        ? `Listing photos saved. ${warningMessage}`
+        : "Listing photos saved.",
       images: refreshedImages.images,
     };
   } catch {

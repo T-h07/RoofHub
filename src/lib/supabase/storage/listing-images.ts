@@ -3,11 +3,15 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
 
 import {
+  LISTING_IMAGE_MAX_PATH_LENGTH,
   LISTING_IMAGES_BUCKET,
   buildListingImageInsertRows,
   createListingImageObjectPath,
+  detectListingImageMimeTypeFromFile,
   isAllowedListingImageMimeType,
+  isListingImagePathForOwnerAndListing,
   normalizeCoverAndOrder,
+  parseListingImageObjectPath,
   validateListingImageFile,
   type ListingImageInsertSeed,
   type ListingImageUploadDescriptor,
@@ -40,26 +44,35 @@ export async function uploadListingImage(
     throw new Error(issues.map((issue) => issue.message).join(" "));
   }
 
-  if (!isAllowedListingImageMimeType(input.image.file.type)) {
-    throw new Error("Unsupported image MIME type.");
+  const sniffedMimeType = await detectListingImageMimeTypeFromFile(input.image.file);
+  if (!sniffedMimeType) {
+    throw new Error("Unsupported image file signature. Allowed: JPEG, PNG, WEBP.");
+  }
+
+  if (
+    input.image.file.type &&
+    isAllowedListingImageMimeType(input.image.file.type) &&
+    input.image.file.type !== sniffedMimeType
+  ) {
+    throw new Error("Image MIME type does not match file contents.");
   }
 
   const storagePath = createListingImageObjectPath({
     ownerId: input.ownerId,
     listingId: input.listingId,
-    mimeType: input.image.file.type,
+    mimeType: sniffedMimeType,
   });
 
   const { error } = await supabase.storage
     .from(LISTING_IMAGES_BUCKET)
     .upload(storagePath, input.image.file, {
       upsert: false,
-      contentType: input.image.file.type,
+      contentType: sniffedMimeType,
       cacheControl: "3600",
     });
 
   if (error) {
-    throw new Error(`Upload failed for ${input.image.file.name}: ${error.message}`);
+    throw new Error("Upload failed. Please retry.");
   }
 
   return {
@@ -67,7 +80,7 @@ export async function uploadListingImage(
     storagePath,
     sortOrder: input.image.sortOrder,
     isCover: input.image.isCover,
-    mimeType: input.image.file.type,
+    mimeType: sniffedMimeType,
     size: input.image.file.size,
   };
 }
@@ -114,7 +127,11 @@ export async function createListingImageSignedUrl(
 
 export async function deleteListingImageObjects(
   supabase: SupabaseClient<Database>,
-  storagePaths: readonly string[]
+  storagePaths: readonly string[],
+  ownerAndListing?: {
+    ownerId: string;
+    listingId: string;
+  }
 ): Promise<ListingImageDeleteResult> {
   if (storagePaths.length === 0) {
     return {
@@ -124,7 +141,30 @@ export async function deleteListingImageObjects(
   }
 
   const uniquePaths = [...new Set(storagePaths)];
-  const { data, error } = await supabase.storage.from(LISTING_IMAGES_BUCKET).remove(uniquePaths);
+  const validatedPaths = uniquePaths.map((path) => path.trim());
+
+  for (const path of validatedPaths) {
+    if (!path || path.length > LISTING_IMAGE_MAX_PATH_LENGTH) {
+      throw new Error("Invalid listing image path.");
+    }
+
+    if (!parseListingImageObjectPath(path)) {
+      throw new Error("Listing image path format is invalid.");
+    }
+
+    if (
+      ownerAndListing &&
+      !isListingImagePathForOwnerAndListing({
+        path,
+        ownerId: ownerAndListing.ownerId,
+        listingId: ownerAndListing.listingId,
+      })
+    ) {
+      throw new Error("Listing image path does not match the expected owner/listing.");
+    }
+  }
+
+  const { data, error } = await supabase.storage.from(LISTING_IMAGES_BUCKET).remove(validatedPaths);
 
   if (error) {
     throw new Error(`Failed to remove image objects: ${error.message}`);
@@ -134,7 +174,7 @@ export async function deleteListingImageObjects(
     .map((entry) => entry.name)
     .filter((name): name is string => typeof name === "string");
   const removedPathSet = new Set(removedPaths);
-  const failedPaths = uniquePaths.filter((path) => !removedPathSet.has(path));
+  const failedPaths = validatedPaths.filter((path) => !removedPathSet.has(path));
 
   return {
     removedPaths,
