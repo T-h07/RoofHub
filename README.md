@@ -4,7 +4,7 @@ Map-first real estate marketplace for rental and sale listings.
 
 ## Current Stage
 
-`NM-PT18 Listing Photos and Publish Flow` is established:
+`NM-PT19 Provider Dashboard and My Listings` is established:
 
 - Next.js App Router + TypeScript scaffold
 - Supabase App Router SSR integration (`@supabase/supabase-js`, `@supabase/ssr`)
@@ -57,6 +57,11 @@ Map-first real estate marketplace for rental and sale listings.
 - real draft -> published action with server-enforced readiness checks
 - centralized listing status transition foundation for later provider management workflows
 - post-publish redirect to public listing detail route for immediate verification
+- provider dashboard route (`/dashboard`) with real owned-listing lifecycle overview cards
+- provider my-listings route (`/dashboard/listings`) with status filters and responsive management surface
+- provider lifecycle actions with backend persistence: pause, archive, set active, mark sold, mark rented
+- listing status model extended with `sold` and `rented` lifecycle states
+- unread leads dashboard placeholder surface reserved for future messaging/leads integration
 - generated TypeScript database types in `src/types/database.ts` (schema + policy helper functions)
 - existing PT02 shell and PT03 integration structure preserved
 
@@ -252,6 +257,12 @@ Provider location-step documentation:
 Provider photo/publish documentation:
 
 - `docs/listing-photos-publish-flow.md`
+
+## Provider Dashboard and My Listings (PT19)
+
+Provider dashboard documentation:
+
+- `docs/provider-dashboard-my-listings.md`
 
 ## Local Development
 
