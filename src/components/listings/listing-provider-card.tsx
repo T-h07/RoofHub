@@ -1,5 +1,8 @@
 import Image from "next/image";
 import {
+  BadgeCheck,
+  Building2,
+  CalendarDays,
   Mail,
   MessageCircle,
   MessageSquareText,
@@ -120,6 +123,31 @@ function getContactMethodIcon(method: ContactMethod) {
   return MessageSquareText;
 }
 
+function formatMemberSince(value: string | null) {
+  if (!value) {
+    return "Joined date unavailable";
+  }
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return "Joined date unavailable";
+  }
+
+  return `Member since ${new Intl.DateTimeFormat("en", {
+    month: "short",
+    year: "numeric",
+  }).format(parsed)}`;
+}
+
+function formatPublishedListingCount(value: number | null) {
+  if (value === null) {
+    return "Published listings unavailable";
+  }
+
+  const formatted = new Intl.NumberFormat("en").format(value);
+  return `${formatted} published listing${value === 1 ? "" : "s"}`;
+}
+
 export function ListingProviderCard({
   provider,
   isOwner,
@@ -176,6 +204,29 @@ export function ListingProviderCard({
             Property details and message context are shared directly by the provider.
           </p>
         )}
+
+        {provider ? (
+          <div className="border-border/70 bg-background/45 space-y-2.5 rounded-lg border px-3 py-2.5">
+            <p className="text-xs font-medium tracking-tight">Trust summary</p>
+
+            <div className="text-muted-foreground flex flex-wrap gap-2 text-xs">
+              <span className="border-border/70 bg-background/60 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1">
+                <CalendarDays className="size-3.5" aria-hidden="true" />
+                {formatMemberSince(provider.joinedAt)}
+              </span>
+              <span className="border-border/70 bg-background/60 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1">
+                <Building2 className="size-3.5" aria-hidden="true" />
+                {formatPublishedListingCount(provider.publishedListingCount)}
+              </span>
+              {provider.emailVerified ? (
+                <span className="border-emerald-500/40 bg-emerald-500/10 text-emerald-200 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1">
+                  <BadgeCheck className="size-3.5" aria-hidden="true" />
+                  Verified email
+                </span>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
 
         <div className="border-border/70 bg-background/50 rounded-lg border px-3 py-2 text-xs">
           <p className="inline-flex items-center gap-1.5 font-medium">

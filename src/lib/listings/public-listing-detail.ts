@@ -49,7 +49,7 @@ type PublicListingDetailRow = Pick<
 
 type ProviderPreviewCompatibilityRow = Pick<
   Tables<"profiles">,
-  "id" | "display_name" | "avatar_url" | "bio" | "phone"
+  "id" | "display_name" | "avatar_url" | "bio" | "phone" | "created_at"
 > & {
   preferred_contact_method: unknown;
   contact_methods?: unknown;
@@ -71,6 +71,9 @@ export type PublicListingDetailProvider = {
   displayName: string;
   avatarUrl: string | null;
   bio: string | null;
+  joinedAt: string | null;
+  publishedListingCount: number | null;
+  emailVerified: boolean | null;
   preferredContactMethod: PreferredContactMethod | null;
   contactMethods: PreferredContactMethod[];
   phone: string | null;
@@ -158,11 +161,11 @@ const PUBLIC_LISTING_DETAIL_SELECT = `
 `;
 
 const PROVIDER_PREVIEW_SELECT =
-  "id, display_name, avatar_url, bio, preferred_contact_method, contact_methods, phone, contact_email, whatsapp_phone, viber_phone";
+  "id, display_name, avatar_url, bio, created_at, preferred_contact_method, contact_methods, phone, contact_email, whatsapp_phone, viber_phone";
 const PROVIDER_PREVIEW_CHANNEL_COMPAT_SELECT =
-  "id, display_name, avatar_url, bio, preferred_contact_method, contact_methods, phone";
+  "id, display_name, avatar_url, bio, created_at, preferred_contact_method, contact_methods, phone";
 const PROVIDER_PREVIEW_LEGACY_SELECT =
-  "id, display_name, avatar_url, bio, preferred_contact_method, phone";
+  "id, display_name, avatar_url, bio, created_at, preferred_contact_method, phone";
 
 function isMissingContactMethodsColumnError(message: string | undefined) {
   if (!message) {
@@ -268,7 +271,11 @@ function normalizeProviderContactMethods(
 }
 
 function normalizeProviderPreview(
-  row: ProviderPreviewCompatibilityRow
+  row: ProviderPreviewCompatibilityRow,
+  trustSignals: {
+    publishedListingCount: number | null;
+    emailVerified: boolean | null;
+  }
 ): PublicListingDetailProvider {
   const contactMethods = normalizeProviderContactMethods(row);
   const preferred = isPreferredContactMethod(row.preferred_contact_method)
@@ -287,6 +294,9 @@ function normalizeProviderPreview(
     displayName: row.display_name,
     avatarUrl: row.avatar_url,
     bio: trimProviderBio(row.bio),
+    joinedAt: row.created_at ?? null,
+    publishedListingCount: trustSignals.publishedListingCount,
+    emailVerified: trustSignals.emailVerified,
     preferredContactMethod: preferred,
     contactMethods,
     phone,
@@ -296,10 +306,35 @@ function normalizeProviderPreview(
   };
 }
 
+async function fetchProviderPublishedListingCount(
+  supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>,
+  providerId: string
+) {
+  const { count, error } = await supabase
+    .from("listings")
+    .select("id", { count: "exact", head: true })
+    .eq("owner_id", providerId)
+    .eq("listing_status", PUBLIC_DISCOVERY_STATUS);
+
+  if (error) {
+    return null;
+  }
+
+  return count ?? 0;
+}
+
 async function fetchPublicListingProvider(
   supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>,
   providerId: string
 ) {
+  const [publishedListingCount] = await Promise.all([
+    fetchProviderPublishedListingCount(supabase, providerId),
+  ]);
+  const trustSignals = {
+    publishedListingCount,
+    emailVerified: null,
+  } as const;
+
   const full = await supabase
     .from("profiles")
     .select(PROVIDER_PREVIEW_SELECT)
@@ -310,7 +345,7 @@ async function fetchPublicListingProvider(
     return {
       ok: true as const,
       provider: full.data
-        ? normalizeProviderPreview(full.data as ProviderPreviewCompatibilityRow)
+        ? normalizeProviderPreview(full.data as ProviderPreviewCompatibilityRow, trustSignals)
         : null,
     };
   }
@@ -331,7 +366,7 @@ async function fetchPublicListingProvider(
               contact_email: null,
               whatsapp_phone: null,
               viber_phone: null,
-            })
+            }, trustSignals)
           : null,
       };
     }
@@ -363,7 +398,7 @@ async function fetchPublicListingProvider(
             contact_email: null,
             whatsapp_phone: null,
             viber_phone: null,
-          })
+          }, trustSignals)
         : null,
     };
   }
@@ -395,7 +430,7 @@ async function fetchPublicListingProvider(
           contact_email: null,
           whatsapp_phone: null,
           viber_phone: null,
-        })
+        }, trustSignals)
       : null,
   };
 }
