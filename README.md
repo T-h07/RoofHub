@@ -4,7 +4,7 @@ Map-first real estate marketplace for rental and sale listings.
 
 ## Current Stage
 
-`NM-PT20 Listing Edit and Status Management` is established:
+`NM-PT22 Messaging UI` is established:
 
 - Next.js App Router + TypeScript scaffold
 - Supabase App Router SSR integration (`@supabase/supabase-js`, `@supabase/ssr`)
@@ -74,6 +74,12 @@ Map-first real estate marketplace for rental and sale listings.
 - new conversation creation is seeker-initiated only and restricted to published listings
 - message persistence and participant-safe read-state updates are now enforced with unread derivation via `messages.read_at`
 - provider dashboard unread lead metric is now backed by real unread conversation data
+- authenticated inbox route now provides real conversation list + thread panel UX (`/messages`)
+- listing-bound thread header now surfaces listing context (title, status, price/location summary, listing deep-link)
+- message composer now sends through PT21 server action flow with pending/error handling
+- unread cues now surface in conversation list and clear on thread-open via read-state mutation
+- responsive messaging layout now supports desktop split view and mobile drill-in/back navigation
+- messaging loading/empty/error states are now integrated for route and thread surfaces
 - generated TypeScript database types in `src/types/database.ts` (schema + policy helper functions)
 - existing PT02 shell and PT03 integration structure preserved
 
@@ -287,6 +293,12 @@ Provider listing maintenance documentation:
 Messaging backend documentation:
 
 - `docs/conversation-messaging-backend.md`
+
+## Messaging UI (PT22)
+
+Messaging UI documentation:
+
+- `docs/messaging-ui.md`
 
 ## Local Development
 
