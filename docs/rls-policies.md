@@ -54,7 +54,11 @@ Note: profile fields include potentially sensitive values (`phone`, `bio`), so p
 ### `conversations`
 
 - Select allowed only for participants (`provider_id` or `seeker_id`) or admin.
-- Insert allowed only when caller is one of the participants, provider matches listing owner, and listing is published (or caller is provider owner/admin).
+- Insert allowed for admin, or seeker-initiated listing contact only:
+  - `seeker_id = auth.uid()`
+  - provider matches listing owner
+  - listing is `published`
+  - requester profile role is seeker
 - Update allowed for participants/admin.
 - Delete restricted to admin.
 
@@ -62,7 +66,8 @@ Note: profile fields include potentially sensitive values (`phone`, `bio`), so p
 
 - Select allowed only for conversation participants or admin.
 - Insert allowed only when `sender_id = auth.uid()` and sender belongs to parent conversation (or admin).
-- Update/delete restricted to admin.
+- Update allows admin and participant read-state updates (guarded by trigger-level immutability checks).
+- Delete restricted to admin.
 
 ### `listing_reports`
 

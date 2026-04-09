@@ -83,7 +83,7 @@ Implemented CTA surfaces:
   - uses shared `FavoriteToggle` component
   - guest flow prompts sign-in
 - Contact CTA:
-  - future-ready entry to `/messages` thread context
+  - listing-aware entry to `/messages` thread context
   - guest flow uses sign-in redirect to intended message path
 - Report CTA:
   - wired with authenticated report submission (`listing_reports`)
@@ -115,5 +115,5 @@ PT15 can build directly on the current favorite integration by:
 
 PT21-PT23 can build directly on current contact entry points by:
 
-- replacing placeholder `/messages` behavior with real conversation creation/open logic
-- preserving existing `listingId` + `providerId` route intent carried from detail CTA
+- reusing the existing listing-bound `/messages?listingId=<id>` contact handoff
+- layering inbox/thread UI and realtime transport over the PT21 backend conversation model

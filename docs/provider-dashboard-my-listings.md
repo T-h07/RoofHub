@@ -19,7 +19,7 @@ Both routes use `getProviderRouteContext(...)` and keep role/ownership checks al
 - sold
 - rented
 
-`unreadLeadsPlaceholder` is intentionally a grounded placeholder (`0`) until messaging/leads PTs hydrate real unread counts.
+`unreadLeadsCount` is now hydrated from persisted conversation/message unread data.
 
 ## My Listings Data Model
 
@@ -62,10 +62,10 @@ Reason:
 - safe duplication requires tighter PT20 editing/status semantics (especially around cloned photo/location intent and publish readiness after clone).
 - current PT19 focuses on clean lifecycle control and provider workspace foundations.
 
-## Unread Leads Placeholder
+## Unread Leads Foundation
 
-Dashboard includes a dedicated unread-leads placeholder card/section with explicit copy that messaging is upcoming.
-No fake lead counts are shown.
+Dashboard now exposes real unread lead counts derived from `messages.read_at` for provider-owned conversations.
+The dedicated dashboard section remains focused on upcoming inbox/realtime UI layering.
 
 ## PT20 Handoff
 
@@ -75,4 +75,4 @@ PT20 can now build on:
 - status-aware owned-listings management UI
 - centralized lifecycle transition mutation path
 - sold/rented status model extension
-- clear placeholder insertion point for real unread lead/inbox integration
+- real unread lead count integration point for inbox/realtime expansion

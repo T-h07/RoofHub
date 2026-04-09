@@ -69,6 +69,11 @@ Map-first real estate marketplace for rental and sale listings.
 - hidden-by-admin listings are explicitly represented in provider UI and cannot be cleared by provider controls
 - published edit safety hardening prevents active listings from being left with invalid pricing or missing photo cover sets
 - public listing visibility remains explicitly tied to published state across discovery/detail/favorites/report surfaces
+- messaging backend foundation is now active under `src/lib/messaging/*`
+- listing contact handoff now uses create-or-get conversation behavior keyed by `(listing_id, provider_id, seeker_id)`
+- new conversation creation is seeker-initiated only and restricted to published listings
+- message persistence and participant-safe read-state updates are now enforced with unread derivation via `messages.read_at`
+- provider dashboard unread lead metric is now backed by real unread conversation data
 - generated TypeScript database types in `src/types/database.ts` (schema + policy helper functions)
 - existing PT02 shell and PT03 integration structure preserved
 
@@ -276,6 +281,12 @@ Provider dashboard documentation:
 Provider listing maintenance documentation:
 
 - `docs/listing-edit-status-management.md`
+
+## Conversation Model and Messaging Backend (PT21)
+
+Messaging backend documentation:
+
+- `docs/conversation-messaging-backend.md`
 
 ## Local Development
 
