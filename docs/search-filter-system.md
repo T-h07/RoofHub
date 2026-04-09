@@ -74,11 +74,12 @@ Listings without an `available_from` value are excluded when this toggle is enab
 - Active filters render as removable chips.
 - Filter/sort changes reset pagination to page 1 to avoid stale-page empty states.
 
-## PT12+ Integration Path
+## PT12/PT13 Integration
 
-Map/list integration builds on this URL-driven state:
+Map/list integration now builds on this URL-driven state:
 
-- reuse `parseExploreSearchParams` as the canonical filter contract
-- keep shared public listing filter logic as server-side query authority
-- add map-specific params (for example bounds/viewport) into the same URL model in PT13
-- avoid parallel client-only filter state paths
+- `parseExploreSearchParams` remains the canonical non-geo filter contract
+- shared public listing filter logic stays server-side authority
+- PT13 adds optional map bounds via `bbox=west,south,east,north`
+- `/map` combines `bbox` with the same PT11 filters instead of introducing a separate map-only filter model
+- map-area application is explicit through a “Search this area” action (not auto-refetch on every movement)

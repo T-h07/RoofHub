@@ -4,7 +4,7 @@ Map-first real estate marketplace for rental and sale listings.
 
 ## Current Stage
 
-`NM-PT12 Map Infrastructure and Public Map Page` is established:
+`NM-PT13 Map Bounds, Clustering, and Search This Area` is established:
 
 - Next.js App Router + TypeScript scaffold
 - Supabase App Router SSR integration (`@supabase/supabase-js`, `@supabase/ssr`)
@@ -27,11 +27,15 @@ Map-first real estate marketplace for rental and sale listings.
 - public map route (`/map`) with MapLibre rendering and URL-synced discovery state
 - server-side public marker query aligned with PT11 filter parsing and public listing visibility rules
 - marker and popup foundation with mobile-safe control and loading/error/empty state handling
+- map clustering for higher listing density
+- `Search this area` flow with typed `bbox` bounds state
+- bounds-aware server queries that still reuse PT11 filter parsing
+- refined desktop map/list split with synchronized applied result counts
 - reusable listing card component for map/list/detail-adjacent surfaces
 - generated TypeScript database types in `src/types/database.ts` (schema + policy helper functions)
 - existing PT02 shell and PT03 integration structure preserved
 
-This stage intentionally excludes business features beyond foundational auth/session plumbing (full role workflows, listings CRUD, advanced map logic such as clustering/bounds search, moderation, and messaging product behavior).
+This stage intentionally excludes business features beyond foundational auth/session plumbing (full role workflows, listings CRUD, listing detail conversion behavior, moderation, and messaging product behavior).
 
 ## Stack
 
@@ -187,6 +191,12 @@ Search/filter documentation:
 Map page documentation:
 
 - `docs/map-page-foundation.md`
+
+## Map Bounds, Clustering, and Search This Area (PT13)
+
+Map scaling and bounds-search documentation:
+
+- `docs/map-bounds-clustering.md`
 
 ## Local Development
 

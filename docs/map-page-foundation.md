@@ -96,11 +96,15 @@ Mobile behavior:
 - `/map` includes a list-view action preserving URL filter state
 - query model remains URL-first and shareable across both routes
 
-## PT13 Extension Path
+## PT13 Status
 
-PT13 should build on this foundation by:
+PT13 has been implemented on top of this foundation. See:
 
-- adding bounds/viewport params to the shared URL state contract
-- implementing “search this area” on top of the existing server query helper structure
-- introducing clustering without replacing marker/popup data normalization
-- coordinating map/list selection and pagination behavior using shared query primitives
+- `docs/map-bounds-clustering.md`
+
+That document covers:
+
+- clustering layer configuration
+- bounds parsing/serialization and URL behavior (`bbox`)
+- search-this-area interaction model
+- desktop split map/list refinement
