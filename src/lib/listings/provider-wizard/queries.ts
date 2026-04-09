@@ -2,11 +2,13 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { createListingImageSignedUrl } from "@/lib/supabase/storage/listing-images";
 import type { Database } from "@/types/database";
 
 import type {
   ProviderContactSettings,
   ProviderDraftEditorRecord,
+  ProviderDraftImage,
   ProviderDraftSummary,
 } from "./types";
 
@@ -154,3 +156,51 @@ export async function loadProviderContactSettings(
   };
 }
 
+export async function loadProviderDraftImages(
+  supabase: SupabaseClient<Database>,
+  listingId: string
+) {
+  const { data, error } = await supabase
+    .from("listing_images")
+    .select("id, storage_path, sort_order, is_cover")
+    .eq("listing_id", listingId)
+    .order("sort_order", { ascending: true })
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    return {
+      ok: false as const,
+      message: "Listing photos could not be loaded.",
+      images: [] as ProviderDraftImage[],
+    };
+  }
+
+  const rows = data ?? [];
+  const images = await Promise.all(
+    rows.map(async (row) => {
+      try {
+        const signedUrl = await createListingImageSignedUrl(supabase, row.storage_path, 30 * 60);
+        return {
+          id: row.id,
+          storagePath: row.storage_path,
+          sortOrder: row.sort_order,
+          isCover: row.is_cover,
+          signedUrl,
+        } satisfies ProviderDraftImage;
+      } catch {
+        return {
+          id: row.id,
+          storagePath: row.storage_path,
+          sortOrder: row.sort_order,
+          isCover: row.is_cover,
+          signedUrl: null,
+        } satisfies ProviderDraftImage;
+      }
+    })
+  );
+
+  return {
+    ok: true as const,
+    images,
+  };
+}

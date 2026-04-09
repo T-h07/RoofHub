@@ -427,6 +427,14 @@ export async function saveProviderWizardStepAction(
       };
     }
 
+    if (input.step === "photos") {
+      return {
+        ok: true,
+        draftId: candidateDraftId,
+        message: "Photo step ready. Save images in this step before publishing.",
+      };
+    }
+
     const reviewValidation = validateReviewStep(input.values);
 
     if (!reviewValidation.isReadyForDraft) {

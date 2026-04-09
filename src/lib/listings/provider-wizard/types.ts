@@ -7,6 +7,7 @@ export const PROVIDER_WIZARD_STEPS = [
   "location",
   "amenities",
   "contact",
+  "photos",
   "review",
 ] as const;
 
@@ -16,6 +17,7 @@ export type ProviderPropertyType = Enums<"property_type">;
 export type ProviderHeatingType = Enums<"heating_type">;
 export type ProviderPreferredContactMethod = Enums<"preferred_contact_method">;
 export type ProviderPublicLocationMode = Enums<"public_location_mode">;
+export type ProviderListingStatus = Enums<"listing_status">;
 
 export const PROVIDER_WIZARD_STEP_LABELS: Record<ProviderWizardStep, string> = {
   basics: "Basics",
@@ -24,6 +26,7 @@ export const PROVIDER_WIZARD_STEP_LABELS: Record<ProviderWizardStep, string> = {
   location: "Location pin",
   amenities: "Amenities",
   contact: "Contact settings",
+  photos: "Photos",
   review: "Review draft",
 };
 
@@ -141,6 +144,14 @@ export type ProviderDraftSummary = Pick<
   | "updated_at"
   | "created_at"
 >;
+
+export type ProviderDraftImage = {
+  id: string;
+  storagePath: string;
+  signedUrl: string | null;
+  sortOrder: number;
+  isCover: boolean;
+};
 
 export type ProviderContactSettings = {
   preferredContactMethod: ProviderPreferredContactMethod | "";
