@@ -4,7 +4,7 @@ Map-first real estate marketplace for rental and sale listings.
 
 ## Current Stage
 
-`NM-PT24 Report Listing and Moderation Basics` is established:
+`NM-PT25 Provider Public Trust Layer` is established:
 
 - Next.js App Router + TypeScript scaffold
 - Supabase App Router SSR integration (`@supabase/supabase-js`, `@supabase/ssr`)
@@ -89,10 +89,13 @@ Map-first real estate marketplace for rental and sale listings.
 - admin moderation workspace route is now available at `/admin/moderation` with admin-only access
 - moderation queue now surfaces report + listing context with hide/unhide controls
 - admin hide/unhide now persists through `hidden_by_admin` status transitions and restores safe visibility state
+- public provider summary on listing detail now includes trust-safe metadata (`member since`, published listing count)
+- provider trust metadata is now sourced from real backend fields with typed fallbacks (no fabricated trust metrics)
+- verified-email trust indicator is now supported as a conditional surface and remains hidden until a reliable public verification source is available
 - generated TypeScript database types in `src/types/database.ts` (schema + policy helper functions)
 - existing PT02 shell and PT03 integration structure preserved
 
-This stage intentionally excludes business features beyond foundational auth/session plumbing (full role workflows, listings CRUD, advanced provider trust enrichment, full favorites collections UX, and full messaging product behavior).
+This stage intentionally excludes business features beyond foundational auth/session plumbing (full role workflows, listings CRUD, full reputation/review mechanics, full favorites collections UX, and full messaging product behavior).
 
 ## Stack
 
@@ -320,6 +323,12 @@ Realtime messaging documentation:
 Moderation starter documentation:
 
 - `docs/report-listing-moderation-basics.md`
+
+## Provider Public Trust Layer (PT25)
+
+Provider trust-layer documentation:
+
+- `docs/provider-public-trust-layer.md`
 
 ## Local Development
 
