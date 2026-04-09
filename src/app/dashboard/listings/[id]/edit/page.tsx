@@ -25,6 +25,9 @@ type EditDashboardListingPageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
 
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 function readStepParam(searchParams: Record<string, string | string[] | undefined>) {
   const rawStep = searchParams.step;
   if (typeof rawStep === "string") {
@@ -43,6 +46,10 @@ export default async function EditDashboardListingPage({
   searchParams,
 }: EditDashboardListingPageProps) {
   const [{ id }, resolvedSearchParams] = await Promise.all([params, searchParams]);
+  if (!UUID_PATTERN.test(id)) {
+    notFound();
+  }
+
   const context = await getProviderRouteContext(`/dashboard/listings/${id}/edit`);
 
   if (!context.ok) {

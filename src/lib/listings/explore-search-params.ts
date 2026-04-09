@@ -6,6 +6,10 @@ const EXPLORE_SORT_VALUES = ["newest", "price_asc", "price_desc"] as const;
 const LISTING_TYPE_VALUES = ["rent", "sale"] as const;
 const PROPERTY_TYPE_VALUES = ["apartment", "house", "studio", "land", "commercial"] as const;
 const BOOLEAN_TRUE_VALUES = new Set(["1", "true", "yes", "on"]);
+const STRICT_INTEGER_PATTERN = /^-?\d+$/;
+const STRICT_FLOAT_PATTERN = /^-?\d+(?:[.,]\d+)?$/;
+const MAX_NUMERIC_TOKEN_LENGTH = 24;
+const EXPLORE_MAX_PAGE = 500;
 
 export type ExploreSortOption = (typeof EXPLORE_SORT_VALUES)[number];
 export type ExploreListingType = Database["public"]["Enums"]["listing_type"];
@@ -116,12 +120,20 @@ function normalizePositiveInteger(value: string | null, fallback: number) {
     return fallback;
   }
 
-  const parsed = Number.parseInt(value, 10);
+  const trimmed = value.trim();
+  if (
+    !STRICT_INTEGER_PATTERN.test(trimmed) ||
+    trimmed.length > MAX_NUMERIC_TOKEN_LENGTH
+  ) {
+    return fallback;
+  }
+
+  const parsed = Number.parseInt(trimmed, 10);
   if (!Number.isFinite(parsed) || parsed < 1) {
     return fallback;
   }
 
-  return parsed;
+  return Math.min(parsed, EXPLORE_MAX_PAGE);
 }
 
 function normalizeIntegerFilter(value: string | null, options: { min?: number; max?: number } = {}) {
@@ -129,7 +141,15 @@ function normalizeIntegerFilter(value: string | null, options: { min?: number; m
     return null;
   }
 
-  const parsed = Number.parseInt(value, 10);
+  const trimmed = value.trim();
+  if (
+    !STRICT_INTEGER_PATTERN.test(trimmed) ||
+    trimmed.length > MAX_NUMERIC_TOKEN_LENGTH
+  ) {
+    return null;
+  }
+
+  const parsed = Number.parseInt(trimmed, 10);
 
   if (!Number.isFinite(parsed)) {
     return null;
@@ -153,7 +173,15 @@ function normalizeFloatFilter(
     return null;
   }
 
-  const parsed = Number.parseFloat(value);
+  const trimmed = value.trim();
+  if (
+    !STRICT_FLOAT_PATTERN.test(trimmed) ||
+    trimmed.length > MAX_NUMERIC_TOKEN_LENGTH
+  ) {
+    return null;
+  }
+
+  const parsed = Number.parseFloat(trimmed.replace(",", "."));
 
   if (!Number.isFinite(parsed)) {
     return null;

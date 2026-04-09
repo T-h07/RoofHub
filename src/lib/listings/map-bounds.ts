@@ -1,4 +1,6 @@
 export const MAP_BOUNDS_PARAM = "bbox";
+const STRICT_BOUND_TOKEN_PATTERN = /^-?\d+(?:\.\d+)?$/;
+const MAX_BOUND_TOKEN_LENGTH = 32;
 
 export type MapSearchBounds = {
   west: number;
@@ -59,6 +61,16 @@ export function parseMapSearchBounds(value: string | null | undefined): MapSearc
     .filter(Boolean);
 
   if (parts.length !== 4) {
+    return null;
+  }
+
+  if (
+    parts.some(
+      (token) =>
+        token.length > MAX_BOUND_TOKEN_LENGTH ||
+        !STRICT_BOUND_TOKEN_PATTERN.test(token)
+    )
+  ) {
     return null;
   }
 

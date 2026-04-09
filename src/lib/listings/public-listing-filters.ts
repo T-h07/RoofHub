@@ -11,7 +11,7 @@ type PublicListingFilterQuery<TQuery> = {
 
 function sanitizeKeywordForOrQuery(keyword: string) {
   return keyword
-    .replace(/[,%()]/g, " ")
+    .replace(/[^a-z0-9\s-]/gi, " ")
     .replace(/\s+/g, " ")
     .trim();
 }

@@ -87,13 +87,23 @@ const PUBLIC_MAP_LISTINGS_SELECT = `
     sort_order
   )
 `;
+const STRICT_COORDINATE_PATTERN = /^-?\d+(?:\.\d+)?$/;
+const MAX_COORDINATE_TOKEN_LENGTH = 32;
 
 function parseCoordinate(value: number | string) {
   if (typeof value === "number") {
     return Number.isFinite(value) ? value : null;
   }
 
-  const parsed = Number.parseFloat(value);
+  const normalized = value.trim();
+  if (
+    normalized.length > MAX_COORDINATE_TOKEN_LENGTH ||
+    !STRICT_COORDINATE_PATTERN.test(normalized)
+  ) {
+    return null;
+  }
+
+  const parsed = Number.parseFloat(normalized);
   return Number.isFinite(parsed) ? parsed : null;
 }
 

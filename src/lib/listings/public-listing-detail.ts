@@ -166,6 +166,10 @@ const PROVIDER_PREVIEW_CHANNEL_COMPAT_SELECT =
   "id, display_name, avatar_url, bio, created_at, preferred_contact_method, contact_methods, phone";
 const PROVIDER_PREVIEW_LEGACY_SELECT =
   "id, display_name, avatar_url, bio, created_at, preferred_contact_method, phone";
+const LISTING_SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const LISTING_SLUG_MAX_LENGTH = 120;
+const STRICT_COORDINATE_PATTERN = /^-?\d+(?:\.\d+)?$/;
+const MAX_COORDINATE_TOKEN_LENGTH = 32;
 
 function isMissingContactMethodsColumnError(message: string | undefined) {
   if (!message) {
@@ -198,7 +202,15 @@ function parseCoordinate(value: number | string) {
     return Number.isFinite(value) ? value : null;
   }
 
-  const parsed = Number.parseFloat(value);
+  const normalized = value.trim();
+  if (
+    normalized.length > MAX_COORDINATE_TOKEN_LENGTH ||
+    !STRICT_COORDINATE_PATTERN.test(normalized)
+  ) {
+    return null;
+  }
+
+  const parsed = Number.parseFloat(normalized);
   return Number.isFinite(parsed) ? parsed : null;
 }
 
@@ -440,7 +452,11 @@ export async function loadPublicListingDetailBySlug(
 ): Promise<PublicListingDetailResult> {
   try {
     const normalizedSlug = slug.trim().toLowerCase();
-    if (!normalizedSlug) {
+    if (
+      !normalizedSlug ||
+      normalizedSlug.length > LISTING_SLUG_MAX_LENGTH ||
+      !LISTING_SLUG_PATTERN.test(normalizedSlug)
+    ) {
       return {
         ok: false,
         reason: "not_found",
