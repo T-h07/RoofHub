@@ -1,7 +1,5 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
-
 import { createServerSupabaseClient } from "@/lib/supabase";
 import type { Enums } from "@/types/database";
 
@@ -18,13 +16,6 @@ const REPORT_REASON_VALUES: readonly Enums<"report_reason">[] = [
 ] as const;
 
 type ActionStatus = "idle" | "success" | "error";
-
-export type FavoriteListingActionState = {
-  status: ActionStatus;
-  message: string | null;
-  isFavorited: boolean;
-  requiresAuth: boolean;
-};
 
 export type ReportListingActionState = {
   status: ActionStatus;
@@ -57,107 +48,6 @@ async function ensurePublicListingVisibility(
     ok: !error && Boolean(data),
     supabase,
   };
-}
-
-export async function toggleListingFavoriteAction(
-  previousState: FavoriteListingActionState,
-  formData: FormData
-): Promise<FavoriteListingActionState> {
-  const listingId = getString(formData, "listingId");
-  const slug = getString(formData, "slug");
-  const currentlyFavorited = getString(formData, "isFavorited") === "1";
-
-  if (!isUuid(listingId) || !slug) {
-    return {
-      ...previousState,
-      status: "error",
-      message: "Favorite action could not be completed. Refresh and try again.",
-      requiresAuth: false,
-    };
-  }
-
-  try {
-    const { ok, supabase } = await ensurePublicListingVisibility(listingId);
-    if (!ok) {
-      return {
-        ...previousState,
-        status: "error",
-        message: "This listing is no longer available for favorites.",
-        requiresAuth: false,
-      };
-    }
-
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return {
-        ...previousState,
-        status: "error",
-        message: "Sign in to save listings to favorites.",
-        requiresAuth: true,
-      };
-    }
-
-    if (currentlyFavorited) {
-      const { error } = await supabase
-        .from("favorites")
-        .delete()
-        .eq("user_id", user.id)
-        .eq("listing_id", listingId);
-
-      if (error) {
-        return {
-          ...previousState,
-          status: "error",
-          message: "Could not remove this listing from favorites.",
-          requiresAuth: false,
-        };
-      }
-
-      revalidatePath(`/listing/${slug}`);
-      revalidatePath("/favorites");
-
-      return {
-        status: "success",
-        message: "Removed from favorites.",
-        isFavorited: false,
-        requiresAuth: false,
-      };
-    }
-
-    const { error } = await supabase.from("favorites").insert({
-      listing_id: listingId,
-      user_id: user.id,
-    });
-
-    if (error && error.code !== "23505") {
-      return {
-        ...previousState,
-        status: "error",
-        message: "Could not save this listing right now.",
-        requiresAuth: false,
-      };
-    }
-
-    revalidatePath(`/listing/${slug}`);
-    revalidatePath("/favorites");
-
-    return {
-      status: "success",
-      message: "Saved to favorites.",
-      isFavorited: true,
-      requiresAuth: false,
-    };
-  } catch {
-    return {
-      ...previousState,
-      status: "error",
-      message: "Favorite action failed. Please try again.",
-      requiresAuth: false,
-    };
-  }
 }
 
 export async function submitListingReportAction(
