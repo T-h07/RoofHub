@@ -6,13 +6,21 @@ import type { Database, Tables } from "@/types/database";
 
 import { isListingContactableForNewConversation } from "./contact-rules";
 import { getMessagingViewerContext, toMessagingFailure } from "./context";
+import {
+  loadMessagingConversationSummariesQuery,
+  loadMessagingThreadQuery,
+} from "./queries";
 import type {
   ConversationCreateResult,
   ConversationReadResult,
   ConversationSendMessageResult,
   CreateOrGetConversationInput,
+  LoadConversationSummariesInput,
+  LoadConversationThreadInput,
   MarkConversationReadInput,
   MessagingConversationRecord,
+  MessagingConversationSummariesResult,
+  MessagingThreadResult,
   MessagingMessageRecord,
   MessagingResult,
   SendConversationMessageInput,
@@ -316,4 +324,16 @@ export async function markConversationReadAction(
       markedReadCount: data?.length ?? 0,
     },
   };
+}
+
+export async function loadMessagingConversationSummariesAction(
+  input: LoadConversationSummariesInput = {}
+): Promise<MessagingResult<MessagingConversationSummariesResult>> {
+  return loadMessagingConversationSummariesQuery(input);
+}
+
+export async function loadMessagingThreadAction(
+  input: LoadConversationThreadInput
+): Promise<MessagingResult<MessagingThreadResult>> {
+  return loadMessagingThreadQuery(input);
 }

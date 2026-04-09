@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowLeft, LoaderCircle, SendHorizontal } from "lucide-react";
@@ -14,12 +14,12 @@ import {
   formatMessageDayLabel,
   formatMessageTimeLabel,
 } from "@/lib/messaging/presentation";
-import type { MessagingThreadResult } from "@/lib/messaging/types";
+import type { MessagingClientThread } from "@/lib/messaging/client-model";
 import { MESSAGE_BODY_MAX_LENGTH, normalizeMessageBody } from "@/lib/messaging/validation";
 import { cn } from "@/lib/utils";
 
 type MessagesThreadPanelProps = {
-  thread: MessagingThreadResult;
+  thread: MessagingClientThread;
   viewerUserId: string;
   isSending: boolean;
   sendError: string | null;
@@ -28,7 +28,7 @@ type MessagesThreadPanelProps = {
   showBackButton: boolean;
 };
 
-function formatPrice(thread: MessagingThreadResult) {
+function formatPrice(thread: MessagingClientThread) {
   if (!thread.listing) {
     return null;
   }
@@ -43,7 +43,7 @@ function formatPrice(thread: MessagingThreadResult) {
   return thread.listing.listing_type === "rent" ? `${amount} / month` : amount;
 }
 
-function getCounterpartLabel(thread: MessagingThreadResult) {
+function getCounterpartLabel(thread: MessagingClientThread) {
   if (thread.participantRole === "provider") {
     return `Conversation with seeker #${thread.counterpartUserId.slice(0, 6)}`;
   }
@@ -51,7 +51,7 @@ function getCounterpartLabel(thread: MessagingThreadResult) {
   return "Conversation with listing provider";
 }
 
-function getLocationLabel(thread: MessagingThreadResult) {
+function getLocationLabel(thread: MessagingClientThread) {
   if (!thread.listing) {
     return "Listing location unavailable";
   }
@@ -74,6 +74,8 @@ export function MessagesThreadPanel({
 }: MessagesThreadPanelProps) {
   const [draftBody, setDraftBody] = useState("");
   const [localError, setLocalError] = useState<string | null>(null);
+  const messageScrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const previousMessageCountRef = useRef(thread.messages.length);
   const messageCountLabel = useMemo(() => {
     const count = thread.messages.length;
     return `${count} message${count === 1 ? "" : "s"}`;
@@ -83,6 +85,36 @@ export function MessagesThreadPanel({
   const characterCount = draftBody.trim().length;
   const listingHref = thread.listing?.slug ? `/listing/${thread.listing.slug}` : null;
   const priceLabel = formatPrice(thread);
+
+  useEffect(() => {
+    const container = messageScrollContainerRef.current;
+    if (!container) {
+      previousMessageCountRef.current = thread.messages.length;
+      return;
+    }
+
+    const previousCount = previousMessageCountRef.current;
+    const nextCount = thread.messages.length;
+
+    if (nextCount <= previousCount) {
+      previousMessageCountRef.current = nextCount;
+      return;
+    }
+
+    const lastMessage = thread.messages[nextCount - 1];
+    const distanceFromBottom =
+      container.scrollHeight - container.scrollTop - container.clientHeight;
+    const shouldStickToBottom =
+      distanceFromBottom < 140 || lastMessage?.sender_id === viewerUserId;
+
+    if (shouldStickToBottom) {
+      window.requestAnimationFrame(() => {
+        container.scrollTop = container.scrollHeight;
+      });
+    }
+
+    previousMessageCountRef.current = nextCount;
+  }, [thread.messages, viewerUserId]);
 
   async function submitMessage() {
     const normalizedBody = normalizeMessageBody(draftBody);
@@ -165,7 +197,10 @@ export function MessagesThreadPanel({
         </div>
       </header>
 
-      <div className="bg-background/60 flex-1 overflow-y-auto px-4 py-3 sm:px-5">
+      <div
+        ref={messageScrollContainerRef}
+        className="bg-background/60 flex-1 overflow-y-auto px-4 py-3 sm:px-5"
+      >
         {thread.messages.length === 0 ? (
           <EmptyState
             title="No messages yet"
@@ -179,6 +214,7 @@ export function MessagesThreadPanel({
                 !previousMessage ||
                 !areMessagesOnSameDay(previousMessage.created_at, message.created_at);
               const isOwnMessage = message.sender_id === viewerUserId;
+              const isPending = message.clientState === "pending";
 
               return (
                 <li key={message.id} className="space-y-2">
@@ -200,14 +236,21 @@ export function MessagesThreadPanel({
                       )}
                     >
                       <p className="text-sm leading-6 whitespace-pre-wrap break-words">{message.body}</p>
-                      <p
+                      <div
                         className={cn(
-                          "mt-1 text-[11px]",
+                          "mt-1 inline-flex items-center gap-1 text-[11px]",
                           isOwnMessage ? "text-primary-foreground/78" : "text-muted-foreground"
                         )}
                       >
-                        {formatMessageTimeLabel(message.created_at)}
-                      </p>
+                        <span>{formatMessageTimeLabel(message.created_at)}</span>
+                        {isPending ? (
+                          <>
+                            <span aria-hidden="true">•</span>
+                            <LoaderCircle className="size-3 animate-spin" aria-hidden="true" />
+                            <span>Sending</span>
+                          </>
+                        ) : null}
+                      </div>
                     </article>
                   </div>
                 </li>

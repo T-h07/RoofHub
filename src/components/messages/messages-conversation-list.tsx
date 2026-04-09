@@ -1,8 +1,9 @@
 "use client";
 
-import { ChevronRight, MessageSquareText } from "lucide-react";
+import { ChevronRight, LoaderCircle, MessageSquareText } from "lucide-react";
 
 import { EmptyState } from "@/components/ui/empty-state";
+import type { MessagingRealtimeHealth } from "@/lib/messaging/client-model";
 import { formatConversationActivityLabel, formatConversationActivityTitle } from "@/lib/messaging/presentation";
 import type { MessagingConversationSummary } from "@/lib/messaging/types";
 import { cn } from "@/lib/utils";
@@ -12,6 +13,9 @@ type MessagesConversationListProps = {
   selectedConversationId: string | null;
   unreadTotalCount: number;
   onOpenConversation: (conversationId: string) => void;
+  realtimeHealth: MessagingRealtimeHealth;
+  isRefreshing: boolean;
+  onRefresh: () => void;
 };
 
 function getCounterpartLabel(summary: MessagingConversationSummary) {
@@ -43,6 +47,9 @@ export function MessagesConversationList({
   selectedConversationId,
   unreadTotalCount,
   onOpenConversation,
+  realtimeHealth,
+  isRefreshing,
+  onRefresh,
 }: MessagesConversationListProps) {
   if (summaries.length === 0) {
     return (
@@ -57,10 +64,49 @@ export function MessagesConversationList({
   return (
     <div className="space-y-2.5">
       <div className="border-border/70 bg-card/45 flex items-center justify-between rounded-lg border px-3.5 py-2.5">
-        <p className="text-sm font-semibold tracking-tight">Inbox</p>
-        <p className="text-muted-foreground text-xs">
-          {summaries.length} thread{summaries.length === 1 ? "" : "s"} • {unreadTotalCount} unread
-        </p>
+        <div className="space-y-0.5">
+          <p className="text-sm font-semibold tracking-tight">Inbox</p>
+          <p className="text-muted-foreground text-xs">
+            {summaries.length} thread{summaries.length === 1 ? "" : "s"} • {unreadTotalCount} unread
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <span
+            className={cn(
+              "rounded-full px-2 py-0.5 text-[11px] font-medium",
+              realtimeHealth === "live"
+                ? "bg-emerald-500/20 text-emerald-300"
+                : realtimeHealth === "connecting"
+                  ? "bg-amber-500/20 text-amber-300"
+                  : "bg-destructive/20 text-destructive-foreground"
+            )}
+          >
+            {realtimeHealth === "live"
+              ? "Live"
+              : realtimeHealth === "connecting"
+                ? "Connecting"
+                : "Fallback"}
+          </span>
+
+          <button
+            type="button"
+            onClick={onRefresh}
+            disabled={isRefreshing}
+            className={cn(
+              "border-border bg-card/65 hover:bg-accent/70 rounded-md border px-2 py-1 text-[11px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-70"
+            )}
+          >
+            {isRefreshing ? (
+              <span className="inline-flex items-center gap-1">
+                <LoaderCircle className="size-3 animate-spin" aria-hidden="true" />
+                Sync
+              </span>
+            ) : (
+              "Refresh"
+            )}
+          </button>
+        </div>
       </div>
 
       <ul className="space-y-2">
