@@ -4,7 +4,7 @@ Map-first real estate marketplace for rental and sale listings.
 
 ## Current Stage
 
-`NM-PT23 Realtime Messaging` is established:
+`NM-PT24 Report Listing and Moderation Basics` is established:
 
 - Next.js App Router + TypeScript scaffold
 - Supabase App Router SSR integration (`@supabase/supabase-js`, `@supabase/ssr`)
@@ -84,6 +84,11 @@ Map-first real estate marketplace for rental and sale listings.
 - optimistic send now renders immediate pending bubbles and reconciles against persisted message events
 - conversation list ordering/unread cues now update live from message events with participant-safe scoping
 - degraded realtime states now auto-fallback to periodic server refresh with manual refresh/retry controls
+- listing report reason codes are now centralized and reused across report UX + backend validation
+- report submission now handles duplicate reports idempotently and blocks self-report attempts
+- admin moderation workspace route is now available at `/admin/moderation` with admin-only access
+- moderation queue now surfaces report + listing context with hide/unhide controls
+- admin hide/unhide now persists through `hidden_by_admin` status transitions and restores safe visibility state
 - generated TypeScript database types in `src/types/database.ts` (schema + policy helper functions)
 - existing PT02 shell and PT03 integration structure preserved
 
@@ -309,6 +314,12 @@ Messaging UI documentation:
 Realtime messaging documentation:
 
 - `docs/realtime-messaging.md`
+
+## Report Listing and Moderation Basics (PT24)
+
+Moderation starter documentation:
+
+- `docs/report-listing-moderation-basics.md`
 
 ## Local Development
 
