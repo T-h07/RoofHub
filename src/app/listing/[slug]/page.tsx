@@ -157,7 +157,6 @@ export default async function ListingDetailPage({
         <aside className="order-1 space-y-4 xl:order-2 xl:sticky xl:top-[5.5rem] xl:self-start">
           <ListingDetailCtaRail
             listingId={listing.id}
-            listingSlug={listing.slug}
             isAuthenticated={isAuthenticated}
             isFavorited={isFavorited}
             isOwner={isOwner}

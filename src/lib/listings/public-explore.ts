@@ -5,6 +5,7 @@ import { createServerSupabaseClient } from "@/lib/supabase";
 import type { Tables } from "@/types/database";
 
 import { EXPLORE_PAGE_SIZE, type ExploreSearchState } from "./explore-search-params";
+import { loadFavoriteListingIdsForUser } from "./favorites";
 import { applyPublicListingFilters } from "./public-listing-filters";
 
 type PublicExploreListingRow = Pick<
@@ -32,6 +33,7 @@ type PublicExploreListingRow = Pick<
 export type PublicExploreListing = Omit<PublicExploreListingRow, "listing_images"> & {
   coverImageUrl: string | null;
   coverImagePath: string | null;
+  isFavorited: boolean;
 };
 
 type PublicExploreSuccessResult = {
@@ -40,6 +42,7 @@ type PublicExploreSuccessResult = {
   totalCount: number;
   totalPages: number;
   cityOptions: string[];
+  viewerUserId: string | null;
 };
 
 type PublicExploreErrorResult = {
@@ -49,6 +52,7 @@ type PublicExploreErrorResult = {
   totalCount: number;
   totalPages: number;
   cityOptions: string[];
+  viewerUserId: string | null;
 };
 
 export type PublicExploreResult = PublicExploreSuccessResult | PublicExploreErrorResult;
@@ -127,6 +131,9 @@ export async function loadPublicExploreListings(state: ExploreSearchState): Prom
   try {
     const cityOptions = await loadPublishedCityOptions();
     const supabase = await createServerSupabaseClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     const rangeStart = (state.page - 1) * EXPLORE_PAGE_SIZE;
     const rangeEnd = rangeStart + EXPLORE_PAGE_SIZE - 1;
 
@@ -166,10 +173,19 @@ export async function loadPublicExploreListings(state: ExploreSearchState): Prom
         totalCount: 0,
         totalPages: 0,
         cityOptions,
+        viewerUserId: user?.id ?? null,
       };
     }
 
     const listingRows = (data ?? []) as PublicExploreListingRow[];
+    const favoriteListingIds =
+      user && listingRows.length > 0
+        ? await loadFavoriteListingIdsForUser(
+            supabase,
+            user.id,
+            listingRows.map((listing) => listing.id)
+          )
+        : new Set<string>();
     const coverImageUrlEntries = await Promise.all(
       listingRows.map(async (listing) => {
         const coverImagePath = getCoverImagePath(listing.listing_images);
@@ -216,6 +232,7 @@ export async function loadPublicExploreListings(state: ExploreSearchState): Prom
         created_at: listing.created_at,
         coverImagePath: coverEntry?.coverImagePath ?? null,
         coverImageUrl: coverEntry?.signedUrl ?? null,
+        isFavorited: favoriteListingIds.has(listing.id),
       };
     });
 
@@ -228,6 +245,7 @@ export async function loadPublicExploreListings(state: ExploreSearchState): Prom
       totalCount,
       totalPages,
       cityOptions,
+      viewerUserId: user?.id ?? null,
     };
   } catch {
     return {
@@ -238,6 +256,7 @@ export async function loadPublicExploreListings(state: ExploreSearchState): Prom
       totalCount: 0,
       totalPages: 0,
       cityOptions: [],
+      viewerUserId: null,
     };
   }
 }

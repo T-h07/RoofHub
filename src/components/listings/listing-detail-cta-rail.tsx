@@ -3,13 +3,12 @@ import { Mail, ShieldAlert } from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { buttonVariants } from "@/components/ui/button";
-import { FavoriteListingForm } from "@/components/listings/favorite-listing-form";
+import { FavoriteToggle } from "@/components/listings/favorite-toggle";
 import { ReportListingDialog } from "@/components/listings/report-listing-dialog";
 import { cn } from "@/lib/utils";
 
 type ListingDetailCtaRailProps = {
   listingId: string;
-  listingSlug: string;
   isAuthenticated: boolean;
   isFavorited: boolean;
   isOwner: boolean;
@@ -19,7 +18,6 @@ type ListingDetailCtaRailProps = {
 
 export function ListingDetailCtaRail({
   listingId,
-  listingSlug,
   isAuthenticated,
   isFavorited,
   isOwner,
@@ -48,12 +46,12 @@ export function ListingDetailCtaRail({
           </Link>
         )}
 
-        <FavoriteListingForm
+        <FavoriteToggle
           listingId={listingId}
-          slug={listingSlug}
+          initiallyFavorited={isFavorited}
           isAuthenticated={isAuthenticated}
           signInHref={signInHref}
-          initiallyFavorited={isFavorited}
+          mode="button"
         />
 
         <div className="border-border/70 bg-background/45 rounded-lg border px-3 py-2">

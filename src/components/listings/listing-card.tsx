@@ -2,17 +2,37 @@ import Image from "next/image";
 import Link from "next/link";
 import { Bath, BedDouble, Expand, Hourglass, MapPin } from "lucide-react";
 
+import { FavoriteToggle } from "@/components/listings/favorite-toggle";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import {
+  type ExploreListingType,
+  type ExplorePropertyType,
   EXPLORE_LISTING_TYPE_LABELS,
   EXPLORE_PROPERTY_TYPE_LABELS,
 } from "@/lib/listings/explore-search-params";
-import type { PublicExploreListing } from "@/lib/listings/public-explore";
+
+export type ListingCardListing = {
+  id: string;
+  slug: string;
+  title: string;
+  listing_type: ExploreListingType;
+  property_type: ExplorePropertyType;
+  price_amount: number;
+  currency_code: string;
+  city: string;
+  neighborhood: string | null;
+  bedrooms: number | null;
+  bathrooms: number | null;
+  area_m2: number;
+  coverImageUrl: string | null;
+  isFavorited: boolean;
+};
 
 type ListingCardProps = {
-  listing: PublicExploreListing;
+  listing: ListingCardListing;
+  isAuthenticated: boolean;
   className?: string;
 };
 
@@ -36,7 +56,7 @@ function getCurrencyFormatter(currencyCode: string) {
   return currencyFormatterCache.get(cacheKey)!;
 }
 
-function formatPrice(listing: PublicExploreListing) {
+function formatPrice(listing: ListingCardListing) {
   const amount = getCurrencyFormatter(listing.currency_code).format(listing.price_amount);
 
   return listing.listing_type === "rent" ? `${amount} / month` : amount;
@@ -58,7 +78,7 @@ function formatArea(value: number) {
   return `${new Intl.NumberFormat("en", { maximumFractionDigits: 0 }).format(value)} m²`;
 }
 
-export function ListingCard({ listing, className }: ListingCardProps) {
+export function ListingCard({ listing, isAuthenticated, className }: ListingCardProps) {
   const locationLabel = listing.neighborhood
     ? `${listing.neighborhood}, ${listing.city}`
     : listing.city;
@@ -86,6 +106,15 @@ export function ListingCard({ listing, className }: ListingCardProps) {
             {EXPLORE_LISTING_TYPE_LABELS[listing.listing_type]}
           </Badge>
           <Badge variant="outline">{EXPLORE_PROPERTY_TYPE_LABELS[listing.property_type]}</Badge>
+        </div>
+
+        <div className="absolute top-3 right-3">
+          <FavoriteToggle
+            listingId={listing.id}
+            initiallyFavorited={listing.isFavorited}
+            isAuthenticated={isAuthenticated}
+            mode="icon"
+          />
         </div>
 
         {!listing.coverImageUrl ? (
