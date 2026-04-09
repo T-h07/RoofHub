@@ -338,6 +338,15 @@ Provider trust-layer documentation:
 
 Security-sensitive changes must follow the baseline and complete the checklist before merge.
 
+## Supply Chain Guardrails (SH-PT07)
+
+- Repository-level supply-chain policy and scanner response workflow: `docs/supply-chain-guardrails.md`
+- CI workflows:
+  - `.github/workflows/security-secrets.yml`
+  - `.github/workflows/security-dependencies.yml`
+  - `.github/workflows/security-codeql.yml`
+- Automated dependency update hygiene: `.github/dependabot.yml`
+
 ## Local Development
 
 ```bash
@@ -367,3 +376,4 @@ See:
 - `docs/commit-conventions.md`
 - `docs/security-baseline.md`
 - `docs/security-checklist.md`
+- `docs/supply-chain-guardrails.md`

@@ -56,6 +56,20 @@ For changes that touch auth/session, authorization, route handlers, server actio
 - follow `docs/security-baseline.md`
 - complete `docs/security-checklist.md` before merge
 - include tests or validation notes for the sensitive behavior change
+- follow `docs/supply-chain-guardrails.md` for dependency/lockfile/scanner expectations
+
+## Lockfile Discipline
+
+- `package-lock.json` is required for reproducible installs.
+- Dependency manifest changes (`package.json`) must include intentional matching lockfile changes.
+- Do not remove or regenerate lockfile entries casually.
+- Do not merge dependency changes that omit required lockfile updates.
+
+## Security Workflow Changes
+
+- Changes to `.github/workflows/security-*.yml` and `.github/dependabot.yml` are security-sensitive.
+- Do not disable scanners or lower guardrail severity without explicit rationale in PR notes.
+- Keep workflow naming and triggers consistent so security results remain discoverable.
 
 ## What to Commit
 

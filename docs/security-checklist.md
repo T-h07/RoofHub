@@ -4,6 +4,8 @@ Use this checklist before merging any security-sensitive change.
 
 Security-sensitive includes: auth/session, authorization, server actions, route handlers, uploads/storage, messaging/moderation/admin boundaries, env/secrets, and dependency changes affecting trust boundaries.
 
+For dependency/lockfile/scanner specifics, also follow `docs/supply-chain-guardrails.md`.
+
 ## Access and authorization
 
 - [ ] Auth is required where needed (no guest bypass on protected behavior).
@@ -38,6 +40,10 @@ Security-sensitive includes: auth/session, authorization, server actions, route 
 
 - [ ] New/updated sensitive dependencies were reviewed and justified.
 - [ ] Lockfile updates are intentional and scoped.
+- [ ] `package-lock.json` updates match dependency manifest changes (no drift/omission).
+- [ ] Dependency Review check passes (or documented exception approved by maintainers).
+- [ ] Secret scan and CodeQL checks were reviewed for this change set.
 - [ ] Changed routes/server actions are documented if trust boundaries changed.
 - [ ] Tests or validation notes cover the security-sensitive behavior.
 - [ ] `docs/security-baseline.md` was updated if assumptions/guardrails changed.
+- [ ] If scanner suppression/workflow changes were made, justification and scope are documented.

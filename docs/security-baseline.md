@@ -7,6 +7,8 @@ It is the baseline future PTs must preserve and extend.
 
 This is a guardrail milestone, not a full hardening rollout.
 
+Supply-chain execution details are defined in `docs/supply-chain-guardrails.md`.
+
 ## Scope and assumptions
 
 - Platform: Next.js App Router on Vercel with Supabase backend services.
@@ -101,6 +103,15 @@ Google OAuth note:
 - Any package affecting auth, uploads, parsing, rendering, crypto, or networking requires explicit review notes.
 - Keep lockfile updates intentional and scoped.
 - Prefer maintained dependencies with clear release/security history.
+- Keep dependency changes reproducible: `package-lock.json` is required and should reflect intentional updates only.
+
+### 10) Supply-chain and CI security guardrails
+
+- Secret scanning, dependency scanning, and code scanning workflows are mandatory baseline controls.
+- Do not disable or weaken security workflows without documented rationale.
+- Scanner suppressions must be narrow, justified, and reviewable.
+- Dependabot update hygiene should remain enabled and scoped to avoid alert fatigue.
+- Security workflow changes are security-sensitive changes and require checklist completion.
 
 ## Required review points for high-risk changes
 
@@ -114,6 +125,7 @@ The following changes require explicit security review before merge:
 - new external input parsers or render paths for user content
 - environment/secrets model changes
 - dependency additions in sensitive domains
+- CI/security workflow changes or scanner suppression changes
 
 ## Definition of done for security-sensitive work
 
@@ -140,6 +152,7 @@ Do not merge when any of the following is true:
 - visibility/status rules can expose hidden/private data
 - errors leak internal backend/provider details
 - checklist is skipped for security-sensitive changes
+- security scanner findings are ignored without documented disposition
 
 ## Intentionally deferred from SH-PT01
 
