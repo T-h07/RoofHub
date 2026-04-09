@@ -1,4 +1,5 @@
 import type { TablesInsert } from "@/types/database";
+import { createUuid } from "@/lib/utils/id";
 
 export const LISTING_IMAGES_BUCKET = "listing-images" as const;
 export const LISTING_IMAGE_MAX_BYTES = 10 * 1024 * 1024; // 10 MB
@@ -153,7 +154,7 @@ export function createListingImageObjectPath(input: {
   assertUuid(input.listingId, "listingId");
 
   const extension = LISTING_IMAGE_MIME_TO_EXTENSION[input.mimeType];
-  const fileName = `${crypto.randomUUID()}.${extension}`;
+  const fileName = `${createUuid()}.${extension}`;
 
   return `owner/${input.ownerId}/listing/${input.listingId}/${fileName}`;
 }

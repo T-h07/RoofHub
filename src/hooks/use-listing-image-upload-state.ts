@@ -7,6 +7,7 @@ import {
   validateListingImageSelection,
   type ListingImageValidationIssue,
 } from "@/lib/storage/listing-images";
+import { createUuid } from "@/lib/utils/id";
 
 export type ListingImageUploadState = "local" | "uploading" | "uploaded" | "failed";
 
@@ -71,7 +72,7 @@ export function useListingImageUploadState(initialImages: readonly ExistingListi
     const baseSortOrder = images.length;
 
     const newDrafts: ListingImageDraft[] = acceptedFiles.map((file, index) => ({
-      id: crypto.randomUUID(),
+      id: createUuid(),
       file,
       fileName: file.name,
       mimeType: file.type,

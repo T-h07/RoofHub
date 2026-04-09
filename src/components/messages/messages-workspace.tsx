@@ -34,6 +34,7 @@ import type {
 import { toMessagePreview } from "@/lib/messaging/validation";
 import { createClient as createBrowserSupabaseClient } from "@/lib/supabase/client";
 import type { Database } from "@/types/database";
+import { createUuid } from "@/lib/utils/id";
 import { cn } from "@/lib/utils";
 
 const FALLBACK_REFRESH_INTERVAL_MS = 15_000;
@@ -498,7 +499,7 @@ export function MessagesWorkspace({
       return false;
     }
 
-    const clientId = crypto.randomUUID();
+    const clientId = createUuid();
     const optimisticCreatedAt = new Date().toISOString();
     const optimistic = optimisticMessage(
       thread.conversation.id,

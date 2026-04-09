@@ -38,6 +38,7 @@ import {
   type ProviderWizardStep,
 } from "@/lib/listings/provider-wizard/types";
 import { canTransitionProviderListingStatus } from "@/lib/listings/provider-wizard/status-transitions";
+import { createUuid } from "@/lib/utils/id";
 import { cn } from "@/lib/utils";
 
 type ProviderListingWizardProps = {
@@ -165,10 +166,7 @@ export function ProviderListingWizard({
   );
 
   const createDraftId = useMemo(
-    () =>
-      typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
-        ? crypto.randomUUID()
-        : null,
+    () => createUuid(),
     []
   );
 
