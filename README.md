@@ -338,6 +338,11 @@ Provider trust-layer documentation:
 
 Security-sensitive changes must follow the baseline and complete the checklist before merge.
 
+## Auth and Session Hardening (SH-PT02)
+
+- Auth/session hardening model and threat-focused controls: `docs/auth-session-hardening.md`
+- Foundational auth flow behavior and route map: `docs/auth-flows.md`
+
 ## Supply Chain Guardrails (SH-PT07)
 
 - Repository-level supply-chain policy and scanner response workflow: `docs/supply-chain-guardrails.md`
@@ -376,4 +381,5 @@ See:
 - `docs/commit-conventions.md`
 - `docs/security-baseline.md`
 - `docs/security-checklist.md`
+- `docs/auth-session-hardening.md`
 - `docs/supply-chain-guardrails.md`

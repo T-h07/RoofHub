@@ -2,6 +2,10 @@
 
 This document summarizes the auth/session foundation added in PT07.
 
+For the SH-PT02 hardening pass (session invalidation semantics, callback/redirect hardening, and session-failure recovery behavior), see:
+
+- `docs/auth-session-hardening.md`
+
 ## Implemented Flows
 
 - Email/password sign up (`/auth/sign-up`)
@@ -30,6 +34,7 @@ Behavior:
 
 - guest access to protected routes redirects to `/auth/sign-in?next=...`
 - authenticated access to guest-only auth pages (`/auth/sign-in`, `/auth/sign-up`, `/auth/forgot-password`) redirects to the requested safe `next` path or `/dashboard`
+- stale/revoked auth-cookie sessions on protected routes are redirected with explicit reason states (`session_expired` / `session_revoked`) and stale auth cookies are cleared
 
 ## Redirect Logic
 
@@ -39,7 +44,7 @@ Behavior:
   - immediate session (if email confirmation is disabled)
   - confirmation-required flow (if enabled)
 - Forgot password sends users through callback then to `/auth/reset-password`.
-- Sign out redirects to `/`.
+- Sign out redirects to sign-in with explicit reason state (`signed_out`).
 
 ## Profile Bootstrap Integration
 
@@ -72,5 +77,6 @@ Supabase dashboard setup:
 ## Known Limits / Next PT Notes
 
 - OAuth providers are not enabled in PT07.
+- Single-active-session enforcement is configuration-gated in Supabase settings and is not claimed unless explicitly enabled in dashboard.
 - Route protection is authenticated-only (full role-segmented route shells can be expanded later).
 - PT08 can build on this to introduce profile/account UX and deeper guarded route groups.
