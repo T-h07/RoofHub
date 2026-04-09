@@ -228,10 +228,10 @@ export type Database = {
           heating_type: Database["public"]["Enums"]["heating_type"] | null
           id: string
           internet_included: boolean
-          latitude: number
+          latitude: number | null
           listing_status: Database["public"]["Enums"]["listing_status"]
           listing_type: Database["public"]["Enums"]["listing_type"]
-          longitude: number
+          longitude: number | null
           neighborhood: string | null
           owner_id: string
           parking: boolean
@@ -265,10 +265,10 @@ export type Database = {
           heating_type?: Database["public"]["Enums"]["heating_type"] | null
           id?: string
           internet_included?: boolean
-          latitude: number
+          latitude?: number | null
           listing_status?: Database["public"]["Enums"]["listing_status"]
           listing_type: Database["public"]["Enums"]["listing_type"]
-          longitude: number
+          longitude?: number | null
           neighborhood?: string | null
           owner_id: string
           parking?: boolean
@@ -302,10 +302,10 @@ export type Database = {
           heating_type?: Database["public"]["Enums"]["heating_type"] | null
           id?: string
           internet_included?: boolean
-          latitude?: number
+          latitude?: number | null
           listing_status?: Database["public"]["Enums"]["listing_status"]
           listing_type?: Database["public"]["Enums"]["listing_type"]
-          longitude?: number
+          longitude?: number | null
           neighborhood?: string | null
           owner_id?: string
           parking?: boolean
@@ -595,4 +595,3 @@ export const Constants = {
     },
   },
 } as const
-
