@@ -158,11 +158,11 @@ const PUBLIC_LISTING_DETAIL_SELECT = `
 `;
 
 const PROVIDER_PREVIEW_SELECT =
-  "id, display_name, avatar_url, bio, role, preferred_contact_method, contact_methods, phone, contact_email, whatsapp_phone, viber_phone";
+  "id, display_name, avatar_url, bio, preferred_contact_method, contact_methods, phone, contact_email, whatsapp_phone, viber_phone";
 const PROVIDER_PREVIEW_CHANNEL_COMPAT_SELECT =
-  "id, display_name, avatar_url, bio, role, preferred_contact_method, contact_methods, phone";
+  "id, display_name, avatar_url, bio, preferred_contact_method, contact_methods, phone";
 const PROVIDER_PREVIEW_LEGACY_SELECT =
-  "id, display_name, avatar_url, bio, role, preferred_contact_method, phone";
+  "id, display_name, avatar_url, bio, preferred_contact_method, phone";
 
 function isMissingContactMethodsColumnError(message: string | undefined) {
   if (!message) {
@@ -304,7 +304,6 @@ async function fetchPublicListingProvider(
     .from("profiles")
     .select(PROVIDER_PREVIEW_SELECT)
     .eq("id", providerId)
-    .eq("role", "provider")
     .maybeSingle();
 
   if (!full.error) {
@@ -321,7 +320,6 @@ async function fetchPublicListingProvider(
       .from("profiles")
       .select(PROVIDER_PREVIEW_CHANNEL_COMPAT_SELECT)
       .eq("id", providerId)
-      .eq("role", "provider")
       .maybeSingle();
 
     if (!channelCompatible.error) {
@@ -348,7 +346,6 @@ async function fetchPublicListingProvider(
       .from("profiles")
       .select(PROVIDER_PREVIEW_LEGACY_SELECT)
       .eq("id", providerId)
-      .eq("role", "provider")
       .maybeSingle();
 
     if (legacy.error) {
@@ -381,7 +378,6 @@ async function fetchPublicListingProvider(
     .from("profiles")
     .select(PROVIDER_PREVIEW_LEGACY_SELECT)
     .eq("id", providerId)
-    .eq("role", "provider")
     .maybeSingle();
 
   if (legacy.error) {
