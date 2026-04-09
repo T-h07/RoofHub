@@ -1,25 +1,39 @@
 "use client";
 
-import Link from "next/link";
 import Image from "next/image";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { ExternalLink, MapPin, RefreshCw } from "lucide-react";
+import Link from "next/link";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import type { FeatureCollection, Point } from "geojson";
+import { ExternalLink, LoaderCircle, RefreshCw } from "lucide-react";
 import MapLibre, {
-  Marker,
+  Layer,
   NavigationControl,
   Popup,
   ScaleControl,
+  Source,
+  type LayerProps,
+  type MapLayerMouseEvent,
   type MapRef,
 } from "react-map-gl/maplibre";
+import type { GeoJSONSource } from "maplibre-gl";
 
 import { buttonVariants } from "@/components/ui/button";
 import { DEFAULT_PUBLIC_MAP_STYLE_URL } from "@/lib/config/map";
+import {
+  MAP_BOUNDS_PARAM,
+  areBoundsMeaningfullyDifferent,
+  parseMapSearchBounds,
+  serializeMapSearchBounds,
+  type MapSearchBounds,
+} from "@/lib/listings/map-bounds";
 import type { PublicMapListing } from "@/lib/listings/public-map";
 import { cn } from "@/lib/utils";
 
 type PublicListingsMapProps = {
   mapStyleUrl: string;
   listings: PublicMapListing[];
+  appliedBounds: MapSearchBounds | null;
 };
 
 type InitialViewState = {
@@ -28,12 +42,99 @@ type InitialViewState = {
   zoom: number;
 };
 
+type ListingPointProperties = {
+  listingId: string;
+  priceLabel: string;
+  approximate: 0 | 1;
+};
+
+const LISTINGS_SOURCE_ID = "public-listings";
+const CLUSTER_LAYER_ID = "listing-clusters";
+const CLUSTER_COUNT_LAYER_ID = "listing-cluster-count";
+const POINT_LAYER_ID = "listing-points";
+const POINT_LABEL_LAYER_ID = "listing-point-labels";
+
 const DEFAULT_CENTER = {
   longitude: 13.404954,
   latitude: 52.520008,
 };
 
 const currencyFormatterCache = new Map<string, Intl.NumberFormat>();
+
+const clusterCircleLayer: LayerProps = {
+  id: CLUSTER_LAYER_ID,
+  type: "circle",
+  source: LISTINGS_SOURCE_ID,
+  filter: ["has", "point_count"],
+  paint: {
+    "circle-color": ["step", ["get", "point_count"], "#5fa6ff", 16, "#3f89f4", 52, "#2a66d9"],
+    "circle-radius": ["step", ["get", "point_count"], 18, 16, 23, 52, 29],
+    "circle-stroke-color": "rgba(4, 12, 28, 0.92)",
+    "circle-stroke-width": 1.8,
+    "circle-opacity": 0.92,
+  },
+};
+
+const clusterCountLayer: LayerProps = {
+  id: CLUSTER_COUNT_LAYER_ID,
+  type: "symbol",
+  source: LISTINGS_SOURCE_ID,
+  filter: ["has", "point_count"],
+  layout: {
+    "text-field": ["get", "point_count_abbreviated"],
+    "text-size": 11.5,
+    "text-font": ["Open Sans Bold", "Arial Unicode MS Bold"],
+  },
+  paint: {
+    "text-color": "rgba(245, 249, 255, 0.96)",
+  },
+};
+
+const unclusteredPointLayer: LayerProps = {
+  id: POINT_LAYER_ID,
+  type: "circle",
+  source: LISTINGS_SOURCE_ID,
+  filter: ["!", ["has", "point_count"]],
+  paint: {
+    "circle-color": ["case", ["==", ["get", "approximate"], 1], "#5d88ce", "#71b0ff"],
+    "circle-radius": 12.5,
+    "circle-stroke-color": "rgba(3, 10, 24, 0.9)",
+    "circle-stroke-width": 1.6,
+    "circle-opacity": 0.92,
+  },
+};
+
+const unclusteredLabelLayer: LayerProps = {
+  id: POINT_LABEL_LAYER_ID,
+  type: "symbol",
+  source: LISTINGS_SOURCE_ID,
+  filter: ["!", ["has", "point_count"]],
+  layout: {
+    "text-field": ["get", "priceLabel"],
+    "text-size": 10.25,
+    "text-font": ["Open Sans Semibold", "Arial Unicode MS Bold"],
+    "text-allow-overlap": false,
+    "text-ignore-placement": false,
+  },
+  paint: {
+    "text-color": "rgba(244, 249, 255, 0.94)",
+    "text-halo-color": "rgba(3, 11, 24, 0.95)",
+    "text-halo-width": 0.7,
+  },
+};
+
+function clamp(value: number, minimum: number, maximum: number) {
+  return Math.min(maximum, Math.max(minimum, value));
+}
+
+function estimateZoomFromBounds(bounds: MapSearchBounds) {
+  const lngSpan = Math.max(bounds.east - bounds.west, 0.00001);
+  const latSpan = Math.max(bounds.north - bounds.south, 0.00001);
+  const span = Math.max(lngSpan, latSpan);
+  const zoom = Math.log2(360 / span);
+
+  return clamp(zoom, 2, 14);
+}
 
 function getCurrencyFormatter(currencyCode: string) {
   const normalizedCurrency = currencyCode?.toUpperCase() || "EUR";
@@ -86,7 +187,18 @@ function formatArea(value: number) {
   return `${new Intl.NumberFormat("en", { maximumFractionDigits: 0 }).format(value)} m²`;
 }
 
-function getInitialViewState(listings: PublicMapListing[]): InitialViewState {
+function getInitialViewState(
+  listings: PublicMapListing[],
+  appliedBounds: MapSearchBounds | null
+): InitialViewState {
+  if (appliedBounds) {
+    return {
+      longitude: (appliedBounds.west + appliedBounds.east) / 2,
+      latitude: (appliedBounds.south + appliedBounds.north) / 2,
+      zoom: estimateZoomFromBounds(appliedBounds),
+    };
+  }
+
   if (listings.length === 0) {
     return {
       ...DEFAULT_CENTER,
@@ -119,15 +231,39 @@ function getPopupListHref(listing: PublicMapListing) {
   return `/explore?${params.toString()}`;
 }
 
-export function PublicListingsMap({ mapStyleUrl, listings }: PublicListingsMapProps) {
+function readBoundsFromMap(mapRef: MapRef | null) {
+  const mapBounds = mapRef?.getMap().getBounds();
+
+  if (!mapBounds) {
+    return null;
+  }
+
+  return parseMapSearchBounds(
+    `${mapBounds.getWest()},${mapBounds.getSouth()},${mapBounds.getEast()},${mapBounds.getNorth()}`
+  );
+}
+
+export function PublicListingsMap({ mapStyleUrl, listings, appliedBounds }: PublicListingsMapProps) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const [isAreaSearchPending, startAreaSearchTransition] = useTransition();
   const mapRef = useRef<MapRef | null>(null);
-  const initialViewState = useMemo(() => getInitialViewState(listings), [listings]);
-  const [selectedListingId, setSelectedListingId] = useState<string | null>(listings[0]?.id ?? null);
+  const baselineBoundsRef = useRef<MapSearchBounds | null>(appliedBounds);
+  const hasInitializedBoundsRef = useRef(Boolean(appliedBounds));
+
+  const initialViewState = useMemo(
+    () => getInitialViewState(listings, appliedBounds),
+    [listings, appliedBounds]
+  );
+  const [selectedListingId, setSelectedListingId] = useState<string | null>(null);
   const [activeStyleUrl, setActiveStyleUrl] = useState(mapStyleUrl);
   const [didFallbackStyle, setDidFallbackStyle] = useState(false);
   const [isMapReady, setIsMapReady] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
   const [mapRenderKey, setMapRenderKey] = useState(0);
+  const [hasPendingAreaChange, setHasPendingAreaChange] = useState(false);
+  const [pendingBounds, setPendingBounds] = useState<MapSearchBounds | null>(null);
 
   const selectedListing = useMemo(() => {
     if (!selectedListingId) {
@@ -136,6 +272,31 @@ export function PublicListingsMap({ mapStyleUrl, listings }: PublicListingsMapPr
 
     return listings.find((listing) => listing.id === selectedListingId) ?? null;
   }, [listings, selectedListingId]);
+
+  const listingsGeoJson = useMemo<FeatureCollection<Point, ListingPointProperties>>(() => {
+    return {
+      type: "FeatureCollection",
+      features: listings.map((listing) => ({
+        type: "Feature",
+        geometry: {
+          type: "Point",
+          coordinates: [listing.longitude, listing.latitude],
+        },
+        properties: {
+          listingId: listing.id,
+          priceLabel: formatMarkerPrice(listing),
+          approximate: listing.public_location_mode === "approximate" ? 1 : 0,
+        },
+      })),
+    };
+  }, [listings]);
+
+  useEffect(() => {
+    baselineBoundsRef.current = appliedBounds;
+    hasInitializedBoundsRef.current = Boolean(appliedBounds);
+    setHasPendingAreaChange(false);
+    setPendingBounds(null);
+  }, [appliedBounds]);
 
   useEffect(() => {
     setActiveStyleUrl(mapStyleUrl);
@@ -146,7 +307,36 @@ export function PublicListingsMap({ mapStyleUrl, listings }: PublicListingsMapPr
   }, [mapStyleUrl]);
 
   useEffect(() => {
-    if (!isMapReady || !mapRef.current || listings.length === 0) {
+    if (selectedListingId && !listings.some((listing) => listing.id === selectedListingId)) {
+      setSelectedListingId(null);
+    }
+  }, [listings, selectedListingId]);
+
+  useEffect(() => {
+    if (!isMapReady || !mapRef.current) {
+      return;
+    }
+
+    if (appliedBounds) {
+      mapRef.current.fitBounds(
+        [
+          [appliedBounds.west, appliedBounds.south],
+          [appliedBounds.east, appliedBounds.north],
+        ],
+        {
+          duration: 0,
+          padding: {
+            top: 64,
+            right: 56,
+            bottom: 64,
+            left: 56,
+          },
+        }
+      );
+      return;
+    }
+
+    if (listings.length === 0) {
       return;
     }
 
@@ -173,17 +363,17 @@ export function PublicListingsMap({ mapStyleUrl, listings }: PublicListingsMapPr
         [maxLongitude, maxLatitude],
       ],
       {
-      duration: 0,
-      maxZoom: 12.5,
-      padding: {
-        top: 72,
-        right: 56,
-        bottom: 72,
-        left: 56,
-      },
-    }
+        duration: 0,
+        maxZoom: 12.5,
+        padding: {
+          top: 64,
+          right: 56,
+          bottom: 64,
+          left: 56,
+        },
+      }
     );
-  }, [isMapReady, listings, mapRenderKey]);
+  }, [isMapReady, listings, mapRenderKey, appliedBounds]);
 
   useEffect(() => {
     if (isMapReady || mapError) {
@@ -204,6 +394,139 @@ export function PublicListingsMap({ mapStyleUrl, listings }: PublicListingsMapPr
     };
   }, [isMapReady, mapError, mapRenderKey]);
 
+  function updatePendingAreaState() {
+    const currentBounds = readBoundsFromMap(mapRef.current);
+
+    if (!currentBounds) {
+      return;
+    }
+
+    if (!hasInitializedBoundsRef.current && !baselineBoundsRef.current) {
+      baselineBoundsRef.current = currentBounds;
+      hasInitializedBoundsRef.current = true;
+      setHasPendingAreaChange(false);
+      setPendingBounds(null);
+      return;
+    }
+
+    if (!hasInitializedBoundsRef.current) {
+      hasInitializedBoundsRef.current = true;
+    }
+
+    const baselineBounds = baselineBoundsRef.current ?? currentBounds;
+    const hasChanged = areBoundsMeaningfullyDifferent(currentBounds, baselineBounds);
+
+    setHasPendingAreaChange(hasChanged);
+    setPendingBounds(hasChanged ? currentBounds : null);
+  }
+
+  function handleSearchThisArea() {
+    const boundsToApply = pendingBounds ?? readBoundsFromMap(mapRef.current);
+
+    if (!boundsToApply) {
+      return;
+    }
+
+    const serializedBounds = serializeMapSearchBounds(boundsToApply);
+
+    if (!serializedBounds) {
+      return;
+    }
+
+    baselineBoundsRef.current = boundsToApply;
+    setHasPendingAreaChange(false);
+    setPendingBounds(null);
+
+    const params = new URLSearchParams(searchParams.toString());
+    params.set(MAP_BOUNDS_PARAM, serializedBounds);
+    params.delete("page");
+
+    const queryString = params.toString();
+    const target = queryString ? `${pathname}?${queryString}` : pathname;
+
+    startAreaSearchTransition(() => {
+      router.push(target, { scroll: false });
+    });
+  }
+
+  function handleClearArea() {
+    baselineBoundsRef.current = readBoundsFromMap(mapRef.current);
+    setHasPendingAreaChange(false);
+    setPendingBounds(null);
+
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete(MAP_BOUNDS_PARAM);
+    params.delete("page");
+
+    const queryString = params.toString();
+    const target = queryString ? `${pathname}?${queryString}` : pathname;
+
+    startAreaSearchTransition(() => {
+      router.push(target, { scroll: false });
+    });
+  }
+
+  function handleMapClick(event: MapLayerMouseEvent) {
+    const clickedFeature = event.features?.[0];
+
+    if (!clickedFeature) {
+      return;
+    }
+
+    if (
+      clickedFeature.layer.id === CLUSTER_LAYER_ID ||
+      clickedFeature.layer.id === CLUSTER_COUNT_LAYER_ID
+    ) {
+      const clusterIdRaw = clickedFeature.properties?.cluster_id;
+      const clusterId = Number(clusterIdRaw);
+
+      if (!Number.isFinite(clusterId)) {
+        return;
+      }
+
+      const source = mapRef.current?.getMap().getSource(LISTINGS_SOURCE_ID) as
+        | GeoJSONSource
+        | undefined;
+
+      if (!source) {
+        return;
+      }
+
+      source
+        .getClusterExpansionZoom(clusterId)
+        .then((zoom) => {
+          if (!Number.isFinite(zoom) || !mapRef.current) {
+            return;
+          }
+
+          mapRef.current.easeTo({
+            center: [event.lngLat.lng, event.lngLat.lat],
+            zoom: Math.min(zoom + 0.35, 16),
+            duration: 320,
+          });
+        })
+        .catch(() => {
+          return;
+        });
+
+      return;
+    }
+
+    if (clickedFeature.layer.id === POINT_LAYER_ID || clickedFeature.layer.id === POINT_LABEL_LAYER_ID) {
+      const listingIdRaw = clickedFeature.properties?.listingId;
+      const listingId =
+        typeof listingIdRaw === "string"
+          ? listingIdRaw
+          : typeof listingIdRaw === "number"
+            ? String(listingIdRaw)
+            : "";
+
+      if (listingId) {
+        setSelectedListingId(listingId);
+      }
+    }
+  }
+
   return (
     <div className="border-border/75 bg-card/55 relative h-[68dvh] min-h-[26rem] overflow-hidden rounded-2xl border">
       <MapLibre
@@ -216,6 +539,12 @@ export function PublicListingsMap({ mapStyleUrl, listings }: PublicListingsMapPr
         dragRotate={false}
         touchPitch={false}
         attributionControl={false}
+        interactiveLayerIds={[
+          CLUSTER_LAYER_ID,
+          CLUSTER_COUNT_LAYER_ID,
+          POINT_LAYER_ID,
+          POINT_LABEL_LAYER_ID,
+        ]}
         onLoad={() => {
           setIsMapReady(true);
           setMapError(null);
@@ -229,7 +558,22 @@ export function PublicListingsMap({ mapStyleUrl, listings }: PublicListingsMapPr
         onIdle={() => {
           setIsMapReady(true);
           setMapError(null);
+
+          if (!hasInitializedBoundsRef.current && !baselineBoundsRef.current) {
+            const settledBounds = readBoundsFromMap(mapRef.current);
+
+            if (settledBounds) {
+              baselineBoundsRef.current = settledBounds;
+              hasInitializedBoundsRef.current = true;
+              setHasPendingAreaChange(false);
+              setPendingBounds(null);
+            }
+          }
         }}
+        onMoveEnd={() => {
+          updatePendingAreaState();
+        }}
+        onClick={handleMapClick}
         onError={(event) => {
           const eventErrorMessage =
             event?.error && typeof event.error === "object" && "message" in event.error
@@ -254,31 +598,19 @@ export function PublicListingsMap({ mapStyleUrl, listings }: PublicListingsMapPr
         <NavigationControl visualizePitch={false} position="top-right" />
         <ScaleControl position="bottom-left" unit="metric" />
 
-        {listings.map((listing) => {
-          const isSelected = listing.id === selectedListingId;
-          const isApproximate = listing.public_location_mode === "approximate";
-
-          return (
-            <Marker key={listing.id} longitude={listing.longitude} latitude={listing.latitude} anchor="bottom">
-              <button
-                type="button"
-                onClick={() => setSelectedListingId(listing.id)}
-                className={cn(
-                  "inline-flex h-8 items-center gap-1 rounded-full border px-2.5 text-[11px] font-semibold tracking-tight shadow-lg transition-colors",
-                  "focus-visible:ring-ring focus-visible:ring-offset-background focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none",
-                  isSelected
-                    ? "border-primary/85 bg-primary text-primary-foreground"
-                    : "border-border/75 bg-background/92 text-foreground hover:border-primary/60 hover:bg-background",
-                  isApproximate && !isSelected ? "border-dashed" : null
-                )}
-                aria-label={`Open map popup for ${listing.title}`}
-              >
-                <MapPin className="size-3.5" aria-hidden="true" />
-                {formatMarkerPrice(listing)}
-              </button>
-            </Marker>
-          );
-        })}
+        <Source
+          id={LISTINGS_SOURCE_ID}
+          type="geojson"
+          data={listingsGeoJson}
+          cluster
+          clusterRadius={52}
+          clusterMaxZoom={14}
+        >
+          <Layer {...clusterCircleLayer} />
+          <Layer {...clusterCountLayer} />
+          <Layer {...unclusteredPointLayer} />
+          <Layer {...unclusteredLabelLayer} />
+        </Source>
 
         {selectedListing ? (
           <Popup
@@ -354,6 +686,40 @@ export function PublicListingsMap({ mapStyleUrl, listings }: PublicListingsMapPr
         ) : null}
       </MapLibre>
 
+      {isMapReady && !mapError ? (
+        <div className="absolute top-3 left-1/2 z-20 -translate-x-1/2">
+          {hasPendingAreaChange ? (
+            <button
+              type="button"
+              className={cn(buttonVariants({ size: "sm" }), "h-8 gap-1.5 px-3.5 text-xs shadow-lg")}
+              onClick={handleSearchThisArea}
+              disabled={isAreaSearchPending}
+            >
+              {isAreaSearchPending ? (
+                <LoaderCircle className="size-3.5 animate-spin" aria-hidden="true" />
+              ) : null}
+              Search this area
+            </button>
+          ) : appliedBounds ? (
+            <button
+              type="button"
+              className={cn(buttonVariants({ size: "sm", variant: "outline" }), "h-8 px-3 text-xs shadow-lg")}
+              onClick={handleClearArea}
+              disabled={isAreaSearchPending}
+            >
+              {isAreaSearchPending ? (
+                <LoaderCircle className="size-3.5 animate-spin" aria-hidden="true" />
+              ) : null}
+              Search all visible areas
+            </button>
+          ) : (
+            <div className="border-border/70 bg-card/88 text-muted-foreground rounded-full border px-3 py-1.5 text-[11px] shadow-lg">
+              Move map and use Search this area
+            </div>
+          )}
+        </div>
+      ) : null}
+
       {!isMapReady && !mapError ? (
         <div className="bg-background/65 absolute inset-0 z-10 grid place-items-center backdrop-blur-[1px]">
           <div className="border-border/75 bg-card/95 space-y-2 rounded-lg border px-4 py-3 text-center">
@@ -368,7 +734,7 @@ export function PublicListingsMap({ mapStyleUrl, listings }: PublicListingsMapPr
           <div className="border-border/75 bg-card/96 space-y-3 rounded-lg border px-4 py-3 text-center">
             <p className="text-sm font-semibold tracking-tight">Map couldn’t load right now</p>
             <p className="text-muted-foreground text-xs">
-              Check the style URL or retry to reinitialize the map.
+              Check style access and retry map initialization.
             </p>
             <button
               type="button"

@@ -5,6 +5,7 @@ import { createServerSupabaseClient } from "@/lib/supabase";
 import type { Tables } from "@/types/database";
 
 import type { ExploreSearchState } from "./explore-search-params";
+import type { MapSearchBounds } from "./map-bounds";
 import { applyPublicListingFilters } from "./public-listing-filters";
 
 export const PUBLIC_MAP_MARKER_LIMIT = 350;
@@ -114,7 +115,14 @@ function getCoverImagePath(
   return sortedImages[0]?.storage_path ?? null;
 }
 
-export async function loadPublicMapListings(state: ExploreSearchState): Promise<PublicMapResult> {
+type LoadPublicMapListingsOptions = {
+  bounds: MapSearchBounds | null;
+};
+
+export async function loadPublicMapListings(
+  state: ExploreSearchState,
+  options: LoadPublicMapListingsOptions = { bounds: null }
+): Promise<PublicMapResult> {
   try {
     const supabase = await createServerSupabaseClient();
 
@@ -124,6 +132,14 @@ export async function loadPublicMapListings(state: ExploreSearchState): Promise<
         .select(PUBLIC_MAP_LISTINGS_SELECT, { count: "exact" }),
       state
     ).neq("public_location_mode", "hidden");
+
+    if (options.bounds) {
+      query = query
+        .gte("longitude", options.bounds.west)
+        .lte("longitude", options.bounds.east)
+        .gte("latitude", options.bounds.south)
+        .lte("latitude", options.bounds.north);
+    }
 
     query = query
       .order("published_at", {
