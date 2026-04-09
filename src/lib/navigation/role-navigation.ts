@@ -59,6 +59,14 @@ export function getCtaForViewer(viewer: NavViewer) {
     };
   }
 
+  if (isAdminRole(viewer.role)) {
+    return {
+      label: "Moderation",
+      href: "/admin/moderation",
+      detail: getRoleLabel(viewer.role ?? "seeker"),
+    };
+  }
+
   if (isProviderRole(viewer.role)) {
     return {
       label: "List a property",

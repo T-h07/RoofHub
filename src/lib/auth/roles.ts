@@ -40,7 +40,7 @@ export function isAdminRole(role: AppRole | null | undefined) {
 }
 
 export function isProviderRole(role: AppRole | null | undefined) {
-  return role === "provider" || role === "admin";
+  return role === "provider";
 }
 
 export function getRoleLabel(role: AppRole) {

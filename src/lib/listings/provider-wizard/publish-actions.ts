@@ -2,7 +2,7 @@
 
 import { createServerSupabaseClient } from "@/lib/supabase";
 import { getCurrentUserProfile } from "@/lib/auth/profile";
-import { isAdminRole, isProviderRole } from "@/lib/auth/roles";
+import { isProviderRole } from "@/lib/auth/roles";
 import {
   LISTING_IMAGE_MAX_COUNT,
   normalizeCoverAndOrder,
@@ -32,7 +32,6 @@ type ProviderMutationContext =
           ? TProfile
           : never
         : never;
-      isAdmin: boolean;
     }
   | {
       ok: false;
@@ -119,7 +118,6 @@ async function ensureProviderMutationContext(): Promise<ProviderMutationContext>
     ok: true,
     supabase,
     profile: profileResult.profile,
-    isAdmin: isAdminRole(profileResult.profile.role),
   };
 }
 
@@ -128,18 +126,14 @@ async function ensureDraftAccess(
   input: {
     draftId: string;
     userId: string;
-    isAdmin: boolean;
   }
 ) {
-  let query = supabase
+  const query = supabase
     .from("listings")
     .select("id, owner_id, listing_status, slug")
     .eq("id", input.draftId)
+    .eq("owner_id", input.userId)
     .limit(1);
-
-  if (!input.isAdmin) {
-    query = query.eq("owner_id", input.userId);
-  }
 
   const { data, error } = await query.maybeSingle();
 
@@ -282,11 +276,10 @@ export async function syncProviderListingPhotosAction(
     };
   }
 
-  const { supabase, profile, isAdmin } = context;
+  const { supabase, profile } = context;
   const draftAccess = await ensureDraftAccess(supabase, {
     draftId: input.draftId,
     userId: profile.id,
-    isAdmin,
   });
 
   if (!draftAccess.ok || !draftAccess.listing) {
@@ -426,8 +419,8 @@ export async function publishProviderListingDraftAction(
     };
   }
 
-  const { supabase, profile, isAdmin } = context;
-  const draftResult = await loadProviderDraftForEditor(supabase, profile.id, input.draftId, isAdmin);
+  const { supabase, profile } = context;
+  const draftResult = await loadProviderDraftForEditor(supabase, profile.id, input.draftId);
 
   if (!draftResult.ok || !draftResult.draft) {
     return {
@@ -485,7 +478,7 @@ export async function publishProviderListingDraftAction(
     };
   }
 
-  let updateQuery = supabase
+  const updateQuery = supabase
     .from("listings")
     .update({
       listing_status: "published",
@@ -493,12 +486,9 @@ export async function publishProviderListingDraftAction(
       archived_at: null,
     })
     .eq("id", draftResult.draft.id)
+    .eq("owner_id", profile.id)
     .select("slug, listing_status")
     .limit(1);
-
-  if (!isAdmin) {
-    updateQuery = updateQuery.eq("owner_id", profile.id);
-  }
 
   const { data, error } = await updateQuery.maybeSingle();
 

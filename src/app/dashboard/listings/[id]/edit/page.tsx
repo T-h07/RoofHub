@@ -58,7 +58,7 @@ export default async function EditDashboardListingPage({
   }
 
   const [draftResult, contactResult, imagesResult] = await Promise.all([
-    loadProviderDraftForEditor(context.supabase, context.profile.id, id, context.isAdmin),
+    loadProviderDraftForEditor(context.supabase, context.profile.id, id),
     loadProviderContactSettings(context.supabase, context.profile.id),
     loadProviderDraftImages(context.supabase, id),
   ]);

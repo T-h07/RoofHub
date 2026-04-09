@@ -2,7 +2,7 @@
 
 import { createServerSupabaseClient } from "@/lib/supabase";
 import { getCurrentUserProfile } from "@/lib/auth/profile";
-import { isAdminRole, isProviderRole } from "@/lib/auth/roles";
+import { isProviderRole } from "@/lib/auth/roles";
 
 import type { ProviderDraftWizardValues, ProviderWizardFieldErrors, ProviderWizardStep } from "./types";
 import {
@@ -140,7 +140,6 @@ async function ensureProviderContext() {
       message: profileResult.message,
       supabase,
       profile: null,
-      isAdmin: false,
     };
   }
 
@@ -150,7 +149,6 @@ async function ensureProviderContext() {
       message: "Switch your profile role to provider before creating listings.",
       supabase,
       profile: profileResult.profile,
-      isAdmin: isAdminRole(profileResult.profile.role),
     };
   }
 
@@ -159,20 +157,20 @@ async function ensureProviderContext() {
     supabase,
     profile: profileResult.profile,
     userEmail: profileResult.user.email ?? null,
-    isAdmin: isAdminRole(profileResult.profile.role),
   };
 }
 
 async function ensureDraftAccess(
   draftId: string,
   userId: string,
-  isAdmin: boolean,
   supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>
 ) {
-  let query = supabase.from("listings").select("id, owner_id, listing_status").eq("id", draftId).limit(1);
-  if (!isAdmin) {
-    query = query.eq("owner_id", userId);
-  }
+  const query = supabase
+    .from("listings")
+    .select("id, owner_id, listing_status")
+    .eq("id", draftId)
+    .eq("owner_id", userId)
+    .limit(1);
 
   const { data, error } = await query.maybeSingle();
   if (error || !data) {
@@ -194,20 +192,16 @@ async function updateDraftListing(
   options: {
     draftId: string;
     userId: string;
-    isAdmin: boolean;
     patch: Record<string, unknown>;
   }
 ) {
-  let query = supabase
+  const query = supabase
     .from("listings")
     .update(options.patch)
     .eq("id", options.draftId)
+    .eq("owner_id", options.userId)
     .select("id")
     .limit(1);
-
-  if (!options.isAdmin) {
-    query = query.eq("owner_id", options.userId);
-  }
 
   const { data, error } = await query.maybeSingle();
 
@@ -243,7 +237,7 @@ export async function saveProviderWizardStepAction(
     };
   }
 
-  const { supabase, profile, userEmail, isAdmin } = providerContext;
+  const { supabase, profile, userEmail } = providerContext;
   const candidateDraftId = input.draftId ?? null;
 
   try {
@@ -262,7 +256,6 @@ export async function saveProviderWizardStepAction(
         const updateResult = await updateDraftListing(supabase, {
           draftId: candidateDraftId,
           userId: profile.id,
-          isAdmin,
           patch: basicsValidation.payload,
         });
 
@@ -295,7 +288,7 @@ export async function saveProviderWizardStepAction(
 
       if (error) {
         if (error.code === "23505") {
-          const existingAccess = await ensureDraftAccess(draftId, profile.id, isAdmin, supabase);
+          const existingAccess = await ensureDraftAccess(draftId, profile.id, supabase);
           if (existingAccess.ok) {
             return {
               ok: true,
@@ -327,7 +320,7 @@ export async function saveProviderWizardStepAction(
       };
     }
 
-    const accessResult = await ensureDraftAccess(candidateDraftId, profile.id, isAdmin, supabase);
+    const accessResult = await ensureDraftAccess(candidateDraftId, profile.id, supabase);
     if (!accessResult.ok || !accessResult.listing) {
       return {
         ok: false,
@@ -365,7 +358,6 @@ export async function saveProviderWizardStepAction(
       const updateResult = await updateDraftListing(supabase, {
         draftId: candidateDraftId,
         userId: profile.id,
-        isAdmin,
         patch: pricingValidation.payload,
       });
 
@@ -391,7 +383,6 @@ export async function saveProviderWizardStepAction(
       const updateResult = await updateDraftListing(supabase, {
         draftId: candidateDraftId,
         userId: profile.id,
-        isAdmin,
         patch: factsValidation.payload,
       });
 
@@ -417,7 +408,6 @@ export async function saveProviderWizardStepAction(
       const updateResult = await updateDraftListing(supabase, {
         draftId: candidateDraftId,
         userId: profile.id,
-        isAdmin,
         patch: locationValidation.payload,
       });
 
@@ -443,7 +433,6 @@ export async function saveProviderWizardStepAction(
       const updateResult = await updateDraftListing(supabase, {
         draftId: candidateDraftId,
         userId: profile.id,
-        isAdmin,
         patch: amenitiesValidation.payload,
       });
 

@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 
 import { getCurrentUserProfile } from "@/lib/auth/profile";
 import { toSignInPath } from "@/lib/auth/routing";
-import { isAdminRole, isProviderRole } from "@/lib/auth/roles";
+import { isProviderRole } from "@/lib/auth/roles";
 import { createServerSupabaseClient } from "@/lib/supabase";
 
 export async function getProviderRouteContext(nextPath: string) {
@@ -26,11 +26,9 @@ export async function getProviderRouteContext(nextPath: string) {
       supabase,
       profile: null,
       isProvider: false,
-      isAdmin: false,
     };
   }
 
-  const isAdmin = isAdminRole(profileResult.profile.role);
   const isProvider = isProviderRole(profileResult.profile.role);
 
   return {
@@ -39,6 +37,5 @@ export async function getProviderRouteContext(nextPath: string) {
     profile: profileResult.profile,
     userEmail: user.email ?? null,
     isProvider,
-    isAdmin,
   };
 }

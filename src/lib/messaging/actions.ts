@@ -295,6 +295,13 @@ export async function markConversationReadAction(
   if (!conversationResult.ok) {
     return conversationResult.failure;
   }
+  const conversation = conversationResult.conversation;
+  const isParticipant =
+    conversation.provider_id === profile.id || conversation.seeker_id === profile.id;
+
+  if (!isParticipant) {
+    return toMessagingFailure("forbidden", "You are not a participant in this conversation.");
+  }
 
   const nowIso = new Date().toISOString();
   const { data, error } = await supabase

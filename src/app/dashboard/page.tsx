@@ -38,11 +38,9 @@ export default async function DashboardPage() {
   const [overviewResult, recentListingsResult] = await Promise.all([
     loadProviderListingOverviewMetrics(context.supabase, {
       userId: context.profile.id,
-      isAdmin: context.isAdmin,
     }),
     loadProviderManagedListings(context.supabase, {
       userId: context.profile.id,
-      isAdmin: context.isAdmin,
       statusFilter: "all",
       limit: 6,
     }),

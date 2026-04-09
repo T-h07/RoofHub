@@ -56,15 +56,13 @@ async function countProviderListingsByStatus(
   supabase: SupabaseClient<Database>,
   input: {
     userId: string;
-    isAdmin: boolean;
     status?: ProviderListingStatus;
   }
 ) {
-  let query = supabase.from("listings").select("id", { count: "exact", head: true });
-
-  if (!input.isAdmin) {
-    query = query.eq("owner_id", input.userId);
-  }
+  let query = supabase
+    .from("listings")
+    .select("id", { count: "exact", head: true })
+    .eq("owner_id", input.userId);
 
   if (input.status) {
     query = query.eq("listing_status", input.status);
@@ -90,7 +88,6 @@ export async function loadProviderListingOverviewMetrics(
   supabase: SupabaseClient<Database>,
   input: {
     userId: string;
-    isAdmin: boolean;
   }
 ) {
   const [
@@ -164,7 +161,6 @@ export async function loadProviderManagedListings(
   supabase: SupabaseClient<Database>,
   input: {
     userId: string;
-    isAdmin: boolean;
     statusFilter?: ProviderListingStatusFilter;
     limit?: number;
   }
@@ -176,9 +172,7 @@ export async function loadProviderManagedListings(
     .order("created_at", { ascending: false })
     .limit(input.limit ?? 120);
 
-  if (!input.isAdmin) {
-    query = query.eq("owner_id", input.userId);
-  }
+  query = query.eq("owner_id", input.userId);
 
   if (input.statusFilter && input.statusFilter !== "all") {
     query = query.eq("listing_status", input.statusFilter);

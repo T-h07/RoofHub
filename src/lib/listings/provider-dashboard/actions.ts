@@ -1,7 +1,7 @@
 "use server";
 
 import { getCurrentUserProfile } from "@/lib/auth/profile";
-import { isAdminRole, isProviderRole } from "@/lib/auth/roles";
+import { isProviderRole } from "@/lib/auth/roles";
 import { createServerSupabaseClient } from "@/lib/supabase";
 import { canTransitionProviderListingStatus } from "@/lib/listings/provider-wizard/status-transitions";
 
@@ -19,7 +19,6 @@ type ProviderMutationContext =
           ? TProfile
           : never
         : never;
-      isAdmin: boolean;
     }
   | {
       ok: false;
@@ -143,7 +142,6 @@ async function ensureProviderMutationContext(): Promise<ProviderMutationContext>
     ok: true,
     supabase,
     profile: profileResult.profile,
-    isAdmin: isAdminRole(profileResult.profile.role),
   };
 }
 
@@ -152,18 +150,14 @@ async function loadProviderOwnedListing(
   input: {
     listingId: string;
     userId: string;
-    isAdmin: boolean;
   }
 ) {
-  let query = supabase
+  const query = supabase
     .from("listings")
     .select("id, owner_id, listing_status, published_at")
     .eq("id", input.listingId)
+    .eq("owner_id", input.userId)
     .limit(1);
-
-  if (!input.isAdmin) {
-    query = query.eq("owner_id", input.userId);
-  }
 
   const { data, error } = await query.maybeSingle();
 
@@ -200,7 +194,7 @@ export async function updateProviderListingLifecycleStatusAction(
     };
   }
 
-  const { supabase, profile, isAdmin } = context;
+  const { supabase, profile } = context;
 
   if (input.nextStatus === "hidden_by_admin") {
     return {
@@ -212,7 +206,6 @@ export async function updateProviderListingLifecycleStatusAction(
   const listingResult = await loadProviderOwnedListing(supabase, {
     listingId: input.listingId,
     userId: profile.id,
-    isAdmin,
   });
 
   if (!listingResult.ok || !listingResult.listing) {
@@ -241,16 +234,13 @@ export async function updateProviderListingLifecycleStatusAction(
   }
 
   const patch = buildStatusPatch(input.nextStatus, currentListing);
-  let updateQuery = supabase
+  const updateQuery = supabase
     .from("listings")
     .update(patch)
     .eq("id", currentListing.id)
+    .eq("owner_id", profile.id)
     .select("listing_status")
     .limit(1);
-
-  if (!isAdmin) {
-    updateQuery = updateQuery.eq("owner_id", profile.id);
-  }
 
   const { data, error } = await updateQuery.maybeSingle();
 

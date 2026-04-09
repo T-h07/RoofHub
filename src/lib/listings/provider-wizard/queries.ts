@@ -95,18 +95,14 @@ function isMissingContactChannelColumnError(message: string | undefined) {
 
 export async function loadProviderDraftSummaries(
   supabase: SupabaseClient<Database>,
-  userId: string,
-  isAdmin = false
+  userId: string
 ) {
-  let query = supabase
+  const query = supabase
     .from("listings")
     .select(PROVIDER_DRAFT_SUMMARY_SELECT)
+    .eq("owner_id", userId)
     .order("updated_at", { ascending: false })
     .limit(24);
-
-  if (!isAdmin) {
-    query = query.eq("owner_id", userId);
-  }
 
   const { data, error } = await query;
 
@@ -127,18 +123,14 @@ export async function loadProviderDraftSummaries(
 export async function loadProviderDraftForEditor(
   supabase: SupabaseClient<Database>,
   userId: string,
-  draftId: string,
-  isAdmin = false
+  draftId: string
 ) {
-  let query = supabase
+  const query = supabase
     .from("listings")
     .select(PROVIDER_DRAFT_EDITOR_SELECT)
     .eq("id", draftId)
+    .eq("owner_id", userId)
     .limit(1);
-
-  if (!isAdmin) {
-    query = query.eq("owner_id", userId);
-  }
 
   const { data, error } = await query.maybeSingle();
 

@@ -95,6 +95,10 @@ function toConversationRecord(row: ConversationRow): MessagingConversationRecord
   };
 }
 
+function isConversationParticipant(conversation: ConversationRow, userId: string) {
+  return conversation.provider_id === userId || conversation.seeker_id === userId;
+}
+
 async function loadLatestMessagesMap(
   supabase: SupabaseClient<Database>,
   conversationIds: string[]
@@ -148,8 +152,11 @@ export async function loadMessagingConversationSummariesQuery(
   }
 
   const conversations = (data ?? []) as ConversationRow[];
+  const participantConversations = conversations.filter((conversation) =>
+    isConversationParticipant(conversation, profile.id)
+  );
 
-  if (conversations.length === 0) {
+  if (participantConversations.length === 0) {
     return {
       ok: true,
       data: {
@@ -159,11 +166,13 @@ export async function loadMessagingConversationSummariesQuery(
     };
   }
 
-  const conversationIds = conversations.map((conversation) => conversation.id);
-  const listingIds = Array.from(new Set(conversations.map((conversation) => conversation.listing_id)));
+  const conversationIds = participantConversations.map((conversation) => conversation.id);
+  const listingIds = Array.from(
+    new Set(participantConversations.map((conversation) => conversation.listing_id))
+  );
   const counterpartUserIds = Array.from(
     new Set(
-      conversations.map((conversation) =>
+      participantConversations.map((conversation) =>
         conversation.provider_id === profile.id ? conversation.seeker_id : conversation.provider_id
       )
     )
@@ -225,7 +234,7 @@ export async function loadMessagingConversationSummariesQuery(
     }
   }
 
-  const summaries: MessagingConversationSummary[] = conversations.map((conversation) => {
+  const summaries: MessagingConversationSummary[] = participantConversations.map((conversation) => {
     const participantRole = conversation.provider_id === profile.id ? "provider" : "seeker";
     const counterpartUserId =
       participantRole === "provider" ? conversation.seeker_id : conversation.provider_id;
@@ -277,6 +286,10 @@ export async function loadMessagingThreadQuery(
   }
 
   const conversation = conversationResult.data as ConversationRow;
+  if (!isConversationParticipant(conversation, profile.id)) {
+    return toMessagingFailure("forbidden", "You are not a participant in this conversation.");
+  }
+
   const participantRole = conversation.provider_id === profile.id ? "provider" : "seeker";
   const counterpartUserId =
     participantRole === "provider" ? conversation.seeker_id : conversation.provider_id;
@@ -390,6 +403,17 @@ export async function loadProviderUnreadLeadCount(
       ok: false,
       count: 0,
       message: "Provider user reference is invalid.",
+    };
+  }
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user || user.id !== providerUserId) {
+    return {
+      ok: false,
+      count: 0,
+      message: "Unread lead count requires the current provider session context.",
     };
   }
 

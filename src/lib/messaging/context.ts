@@ -1,5 +1,6 @@
 import "server-only";
 
+import { isAdminRole } from "@/lib/auth/roles";
 import { getCurrentUserProfile } from "@/lib/auth/profile";
 import { createServerSupabaseClient } from "@/lib/supabase";
 
@@ -43,6 +44,13 @@ export async function getMessagingViewerContext(): Promise<MessagingResult<Messa
   const profileResult = await getCurrentUserProfile(supabase);
   if (!profileResult.ok) {
     return toFailure("internal", profileResult.message);
+  }
+
+  if (isAdminRole(profileResult.profile.role)) {
+    return toFailure(
+      "forbidden",
+      "Messaging access is limited to seeker and provider participant accounts."
+    );
   }
 
   return {
