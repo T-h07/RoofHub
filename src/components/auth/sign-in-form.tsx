@@ -10,15 +10,35 @@ import { AuthSubmitButton } from "@/components/auth/auth-submit-button";
 import { Field, FieldError, FieldHelp } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import type { AuthRedirectReason } from "@/lib/auth/routing";
 import { AUTH_ACTION_IDLE_STATE } from "@/lib/auth/types";
 import { signInAction } from "@/lib/auth/actions";
 
 type SignInFormProps = {
   nextPath: string;
-  callbackError?: string | null;
+  reason?: AuthRedirectReason | null;
 };
 
-export function SignInForm({ nextPath, callbackError }: SignInFormProps) {
+function getReasonMessage(reason: AuthRedirectReason | null | undefined) {
+  switch (reason) {
+    case "auth_required":
+      return "Sign in to continue to that page.";
+    case "session_expired":
+      return "Your session expired. Sign in again to continue.";
+    case "session_revoked":
+      return "This session is no longer valid. Sign in again to continue.";
+    case "signed_out":
+      return "You have been signed out.";
+    case "profile_unavailable":
+      return "Your account session could not be finalized. Sign in again.";
+    case "callback_invalid":
+      return "Your sign-in link is invalid or expired. Sign in again to continue.";
+    default:
+      return null;
+  }
+}
+
+export function SignInForm({ nextPath, reason }: SignInFormProps) {
   const router = useRouter();
   const [state, formAction] = useActionState(signInAction, AUTH_ACTION_IDLE_STATE);
 
@@ -29,12 +49,8 @@ export function SignInForm({ nextPath, callbackError }: SignInFormProps) {
     }
   }, [router, state.redirectTo, state.status]);
 
-  const formErrorMessage =
-    callbackError === "callback"
-      ? "Your link is invalid or expired. Sign in again to continue."
-      : state.status === "error"
-        ? state.message
-        : undefined;
+  const reasonMessage = getReasonMessage(reason);
+  const formErrorMessage = state.status === "error" ? state.message : reasonMessage ?? undefined;
 
   return (
     <form action={formAction} className="space-y-4">

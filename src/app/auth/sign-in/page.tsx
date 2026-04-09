@@ -2,7 +2,11 @@ import Link from "next/link";
 
 import { AuthShell } from "@/components/auth/auth-shell";
 import { SignInForm } from "@/components/auth/sign-in-form";
-import { AUTH_DEFAULT_REDIRECT_PATH, resolveAuthenticatedRedirect } from "@/lib/auth/routing";
+import {
+  AUTH_DEFAULT_REDIRECT_PATH,
+  isAuthRedirectReason,
+  resolveAuthenticatedRedirect,
+} from "@/lib/auth/routing";
 
 type SignInPageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -11,7 +15,13 @@ type SignInPageProps = {
 export default async function SignInPage({ searchParams }: SignInPageProps) {
   const params = await searchParams;
   const nextParam = typeof params.next === "string" ? params.next : null;
+  const reasonParam = typeof params.reason === "string" ? params.reason : null;
   const callbackError = typeof params.error === "string" ? params.error : null;
+  const reason = isAuthRedirectReason(reasonParam)
+    ? reasonParam
+    : callbackError === "callback"
+      ? "callback_invalid"
+      : null;
   const nextPath = resolveAuthenticatedRedirect(nextParam, AUTH_DEFAULT_REDIRECT_PATH);
 
   return (
@@ -32,7 +42,7 @@ export default async function SignInPage({ searchParams }: SignInPageProps) {
         </>
       }
     >
-      <SignInForm nextPath={nextPath} callbackError={callbackError} />
+      <SignInForm nextPath={nextPath} reason={reason} />
     </AuthShell>
   );
 }

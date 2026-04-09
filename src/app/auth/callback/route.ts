@@ -4,8 +4,8 @@ import type { EmailOtpType } from "@supabase/supabase-js";
 import { ensureProfileForCurrentUser } from "@/lib/auth/profile";
 import {
   AUTH_DEFAULT_REDIRECT_PATH,
-  AUTH_SIGN_IN_ROUTE,
   resolveAuthenticatedRedirect,
+  toSignInPath,
 } from "@/lib/auth/routing";
 import { createServerSupabaseClient } from "@/lib/supabase";
 
@@ -20,6 +20,22 @@ const SUPPORTED_OTP_TYPES = new Set<EmailOtpType>([
 
 function toRedirectUrl(request: Request, path: string) {
   return new URL(path, request.url);
+}
+
+async function handleProfileBootstrapAfterCallback(
+  supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>,
+  request: Request,
+  nextPath: string
+) {
+  const profileResult = await ensureProfileForCurrentUser(supabase);
+  if (!profileResult.ok) {
+    await supabase.auth.signOut({ scope: "local" });
+    return NextResponse.redirect(
+      toRedirectUrl(request, toSignInPath(nextPath, "profile_unavailable"))
+    );
+  }
+
+  return NextResponse.redirect(toRedirectUrl(request, nextPath));
 }
 
 export async function GET(request: Request) {
@@ -38,8 +54,7 @@ export async function GET(request: Request) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
 
     if (!error) {
-      await ensureProfileForCurrentUser(supabase);
-      return NextResponse.redirect(toRedirectUrl(request, nextPath));
+      return handleProfileBootstrapAfterCallback(supabase, request, nextPath);
     }
   }
 
@@ -50,13 +65,11 @@ export async function GET(request: Request) {
     });
 
     if (!error) {
-      await ensureProfileForCurrentUser(supabase);
-      return NextResponse.redirect(toRedirectUrl(request, nextPath));
+      return handleProfileBootstrapAfterCallback(supabase, request, nextPath);
     }
   }
 
-  const signInUrl = toRedirectUrl(request, AUTH_SIGN_IN_ROUTE);
-  signInUrl.searchParams.set("error", "callback");
-
-  return NextResponse.redirect(signInUrl);
+  return NextResponse.redirect(
+    toRedirectUrl(request, toSignInPath(nextPath, "callback_invalid"))
+  );
 }

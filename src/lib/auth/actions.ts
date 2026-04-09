@@ -11,6 +11,7 @@ import {
   AUTH_DEFAULT_REDIRECT_PATH,
   AUTH_RESET_PASSWORD_ROUTE,
   resolveAuthenticatedRedirect,
+  toSignInPath,
 } from "./routing";
 import type { AuthActionState } from "./types";
 import { buildAbsolutePath } from "./url";
@@ -23,6 +24,16 @@ import {
   validateSignInInput,
   validateSignUpInput,
 } from "./validation";
+
+type ServerSupabaseClient = Awaited<ReturnType<typeof createServerSupabaseClient>>;
+
+async function rollbackSessionAfterProfileBootstrapFailure(supabase: ServerSupabaseClient) {
+  try {
+    await supabase.auth.signOut({ scope: "local" });
+  } catch {
+    // Best effort rollback to avoid partial auth state after bootstrap failures.
+  }
+}
 
 function toSignInError(message: string) {
   const normalized = message.toLowerCase();
@@ -120,9 +131,10 @@ export async function signInAction(
 
   const profileResult = await ensureProfileForCurrentUser(supabase);
   if (!profileResult.ok) {
+    await rollbackSessionAfterProfileBootstrapFailure(supabase);
     return {
       status: "error",
-      message: profileResult.message,
+      message: "We could not finalize your account session. Please sign in again.",
     };
   }
 
@@ -179,9 +191,10 @@ export async function signUpAction(
   if (data.session) {
     const profileResult = await ensureProfileForCurrentUser(supabase, input.displayName);
     if (!profileResult.ok) {
+      await rollbackSessionAfterProfileBootstrapFailure(supabase);
       return {
         status: "error",
-        message: profileResult.message,
+        message: "Account created, but session setup was incomplete. Please sign in again.",
       };
     }
 
@@ -275,7 +288,7 @@ export async function resetPasswordAction(
 
 export async function signOutAction() {
   const supabase = await createServerSupabaseClient();
-  await supabase.auth.signOut();
+  await supabase.auth.signOut({ scope: "local" });
   revalidatePath("/", "layout");
-  redirect("/");
+  redirect(toSignInPath(AUTH_DEFAULT_REDIRECT_PATH, "signed_out"));
 }

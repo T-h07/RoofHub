@@ -4,6 +4,16 @@ export const AUTH_SIGN_UP_ROUTE = "/auth/sign-up";
 export const AUTH_FORGOT_PASSWORD_ROUTE = "/auth/forgot-password";
 export const AUTH_CALLBACK_ROUTE = "/auth/callback";
 export const AUTH_RESET_PASSWORD_ROUTE = "/auth/reset-password";
+export const AUTH_REDIRECT_REASON_VALUES = [
+  "auth_required",
+  "session_expired",
+  "session_revoked",
+  "signed_out",
+  "callback_invalid",
+  "profile_unavailable",
+] as const;
+
+export type AuthRedirectReason = (typeof AUTH_REDIRECT_REASON_VALUES)[number];
 
 export const AUTH_GUEST_ROUTES = [
   AUTH_SIGN_IN_ROUTE,
@@ -23,11 +33,24 @@ export function isGuestOnlyAuthPath(pathname: string) {
   return AUTH_GUEST_ROUTES.some((route) => pathname === route);
 }
 
-export function toSignInPath(nextPath?: string | null) {
+export function isAuthRedirectReason(
+  value: string | null | undefined
+): value is AuthRedirectReason {
+  return typeof value === "string" && AUTH_REDIRECT_REASON_VALUES.includes(value as AuthRedirectReason);
+}
+
+export function toSignInPath(nextPath?: string | null, reason?: AuthRedirectReason | null) {
   const fallback = AUTH_DEFAULT_REDIRECT_PATH;
   const normalizedNext = getSafeRedirectPath(nextPath, fallback);
+  const params = new URLSearchParams({
+    next: normalizedNext,
+  });
 
-  return `${AUTH_SIGN_IN_ROUTE}?next=${encodeURIComponent(normalizedNext)}`;
+  if (reason) {
+    params.set("reason", reason);
+  }
+
+  return `${AUTH_SIGN_IN_ROUTE}?${params.toString()}`;
 }
 
 export function resolveAuthenticatedRedirect(
@@ -49,13 +72,35 @@ export function getSafeRedirectPath(path: string | null | undefined, fallback = 
     return fallback;
   }
 
-  if (!path.startsWith("/")) {
+  const normalized = path.trim();
+  if (!normalized.startsWith("/")) {
     return fallback;
   }
 
-  if (path.startsWith("//")) {
+  if (normalized.startsWith("//")) {
     return fallback;
   }
 
-  return path;
+  if (normalized.includes("\\")) {
+    return fallback;
+  }
+
+  if (/[\u0000-\u001f]/.test(normalized)) {
+    return fallback;
+  }
+
+  try {
+    const parsed = new URL(normalized, "https://roofhub.local");
+    if (parsed.origin !== "https://roofhub.local") {
+      return fallback;
+    }
+
+    if (!parsed.pathname.startsWith("/")) {
+      return fallback;
+    }
+
+    return `${parsed.pathname}${parsed.search}`;
+  } catch {
+    return fallback;
+  }
 }

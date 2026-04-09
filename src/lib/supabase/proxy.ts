@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import {
   AUTH_DEFAULT_REDIRECT_PATH,
+  type AuthRedirectReason,
   isGuestOnlyAuthPath,
   isProtectedPath,
   resolveAuthenticatedRedirect,
@@ -16,6 +17,43 @@ function applyRelativePath(url: URL, relativePath: string) {
   const target = new URL(relativePath, url.origin);
   url.pathname = target.pathname;
   url.search = target.search;
+}
+
+function isSupabaseAuthCookieName(cookieName: string) {
+  return cookieName.startsWith("sb-") && cookieName.includes("-auth-token");
+}
+
+function getSupabaseAuthCookieNames(request: NextRequest) {
+  return request.cookies
+    .getAll()
+    .map((cookie) => cookie.name)
+    .filter(isSupabaseAuthCookieName);
+}
+
+function clearSupabaseAuthCookies(response: NextResponse, cookieNames: string[]) {
+  cookieNames.forEach((cookieName) => {
+    response.cookies.delete(cookieName);
+  });
+}
+
+function resolveUnauthenticatedReason(
+  hasSupabaseAuthCookies: boolean,
+  authErrorMessage: string | null
+): AuthRedirectReason {
+  if (!hasSupabaseAuthCookies) {
+    return "auth_required";
+  }
+
+  const normalizedError = authErrorMessage?.toLowerCase() ?? "";
+  if (
+    normalizedError.includes("revoked") ||
+    normalizedError.includes("invalid refresh token") ||
+    normalizedError.includes("refresh token")
+  ) {
+    return "session_revoked";
+  }
+
+  return "session_expired";
 }
 
 export async function updateSession(request: NextRequest) {
@@ -44,20 +82,34 @@ export async function updateSession(request: NextRequest) {
     },
   });
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  let user: { id: string } | null = null;
+  let authErrorMessage: string | null = null;
+  try {
+    const { data, error } = await supabase.auth.getUser();
+    user = data.user;
+    authErrorMessage = error?.message ?? null;
+  } catch (error) {
+    authErrorMessage = error instanceof Error ? error.message : "Unable to validate auth session.";
+  }
 
   const pathname = request.nextUrl.pathname;
   const currentPath = `${pathname}${request.nextUrl.search}`;
+  const supabaseAuthCookieNames = getSupabaseAuthCookieNames(request);
+  const hasSupabaseAuthCookies = supabaseAuthCookieNames.length > 0;
 
   if (!user && isProtectedPath(pathname)) {
     const redirectUrl = request.nextUrl.clone();
+    const reason = resolveUnauthenticatedReason(hasSupabaseAuthCookies, authErrorMessage);
+    const signInPath = toSignInPath(currentPath, reason);
 
-    const signInPath = toSignInPath(currentPath);
     applyRelativePath(redirectUrl, signInPath);
 
-    return NextResponse.redirect(redirectUrl);
+    const redirectResponse = NextResponse.redirect(redirectUrl);
+    if (hasSupabaseAuthCookies) {
+      clearSupabaseAuthCookies(redirectResponse, supabaseAuthCookieNames);
+    }
+
+    return redirectResponse;
   }
 
   if (user && isGuestOnlyAuthPath(pathname)) {
@@ -69,6 +121,10 @@ export async function updateSession(request: NextRequest) {
     applyRelativePath(redirectUrl, requestedNext);
 
     return NextResponse.redirect(redirectUrl);
+  }
+
+  if (!user && hasSupabaseAuthCookies && isGuestOnlyAuthPath(pathname)) {
+    clearSupabaseAuthCookies(response, supabaseAuthCookieNames);
   }
 
   return response;
