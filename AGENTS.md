@@ -16,6 +16,7 @@
 - Validate all external input (query params, form data, route params, webhook/body payloads) before use.
 - Do not use unsafe HTML rendering for user-generated content; default to escaped rendering.
 - Use safe redirect/callback behavior: allow only trusted relative paths or explicitly allowlisted origins.
+- Preserve centralized redirect safety helpers (`src/lib/auth/routing.ts`) and do not bypass them with ad-hoc `next` handling.
 - Keep upload/storage flows ownership-aware and deterministic:
   - validate file type/size/count
   - use deterministic path conventions
@@ -38,6 +39,13 @@
   - package maintenance/safety signal
   - security impact on trust boundaries (especially auth/crypto/upload/parsing/rendering/networking)
 - Keep automated dependency updates (`.github/dependabot.yml`) scoped and maintainable; avoid update spam patterns.
+
+## Auth/session hardening invariants
+- Preserve Supabase SSR browser/server client separation and cookie-based session flow.
+- Preserve proxy-driven session revalidation (`proxy.ts` + `src/lib/supabase/proxy.ts`) as the source of route auth gating.
+- When auth succeeds but profile bootstrap fails, avoid partial-auth states (rollback/clear session and return bounded error).
+- Keep sign-out semantics explicit and invalidating; do not leave stale authenticated UI assumptions.
+- Treat session-expired/session-revoked flows as first-class recovery states with clear, non-sensitive user messaging.
 
 ## Required workflow for security-sensitive changes
 - Update `docs/security-baseline.md` when behavior, trust boundaries, or assumptions change.

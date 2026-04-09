@@ -34,6 +34,10 @@ Supply-chain execution details are defined in `docs/supply-chain-guardrails.md`.
 - Do not trust client role/ownership claims.
 - Callback/redirect handling must use safe relative paths or explicit allowlists.
 - Password reset and callback flows must avoid exposing raw provider/backend errors.
+- Session revalidation should remain server-enforced (SSR cookie model), not client-local storage auth assumptions.
+- Sign-out must invalidate active app session state cleanly and leave no stale protected-route access.
+- Session-expired/session-revoked states must fail closed and require explicit re-authentication.
+- Detailed auth/session hardening behavior is documented in `docs/auth-session-hardening.md`.
 
 ### 2) Authorization, ownership, and RLS alignment
 

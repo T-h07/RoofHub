@@ -10,6 +10,8 @@ For dependency/lockfile/scanner specifics, also follow `docs/supply-chain-guardr
 
 - [ ] Auth is required where needed (no guest bypass on protected behavior).
 - [ ] Authorization is enforced server-side (not only by route protection/UI state).
+- [ ] Session revalidation behavior is server-enforced and remains SSR cookie-based.
+- [ ] Sign-out reliably invalidates protected-route access after refresh/navigation.
 - [ ] Ownership is derived from authenticated context, not client-supplied ids.
 - [ ] Admin/provider/user boundary checks are explicit.
 - [ ] RLS assumptions are preserved (no app-side bypass pattern introduced).
@@ -17,6 +19,7 @@ For dependency/lockfile/scanner specifics, also follow `docs/supply-chain-guardr
 ## Input and output safety
 
 - [ ] Route params, query params, and form/body payloads are validated and typed.
+- [ ] Callback and redirect parameters are sanitized and constrained to safe targets.
 - [ ] Unsafe or unbounded parsing paths were not introduced.
 - [ ] User-generated text is rendered safely (no unsafe HTML interpolation).
 - [ ] Public/private data exposure was reviewed for all changed queries/responses.
