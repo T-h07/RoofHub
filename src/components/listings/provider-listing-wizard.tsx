@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, LoaderCircle, MapPin, Rocket } from "lucide-react";
 import { toast } from "sonner";
@@ -130,6 +130,10 @@ export function ProviderListingWizard({
   const [photoSelectionIssues, setPhotoSelectionIssues] = useState<ListingImageSelectionIssue[]>([]);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [statusTone, setStatusTone] = useState<"success" | "error" | "info">("info");
+  const [photoAutosaveRevision, setPhotoAutosaveRevision] = useState(0);
+  const [isPhotoMetadataSyncing, setIsPhotoMetadataSyncing] = useState(false);
+  const photoMetadataSyncInFlightRef = useRef(false);
+  const photoMetadataSyncQueuedRef = useRef(false);
   const {
     images: draftImages,
     addFiles,
@@ -175,6 +179,10 @@ export function ProviderListingWizard({
   const previousStep = getPreviousProviderWizardStep(currentStep);
   const nextStep = getNextProviderWizardStep(currentStep);
   const canPublishFromCurrentStatus = canTransitionProviderListingStatus(listingStatus, "published");
+
+  function queuePhotoMetadataSync() {
+    setPhotoAutosaveRevision((current) => current + 1);
+  }
 
   function setField<K extends keyof ProviderDraftWizardValues>(key: K, value: ProviderDraftWizardValues[K]) {
     setDraft((current) => ({ ...current, [key]: value }));
@@ -316,6 +324,82 @@ export function ProviderListingWizard({
     };
   }
 
+  useEffect(() => {
+    if (photoAutosaveRevision === 0 || !draftId) {
+      return;
+    }
+
+    if (hasPendingPhotoUploads || hasPhotoUploadFailures) {
+      return;
+    }
+
+    if (draftImages.some((image) => image.uploadState !== "uploaded" || !image.storagePath)) {
+      return;
+    }
+
+    let isCancelled = false;
+    const timeoutId = window.setTimeout(async () => {
+      if (photoMetadataSyncInFlightRef.current) {
+        photoMetadataSyncQueuedRef.current = true;
+        return;
+      }
+
+      photoMetadataSyncInFlightRef.current = true;
+      setIsPhotoMetadataSyncing(true);
+
+      const syncResult = await syncProviderListingPhotosAction({
+        draftId,
+        images: draftImages
+          .filter((image) => Boolean(image.storagePath))
+          .map((image) => ({
+            storagePath: image.storagePath as string,
+            sortOrder: image.sortOrder,
+            isCover: image.isCover,
+          })),
+      });
+
+      if (!isCancelled) {
+        if (!syncResult.ok) {
+          setStatusTone("error");
+          setStatusMessage(syncResult.message);
+          toast.error(syncResult.message);
+        } else {
+          replaceImages(
+            syncResult.images.map((image) => ({
+              id: image.id,
+              storagePath: image.storagePath,
+              previewUrl: image.signedUrl ?? "",
+              sortOrder: image.sortOrder,
+              isCover: image.isCover,
+            }))
+          );
+        }
+      }
+
+      photoMetadataSyncInFlightRef.current = false;
+      if (!isCancelled) {
+        setIsPhotoMetadataSyncing(false);
+      }
+
+      if (photoMetadataSyncQueuedRef.current) {
+        photoMetadataSyncQueuedRef.current = false;
+        setPhotoAutosaveRevision((current) => current + 1);
+      }
+    }, 350);
+
+    return () => {
+      isCancelled = true;
+      window.clearTimeout(timeoutId);
+    };
+  }, [
+    draftId,
+    draftImages,
+    hasPendingPhotoUploads,
+    hasPhotoUploadFailures,
+    photoAutosaveRevision,
+    replaceImages,
+  ]);
+
   function persistStep(stayOnStep = false) {
     setStatusMessage(null);
     setReviewBlockers([]);
@@ -442,6 +526,7 @@ export function ProviderListingWizard({
 
   function setCoverPhoto(imageId: string) {
     setCoverImage(imageId);
+    queuePhotoMetadataSync();
     if (publishBlockers.length > 0) {
       setPublishBlockers([]);
     }
@@ -449,6 +534,7 @@ export function ProviderListingWizard({
 
   function movePhoto(imageId: string, targetIndex: number) {
     moveImage(imageId, targetIndex);
+    queuePhotoMetadataSync();
     if (publishBlockers.length > 0) {
       setPublishBlockers([]);
     }
@@ -456,6 +542,7 @@ export function ProviderListingWizard({
 
   function removePhoto(imageId: string) {
     removeImage(imageId);
+    queuePhotoMetadataSync();
     if (publishBlockers.length > 0) {
       setPublishBlockers([]);
     }
@@ -887,6 +974,12 @@ export function ProviderListingWizard({
             </p>
           </div>
         </div>
+
+        <p className="text-muted-foreground text-xs">
+          {isPhotoMetadataSyncing
+            ? "Saving photo order and cover selection..."
+            : "Cover and order changes are auto-saved. Use Save step to upload new files."}
+        </p>
       </div>
     );
   }
@@ -1166,7 +1259,7 @@ export function ProviderListingWizard({
         <ol className="grid gap-2 sm:grid-cols-2 lg:grid-cols-8">
           {PROVIDER_WIZARD_STEPS.map((step, index) => {
             const isActive = currentStep === step;
-            const isClickable = Boolean(draftId) && index <= currentStepIndex;
+            const isClickable = Boolean(draftId) && (mode === "edit" || index <= currentStepIndex);
             return (
               <li key={step}>
                 <button
