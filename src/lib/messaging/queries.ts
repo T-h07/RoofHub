@@ -3,6 +3,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { Database, Tables } from "@/types/database";
+import { createListingImageSignedUrl } from "@/lib/supabase/storage/listing-images";
 
 import { getMessagingViewerContext, toMessagingFailure } from "./context";
 import type {
@@ -22,6 +23,7 @@ const CONVERSATION_SELECT = "id, listing_id, provider_id, seeker_id, last_messag
 const MESSAGE_SELECT = "id, conversation_id, sender_id, body, read_at, created_at";
 const LISTING_SNIPPET_SELECT =
   "id, slug, title, city, neighborhood, listing_status, listing_type, property_type, price_amount, currency_code";
+const LISTING_COVER_IMAGE_SELECT = "storage_path, is_cover, sort_order";
 
 type ConversationRow = Pick<
   Tables<"conversations">,
@@ -46,6 +48,8 @@ type ListingSnippetRow = Pick<
   | "price_amount"
   | "currency_code"
 >;
+
+type ListingCoverImageRow = Pick<Tables<"listing_images">, "storage_path" | "is_cover" | "sort_order">;
 
 export type ProviderUnreadLeadCountResult =
   | {
@@ -253,7 +257,7 @@ export async function loadMessagingThreadQuery(
   const counterpartUserId =
     participantRole === "provider" ? conversation.seeker_id : conversation.provider_id;
 
-  const [messagesResult, listingResult, unreadCountResult] = await Promise.all([
+  const [messagesResult, listingResult, unreadCountResult, listingCoverImageResult] = await Promise.all([
     supabase
       .from("messages")
       .select(MESSAGE_SELECT)
@@ -271,6 +275,14 @@ export async function loadMessagingThreadQuery(
       .eq("conversation_id", conversation.id)
       .neq("sender_id", profile.id)
       .is("read_at", null),
+    supabase
+      .from("listing_images")
+      .select(LISTING_COVER_IMAGE_SELECT)
+      .eq("listing_id", conversation.listing_id)
+      .order("is_cover", { ascending: false })
+      .order("sort_order", { ascending: true })
+      .limit(1)
+      .maybeSingle(),
   ]);
 
   if (messagesResult.error) {
@@ -306,11 +318,25 @@ export async function loadMessagingThreadQuery(
         }
       : null;
 
+  let listingCoverImageUrl: string | null = null;
+  if (!listingCoverImageResult.error && listingCoverImageResult.data) {
+    try {
+      listingCoverImageUrl = await createListingImageSignedUrl(
+        supabase,
+        (listingCoverImageResult.data as ListingCoverImageRow).storage_path,
+        30 * 60
+      );
+    } catch {
+      listingCoverImageUrl = null;
+    }
+  }
+
   return {
     ok: true,
     data: {
       conversation: toConversationRecord(conversation),
       listing,
+      listingCoverImageUrl,
       participantRole,
       counterpartUserId,
       messages,

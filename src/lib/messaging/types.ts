@@ -81,6 +81,7 @@ export type MessagingConversationSummariesResult = {
 export type MessagingThreadResult = {
   conversation: MessagingConversationRecord;
   listing: MessagingListingSnippet | null;
+  listingCoverImageUrl: string | null;
   participantRole: MessagingParticipantRole;
   counterpartUserId: string;
   messages: MessagingMessageRecord[];
