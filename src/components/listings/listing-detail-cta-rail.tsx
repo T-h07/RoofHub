@@ -25,7 +25,7 @@ export function ListingDetailCtaRail({
   signInHref,
 }: ListingDetailCtaRailProps) {
   return (
-    <Card className="xl:sticky xl:top-[5.5rem]">
+    <Card>
       <CardHeader className="pb-3">
         <CardTitle className="text-base">Listing actions</CardTitle>
       </CardHeader>
