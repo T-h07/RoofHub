@@ -330,6 +330,14 @@ Provider trust-layer documentation:
 
 - `docs/provider-public-trust-layer.md`
 
+## Security Baseline and Guardrails (SH-PT01)
+
+- Root agent and contributor security contract: `AGENTS.md`
+- Platform baseline and merge-blocking rules: `docs/security-baseline.md`
+- Pre-merge checklist for sensitive work: `docs/security-checklist.md`
+
+Security-sensitive changes must follow the baseline and complete the checklist before merge.
+
 ## Local Development
 
 ```bash
@@ -357,3 +365,5 @@ See:
 
 - `docs/repository-workflow.md`
 - `docs/commit-conventions.md`
+- `docs/security-baseline.md`
+- `docs/security-checklist.md`

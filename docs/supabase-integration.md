@@ -62,3 +62,8 @@ Vercel usage:
 - Profile/role details are documented in `docs/profile-role-foundation.md`.
 
 Schema details and migration workflow remain documented in `docs/database-schema-v1.md`.
+
+Repository-wide security guardrails are defined in:
+
+- `docs/security-baseline.md`
+- `docs/security-checklist.md`

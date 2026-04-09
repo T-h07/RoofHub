@@ -49,6 +49,14 @@ Commit only after a logically complete unit of work:
 - Merges into `dev` and `main` are manual by the repository owner.
 - Keep history readable with clear, scoped commit messages.
 
+## Security Gate for Sensitive Changes
+
+For changes that touch auth/session, authorization, route handlers, server actions, uploads/storage, moderation/admin logic, messaging access rules, environment/secrets, or sensitive dependencies:
+
+- follow `docs/security-baseline.md`
+- complete `docs/security-checklist.md` before merge
+- include tests or validation notes for the sensitive behavior change
+
 ## What to Commit
 
 Commit:
