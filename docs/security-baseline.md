@@ -46,6 +46,7 @@ Supply-chain execution details are defined in `docs/supply-chain-guardrails.md`.
 - Preserve RLS assumptions; app code must not "re-authorize" by weak client filters.
 - Admin-only behavior must have explicit role checks in server code.
 - Provider-only behavior must derive provider identity from authenticated profile context.
+- Keep the role/ownership/participant contract aligned with `docs/authorization-boundary-audit.md`.
 
 ### 3) Route handlers and server actions
 

@@ -47,10 +47,17 @@
 - Keep sign-out semantics explicit and invalidating; do not leave stale authenticated UI assumptions.
 - Treat session-expired/session-revoked flows as first-class recovery states with clear, non-sensitive user messaging.
 
+## Authorization invariants
+- Provider listing flows are owner-scoped. Do not treat admin role as implicit provider-owner access in provider routes/actions.
+- Messaging reads/writes/read-state changes are participant-only; listing id alone is not authority to access a thread.
+- Keep moderation-controlled states (for example `hidden_by_admin`) admin-controlled in server mutations.
+- Preserve app-layer ownership/participant checks alongside RLS; do not remove app checks assuming RLS alone is enough.
+
 ## Required workflow for security-sensitive changes
 - Update `docs/security-baseline.md` when behavior, trust boundaries, or assumptions change.
 - Run and complete `docs/security-checklist.md` before merge for security-sensitive work.
 - Follow `docs/supply-chain-guardrails.md` when changing dependencies, lockfiles, or security workflows.
+- For authz boundary changes, update `docs/authorization-boundary-audit.md`.
 - Add tests or explicit validation notes for sensitive behavior changes (authz, ownership, visibility, storage, redirects, moderation).
 - Document newly added route handlers/server actions and their authorization/input-validation approach.
 

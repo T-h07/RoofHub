@@ -343,6 +343,11 @@ Security-sensitive changes must follow the baseline and complete the checklist b
 - Auth/session hardening model and threat-focused controls: `docs/auth-session-hardening.md`
 - Foundational auth flow behavior and route map: `docs/auth-flows.md`
 
+## Authorization Boundary Audit (SH-PT03)
+
+- Enforced role/ownership/participant authorization contract: `docs/authorization-boundary-audit.md`
+- Works alongside RLS policy boundaries documented in: `docs/rls-policies.md`
+
 ## Supply Chain Guardrails (SH-PT07)
 
 - Repository-level supply-chain policy and scanner response workflow: `docs/supply-chain-guardrails.md`
@@ -382,4 +387,5 @@ See:
 - `docs/security-baseline.md`
 - `docs/security-checklist.md`
 - `docs/auth-session-hardening.md`
+- `docs/authorization-boundary-audit.md`
 - `docs/supply-chain-guardrails.md`

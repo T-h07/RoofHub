@@ -14,6 +14,8 @@ For dependency/lockfile/scanner specifics, also follow `docs/supply-chain-guardr
 - [ ] Sign-out reliably invalidates protected-route access after refresh/navigation.
 - [ ] Ownership is derived from authenticated context, not client-supplied ids.
 - [ ] Admin/provider/user boundary checks are explicit.
+- [ ] Provider actions remain owner-scoped; admin is not implicitly treated as provider-owner in provider flows.
+- [ ] Messaging list/thread/send/read actions enforce participant-only access.
 - [ ] RLS assumptions are preserved (no app-side bypass pattern introduced).
 
 ## Input and output safety
