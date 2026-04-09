@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Link from "next/link";
 import { Bath, BedDouble, Expand, Hourglass, MapPin } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -122,7 +123,9 @@ export function ListingCard({ listing, className }: ListingCardProps) {
 
         <div className="border-border/70 flex items-center justify-between border-t pt-3">
           <span className="type-caption">Public listing</span>
-          <span className="text-primary text-xs font-medium">Detail page planned in PT14</span>
+          <Link href={`/listing/${listing.slug}`} className="text-primary text-xs font-medium hover:underline">
+            View details
+          </Link>
         </div>
       </CardContent>
     </Card>

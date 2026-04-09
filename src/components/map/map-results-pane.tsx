@@ -60,12 +60,8 @@ function formatArea(value: number) {
   return `${new Intl.NumberFormat("en", { maximumFractionDigits: 0 }).format(value)} m²`;
 }
 
-function getListingListHref(listing: PublicMapListing) {
-  const params = new URLSearchParams();
-  params.set("q", listing.title);
-  params.set("city", listing.city);
-
-  return `/explore?${params.toString()}`;
+function getListingDetailHref(listing: PublicMapListing) {
+  return `/listing/${listing.slug}`;
 }
 
 export function MapResultsPane({
@@ -160,10 +156,10 @@ export function MapResultsPane({
                       </span>
                     </div>
                     <Link
-                      href={getListingListHref(listing)}
+                      href={getListingDetailHref(listing)}
                       className={cn(buttonVariants({ size: "sm", variant: "ghost" }), "h-7 px-2 text-xs")}
                     >
-                      Open in list
+                      View details
                       <ExternalLink className="size-3.5" aria-hidden="true" />
                     </Link>
                   </div>

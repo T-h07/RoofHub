@@ -231,6 +231,10 @@ function getPopupListHref(listing: PublicMapListing) {
   return `/explore?${params.toString()}`;
 }
 
+function getPopupDetailHref(listing: PublicMapListing) {
+  return `/listing/${listing.slug}`;
+}
+
 function readBoundsFromMap(mapRef: MapRef | null) {
   const mapBounds = mapRef?.getMap().getBounds();
 
@@ -664,15 +668,18 @@ export function PublicListingsMap({ mapStyleUrl, listings, appliedBounds }: Publ
 
                 <div className="flex items-center justify-between gap-2 pt-1">
                   <Link
-                    href={getPopupListHref(selectedListing)}
-                    className={cn(buttonVariants({ size: "sm", variant: "outline" }), "h-8 gap-1.5 px-2.5 text-xs")}
+                    href={getPopupDetailHref(selectedListing)}
+                    className={cn(buttonVariants({ size: "sm" }), "h-8 gap-1.5 px-2.5 text-xs")}
                   >
-                    Open in list
+                    View details
                     <ExternalLink className="size-3.5" aria-hidden="true" />
                   </Link>
-                  <span className="text-muted-foreground text-[11px]">
-                    Detail page planned in PT14
-                  </span>
+                  <Link
+                    href={getPopupListHref(selectedListing)}
+                    className={cn(buttonVariants({ size: "sm", variant: "ghost" }), "h-8 px-2 text-[11px]")}
+                  >
+                    Open in list
+                  </Link>
                 </div>
 
                 {selectedListing.public_location_mode === "approximate" ? (
