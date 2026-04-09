@@ -446,6 +446,7 @@ export async function publishProviderListingDraftAction(
 
   const draftValues = buildWizardValuesFromDraft(draftResult.draft, {
     preferredContactMethod: "",
+    contactMethods: ["in_app"],
     phone: "",
   });
 

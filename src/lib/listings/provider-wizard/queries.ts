@@ -2,6 +2,7 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { isPreferredContactMethod } from "@/lib/auth/roles";
 import { createListingImageSignedUrl } from "@/lib/supabase/storage/listing-images";
 import type { Database } from "@/types/database";
 
@@ -61,7 +62,7 @@ const PROVIDER_DRAFT_EDITOR_SELECT = `
   created_at
 `;
 
-const PROVIDER_CONTACT_SELECT = "preferred_contact_method, phone";
+const PROVIDER_CONTACT_SELECT = "preferred_contact_method, contact_methods, phone";
 
 export async function loadProviderDraftSummaries(
   supabase: SupabaseClient<Database>,
@@ -142,15 +143,32 @@ export async function loadProviderContactSettings(
       message: "Contact settings could not be loaded.",
       settings: {
         preferredContactMethod: "",
+        contactMethods: ["in_app"],
         phone: "",
       } satisfies ProviderContactSettings,
     };
   }
 
+  const normalizedMethods = Array.from(
+    new Set(
+      (data.contact_methods ?? []).filter((method): method is ProviderContactSettings["contactMethods"][number] =>
+        isPreferredContactMethod(method)
+      )
+    )
+  );
+  const fallbackMethods: ProviderContactSettings["contactMethods"] =
+    normalizedMethods.length > 0
+      ? normalizedMethods
+      : data.preferred_contact_method
+        ? [data.preferred_contact_method]
+        : ["in_app"];
+  const preferredContactMethod = data.preferred_contact_method ?? "";
+
   return {
     ok: true as const,
     settings: {
-      preferredContactMethod: data.preferred_contact_method ?? "",
+      preferredContactMethod,
+      contactMethods: fallbackMethods,
       phone: data.phone ?? "",
     } satisfies ProviderContactSettings,
   };

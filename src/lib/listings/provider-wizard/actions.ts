@@ -431,6 +431,7 @@ export async function saveProviderWizardStepAction(
         .from("profiles")
         .update({
           preferred_contact_method: contactValidation.payload.preferred_contact_method,
+          contact_methods: contactValidation.payload.contact_methods,
           phone: contactValidation.payload.phone,
         })
         .eq("id", profile.id);

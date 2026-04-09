@@ -31,6 +31,7 @@ export default async function NewDashboardListingPage() {
   const initialValues = {
     ...PROVIDER_WIZARD_DEFAULT_VALUES,
     preferredContactMethod: contactSettings.settings.preferredContactMethod,
+    contactMethods: contactSettings.settings.contactMethods,
     contactPhone: contactSettings.settings.phone,
   };
   const mapStyleUrl = getMapStyleUrl();

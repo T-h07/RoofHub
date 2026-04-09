@@ -64,6 +64,7 @@ export function buildWizardValuesFromDraft(
     utilitiesIncluded: draft.utilities_included,
     heatingType: draft.heating_type ?? "",
     preferredContactMethod: contact.preferredContactMethod,
+    contactMethods: contact.contactMethods,
     contactPhone: contact.phone,
   };
 }

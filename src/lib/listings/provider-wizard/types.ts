@@ -59,6 +59,7 @@ export type ProviderDraftWizardValues = {
   utilitiesIncluded: boolean;
   heatingType: ProviderHeatingType | "";
   preferredContactMethod: ProviderPreferredContactMethod | "";
+  contactMethods: ProviderPreferredContactMethod[];
   contactPhone: string;
 };
 
@@ -91,6 +92,7 @@ export const PROVIDER_WIZARD_DEFAULT_VALUES: ProviderDraftWizardValues = {
   utilitiesIncluded: false,
   heatingType: "",
   preferredContactMethod: "",
+  contactMethods: ["in_app"],
   contactPhone: "",
 };
 
@@ -155,6 +157,7 @@ export type ProviderDraftImage = {
 
 export type ProviderContactSettings = {
   preferredContactMethod: ProviderPreferredContactMethod | "";
+  contactMethods: ProviderPreferredContactMethod[];
   phone: string;
 };
 

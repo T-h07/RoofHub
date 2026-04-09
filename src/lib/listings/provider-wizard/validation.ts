@@ -10,6 +10,7 @@ const LISTING_TYPES = new Set(["rent", "sale"]);
 const PROPERTY_TYPES = new Set(["apartment", "house", "studio", "land", "commercial"]);
 const HEATING_TYPES = new Set(["central", "electric", "gas", "district", "other"]);
 const PREFERRED_CONTACT_METHODS = new Set(["in_app", "phone", "email", "whatsapp", "viber"]);
+const PHONE_REQUIRED_CONTACT_METHODS = new Set(["phone", "whatsapp", "viber"]);
 const PUBLIC_LOCATION_MODES = new Set(["exact", "approximate"]);
 const PHONE_PATTERN = /^[+0-9().\-\s]{6,24}$/;
 
@@ -134,6 +135,7 @@ export type AmenitiesStepPayload = {
 
 export type ContactStepPayload = {
   preferred_contact_method: ProviderPreferredContactMethod | null;
+  contact_methods: ProviderPreferredContactMethod[];
   phone: string | null;
 };
 
@@ -384,6 +386,13 @@ export function validateAmenitiesStep(
 export function validateContactStep(values: ProviderDraftWizardValues): ValidationResult<ContactStepPayload> {
   const errors: ProviderWizardFieldErrors = {};
   const preferredContactMethod = values.preferredContactMethod || null;
+  const contactMethods = Array.from(
+    new Set(
+      values.contactMethods.filter((method): method is ProviderPreferredContactMethod =>
+        PREFERRED_CONTACT_METHODS.has(method)
+      )
+    )
+  );
   const phone = normalizeNullableText(values.contactPhone, 24);
 
   if (
@@ -393,16 +402,22 @@ export function validateContactStep(values: ProviderDraftWizardValues): Validati
     errors.preferredContactMethod = "Select a valid contact preference.";
   }
 
+  if (contactMethods.length === 0) {
+    errors.contactMethods = "Add at least one contact method.";
+  }
+
   if (phone && !PHONE_PATTERN.test(phone)) {
     errors.contactPhone = "Phone should include digits and optional +, spaces, (), dots, or dashes.";
   }
 
-  if (
-    (preferredContactMethod === "phone" ||
-      preferredContactMethod === "whatsapp" ||
-      preferredContactMethod === "viber") &&
-    !phone
-  ) {
+  const effectiveMethods = preferredContactMethod
+    ? Array.from(new Set([preferredContactMethod, ...contactMethods]))
+    : contactMethods;
+  const requiresPhone = effectiveMethods.some((method) =>
+    PHONE_REQUIRED_CONTACT_METHODS.has(method)
+  );
+
+  if (requiresPhone && !phone) {
     errors.contactPhone = "Add a phone number when phone, WhatsApp, or Viber is preferred.";
   }
 
@@ -414,6 +429,7 @@ export function validateContactStep(values: ProviderDraftWizardValues): Validati
     ok: true,
     payload: {
       preferred_contact_method: preferredContactMethod,
+      contact_methods: effectiveMethods,
       phone,
     },
   };

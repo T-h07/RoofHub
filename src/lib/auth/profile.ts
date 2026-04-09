@@ -4,7 +4,7 @@ import { DEFAULT_APP_ROLE } from "@/lib/auth/roles";
 import type { Database, Tables } from "@/types/database";
 
 const PROFILE_SELECT =
-  "id, role, display_name, avatar_url, phone, bio, preferred_contact_method, created_at, updated_at";
+  "id, role, display_name, avatar_url, phone, bio, preferred_contact_method, contact_methods, created_at, updated_at";
 
 export type AppProfile = Tables<"profiles">;
 

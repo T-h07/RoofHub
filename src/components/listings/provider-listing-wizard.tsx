@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ArrowRight, LoaderCircle, MapPin, Rocket } from "lucide-react";
+import { ArrowLeft, ArrowRight, LoaderCircle, MapPin, Plus, Rocket, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { ProviderListingPhotoStep } from "@/components/listings/provider-listing-photo-step";
@@ -51,6 +51,25 @@ type ProviderListingWizardProps = {
   providerOwnerId: string;
   mapStyleUrl: string;
 };
+
+type ContactMethodValue = Exclude<
+  ProviderDraftWizardValues["preferredContactMethod"],
+  ""
+>;
+
+const CONTACT_METHOD_OPTIONS: ReadonlyArray<{ value: ContactMethodValue; label: string }> = [
+  { value: "in_app", label: "In-app message" },
+  { value: "phone", label: "Phone" },
+  { value: "whatsapp", label: "WhatsApp" },
+  { value: "viber", label: "Viber" },
+  { value: "email", label: "Email" },
+];
+
+const PHONE_REQUIRED_CONTACT_METHODS = new Set<ContactMethodValue>([
+  "phone",
+  "whatsapp",
+  "viber",
+]);
 
 function buildEditHref(draftId: string, step: ProviderWizardStep) {
   return `/dashboard/listings/${draftId}/edit?step=${step}`;
@@ -125,6 +144,19 @@ function formatContactMethodLabel(
     default:
       return "No preference";
   }
+}
+
+function normalizeContactMethods(
+  methods: ProviderDraftWizardValues["contactMethods"]
+): ContactMethodValue[] {
+  return Array.from(
+    new Set<ContactMethodValue>(
+      methods.filter(
+        (method): method is ContactMethodValue =>
+          CONTACT_METHOD_OPTIONS.some((option) => option.value === method)
+      )
+    )
+  );
 }
 
 function buildPhotoMetadataSignature(
@@ -245,6 +277,90 @@ export function ProviderListingWizard({
       setFieldErrors((current) => {
         const next = { ...current };
         delete next[key];
+        return next;
+      });
+    }
+  }
+
+  function setPreferredContactMethod(
+    preferredContactMethod: ProviderDraftWizardValues["preferredContactMethod"]
+  ) {
+    setDraft((current) => {
+      const nextContactMethods = normalizeContactMethods(current.contactMethods);
+      if (preferredContactMethod && !nextContactMethods.includes(preferredContactMethod)) {
+        nextContactMethods.push(preferredContactMethod);
+      }
+
+      return {
+        ...current,
+        preferredContactMethod,
+        contactMethods: nextContactMethods.length > 0 ? nextContactMethods : ["in_app"],
+      };
+    });
+
+    if (publishBlockers.length > 0) {
+      setPublishBlockers([]);
+    }
+    if (fieldErrors.preferredContactMethod || fieldErrors.contactMethods) {
+      setFieldErrors((current) => {
+        const next = { ...current };
+        delete next.preferredContactMethod;
+        delete next.contactMethods;
+        return next;
+      });
+    }
+  }
+
+  function addContactMethod(method: ContactMethodValue) {
+    setDraft((current) => ({
+      ...current,
+      contactMethods: normalizeContactMethods([...current.contactMethods, method]),
+    }));
+
+    if (publishBlockers.length > 0) {
+      setPublishBlockers([]);
+    }
+    if (fieldErrors.contactMethods || fieldErrors.contactPhone) {
+      setFieldErrors((current) => {
+        const next = { ...current };
+        delete next.contactMethods;
+        delete next.contactPhone;
+        return next;
+      });
+    }
+  }
+
+  function removeContactMethod(method: ContactMethodValue) {
+    setDraft((current) => {
+      const nextContactMethods = normalizeContactMethods(
+        current.contactMethods.filter((value) => value !== method)
+      );
+      const safeMethods: ContactMethodValue[] =
+        nextContactMethods.length > 0 ? nextContactMethods : ["in_app"];
+      const currentPreferred = current.preferredContactMethod;
+      const preferredContactMethod: ProviderDraftWizardValues["preferredContactMethod"] =
+        currentPreferred === ""
+          ? ""
+          : safeMethods.includes(currentPreferred as ContactMethodValue)
+            ? currentPreferred
+            : (safeMethods[0] ?? "");
+
+      return {
+        ...current,
+        preferredContactMethod,
+        contactMethods: safeMethods,
+      };
+    });
+
+    if (publishBlockers.length > 0) {
+      setPublishBlockers([]);
+    }
+    if (fieldErrors.contactMethods || fieldErrors.preferredContactMethod || fieldErrors.contactPhone) {
+      setFieldErrors((current) => {
+        const next = { ...current };
+        delete next.contactMethods;
+        delete next.preferredContactMethod;
+        delete next.contactPhone;
         return next;
       });
     }
@@ -1105,49 +1221,127 @@ export function ProviderListingWizard({
   }
 
   function renderContactStep() {
+    const selectedContactMethods = normalizeContactMethods(draft.contactMethods);
+    const effectiveContactMethods: ContactMethodValue[] =
+      selectedContactMethods.length > 0 ? selectedContactMethods : ["in_app"];
+    const remainingContactMethods = CONTACT_METHOD_OPTIONS.filter(
+      (option) => !effectiveContactMethods.includes(option.value)
+    );
+    const phoneIsRequired = effectiveContactMethods.some((method) =>
+      PHONE_REQUIRED_CONTACT_METHODS.has(method)
+    );
+
     return (
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="space-y-4">
         <Field>
-          <Label htmlFor="wizard-contact-method">Preferred contact method</Label>
-          <Select
-            id="wizard-contact-method"
-            value={draft.preferredContactMethod}
-            onChange={(event) =>
-              setField(
-                "preferredContactMethod",
-                event.currentTarget.value as ProviderDraftWizardValues["preferredContactMethod"]
-              )
-            }
-            aria-invalid={Boolean(fieldErrors.preferredContactMethod)}
-          >
-            <option value="">No preference</option>
-            <option value="in_app">In-app message</option>
-            <option value="phone">Phone</option>
-            <option value="whatsapp">WhatsApp</option>
-            <option value="viber">Viber</option>
-            <option value="email">Email</option>
-          </Select>
-          {fieldErrors.preferredContactMethod ? <FieldError>{fieldErrors.preferredContactMethod}</FieldError> : null}
+          <Label>Contact methods</Label>
+          <div className="space-y-2.5">
+            <div className="flex flex-wrap gap-2">
+              {effectiveContactMethods.map((method) => {
+                const isPrimary = draft.preferredContactMethod === method;
+
+                return (
+                  <span
+                    key={method}
+                    className={cn(
+                      "border-border/70 bg-card/45 inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs",
+                      isPrimary ? "border-primary/55 bg-primary/12 text-primary-foreground" : ""
+                    )}
+                  >
+                    <span>{formatContactMethodLabel(method)}</span>
+                    {isPrimary ? (
+                      <span className="rounded-full bg-primary/20 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide">
+                        Primary
+                      </span>
+                    ) : null}
+                    <button
+                      type="button"
+                      onClick={() => removeContactMethod(method)}
+                      className={cn(
+                        "text-muted-foreground hover:text-foreground inline-flex size-4 items-center justify-center rounded-full transition-colors"
+                      )}
+                      aria-label={`Remove ${formatContactMethodLabel(method)}`}
+                    >
+                      <X className="size-3" aria-hidden="true" />
+                    </button>
+                  </span>
+                );
+              })}
+            </div>
+
+            {remainingContactMethods.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {remainingContactMethods.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => addContactMethod(option.value)}
+                    className={cn(
+                      "border-border/70 bg-background/55 hover:bg-accent/60 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors"
+                    )}
+                  >
+                    <Plus className="size-3.5" aria-hidden="true" />
+                    Add {option.label}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <FieldHelp>All available methods are enabled.</FieldHelp>
+            )}
+          </div>
+          {fieldErrors.contactMethods ? <FieldError>{fieldErrors.contactMethods}</FieldError> : null}
         </Field>
 
-        <Field>
-          <Label htmlFor="wizard-contact-phone">Public phone</Label>
-          <Input
-            id="wizard-contact-phone"
-            value={draft.contactPhone}
-            onChange={(event) => setField("contactPhone", event.currentTarget.value)}
-            placeholder="+49 123 456 789"
-            aria-invalid={Boolean(fieldErrors.contactPhone)}
-          />
-          {fieldErrors.contactPhone ? <FieldError>{fieldErrors.contactPhone}</FieldError> : null}
-          <FieldHelp>Required when preferred contact is phone, WhatsApp, or Viber.</FieldHelp>
-        </Field>
+        <div className="grid gap-4 lg:grid-cols-2">
+          <Field>
+            <Label htmlFor="wizard-contact-method">Primary contact method</Label>
+            <Select
+              id="wizard-contact-method"
+              value={draft.preferredContactMethod}
+              onChange={(event) =>
+                setPreferredContactMethod(
+                  event.currentTarget.value as ProviderDraftWizardValues["preferredContactMethod"]
+                )
+              }
+              aria-invalid={Boolean(fieldErrors.preferredContactMethod)}
+            >
+              <option value="">No primary method</option>
+              {effectiveContactMethods.map((method) => (
+                <option key={method} value={method}>
+                  {formatContactMethodLabel(method)}
+                </option>
+              ))}
+            </Select>
+            {fieldErrors.preferredContactMethod ? <FieldError>{fieldErrors.preferredContactMethod}</FieldError> : null}
+            <FieldHelp>Primary method is shown first in listing contact guidance.</FieldHelp>
+          </Field>
+
+          <Field>
+            <Label htmlFor="wizard-contact-phone">Public phone</Label>
+            <Input
+              id="wizard-contact-phone"
+              value={draft.contactPhone}
+              onChange={(event) => setField("contactPhone", event.currentTarget.value)}
+              placeholder="+49 123 456 789"
+              aria-invalid={Boolean(fieldErrors.contactPhone)}
+            />
+            {fieldErrors.contactPhone ? <FieldError>{fieldErrors.contactPhone}</FieldError> : null}
+            <FieldHelp>
+              {phoneIsRequired
+                ? "Required because phone-based channels are enabled."
+                : "Optional unless phone-based channels are enabled."}
+            </FieldHelp>
+          </Field>
+        </div>
       </div>
     );
   }
 
   function renderReviewStep() {
     const coverImage = draftImages.find((image) => image.isCover) ?? null;
+    const contactMethodSummary = normalizeContactMethods(draft.contactMethods)
+      .map((method) => formatContactMethodLabel(method))
+      .join(", ");
 
     return (
       <div className="space-y-4">
@@ -1264,8 +1458,11 @@ export function ProviderListingWizard({
           </div>
           <div className="border-border/70 bg-card/45 rounded-lg border p-3 text-sm">
             <p className="text-muted-foreground">
-              Contact: {formatContactMethodLabel(draft.preferredContactMethod)}{" "}
-              {draft.contactPhone ? `• ${draft.contactPhone}` : ""}
+              Contact methods: {contactMethodSummary || "In-app message"}
+            </p>
+            <p className="text-muted-foreground mt-1">
+              Primary: {formatContactMethodLabel(draft.preferredContactMethod)}
+              {draft.contactPhone ? ` • ${draft.contactPhone}` : ""}
             </p>
             <button
               type="button"
