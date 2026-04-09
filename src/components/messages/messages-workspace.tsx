@@ -32,7 +32,7 @@ import type {
   MessagingThreadResult,
 } from "@/lib/messaging/types";
 import { toMessagePreview } from "@/lib/messaging/validation";
-import { createBrowserSupabaseClient } from "@/lib/supabase";
+import { createClient as createBrowserSupabaseClient } from "@/lib/supabase/client";
 import type { Database } from "@/types/database";
 import { cn } from "@/lib/utils";
 
