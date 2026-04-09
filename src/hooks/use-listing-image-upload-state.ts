@@ -33,26 +33,28 @@ export type ExistingListingImageInput = {
   isCover: boolean;
 };
 
+function toExistingDraft(image: ExistingListingImageInput): ListingImageDraft {
+  return {
+    id: image.id,
+    fileName: image.storagePath.split("/").at(-1) ?? "existing-image",
+    mimeType: "image/jpeg",
+    size: 0,
+    previewUrl: image.previewUrl,
+    previewIsObjectUrl: false,
+    sortOrder: image.sortOrder,
+    isCover: image.isCover,
+    storagePath: image.storagePath,
+    uploadState: "uploaded",
+  };
+}
+
 function normalizeDrafts(images: readonly ListingImageDraft[]) {
   return normalizeCoverAndOrder(images);
 }
 
 export function useListingImageUploadState(initialImages: readonly ExistingListingImageInput[] = []) {
   const [images, setImages] = useState<ListingImageDraft[]>(() =>
-    normalizeDrafts(
-      initialImages.map((image) => ({
-        id: image.id,
-        fileName: image.storagePath.split("/").at(-1) ?? "existing-image",
-        mimeType: "image/jpeg",
-        size: 0,
-        previewUrl: image.previewUrl,
-        previewIsObjectUrl: false,
-        sortOrder: image.sortOrder,
-        isCover: image.isCover,
-        storagePath: image.storagePath,
-        uploadState: "uploaded" as const,
-      }))
-    )
+    normalizeDrafts(initialImages.map(toExistingDraft))
   );
   const [pendingDeletionPaths, setPendingDeletionPaths] = useState<string[]>([]);
   const imagesRef = useRef(images);
@@ -202,6 +204,19 @@ export function useListingImageUploadState(initialImages: readonly ExistingListi
     setPendingDeletionPaths([]);
   }, []);
 
+  const replaceImages = useCallback((nextImages: readonly ExistingListingImageInput[]) => {
+    setImages((prev) => {
+      prev.forEach((image) => {
+        if (image.previewIsObjectUrl) {
+          URL.revokeObjectURL(image.previewUrl);
+        }
+      });
+
+      return normalizeDrafts(nextImages.map(toExistingDraft));
+    });
+    setPendingDeletionPaths([]);
+  }, []);
+
   useEffect(() => {
     imagesRef.current = images;
   }, [images]);
@@ -239,6 +254,7 @@ export function useListingImageUploadState(initialImages: readonly ExistingListi
     markUploaded,
     markUploadFailed,
     consumePendingDeletionPaths,
+    replaceImages,
     clearAll,
   };
 }

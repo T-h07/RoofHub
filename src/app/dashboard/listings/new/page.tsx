@@ -41,8 +41,8 @@ export default async function NewDashboardListingPage() {
         <Badge variant="primary">Provider wizard</Badge>
         <h1 className="type-page-title max-w-4xl">Create a listing draft in guided steps.</h1>
         <p className="type-body-muted max-w-3xl">
-          Build listing identity, pricing, facts, map pin placement, and contact settings in sequence.
-          Drafts persist incrementally and stay ready for photo + publish flow next.
+          Build listing identity, pricing, facts, map pin placement, photos, and publish readiness in
+          sequence. Drafts persist incrementally and can be safely resumed.
         </p>
         <div>
           <Link href="/dashboard" className={buttonVariants({ variant: "outline", size: "sm" })}>
@@ -57,6 +57,8 @@ export default async function NewDashboardListingPage() {
         initialStep="basics"
         initialDraftId={null}
         initialValues={initialValues}
+        initialImages={[]}
+        providerOwnerId={context.profile.id}
         mapStyleUrl={mapStyleUrl}
       />
     </MainContainer>

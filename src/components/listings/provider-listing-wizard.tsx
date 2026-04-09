@@ -2,23 +2,36 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ArrowRight, CheckCircle2, LoaderCircle, MapPin } from "lucide-react";
+import { ArrowLeft, ArrowRight, LoaderCircle, MapPin, Rocket } from "lucide-react";
 import { toast } from "sonner";
 
+import { ProviderListingPhotoStep } from "@/components/listings/provider-listing-photo-step";
 import { ProviderLocationPickerMap } from "@/components/listings/provider-location-picker-map";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, FieldError, FieldHelp } from "@/components/ui/field";
+import {
+  useListingImageUploadState,
+  type ListingImageSelectionIssue,
+} from "@/hooks/use-listing-image-upload-state";
+import { createClient } from "@/lib/supabase/client";
+import { uploadListingImage } from "@/lib/supabase/storage/listing-images";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { saveProviderWizardStepAction } from "@/lib/listings/provider-wizard/actions";
+import { evaluateProviderPublishReadiness, type ProviderPublishBlocker } from "@/lib/listings/provider-wizard/publish";
+import {
+  publishProviderListingDraftAction,
+  syncProviderListingPhotosAction,
+} from "@/lib/listings/provider-wizard/publish-actions";
 import { getNextProviderWizardStep, getPreviousProviderWizardStep } from "@/lib/listings/provider-wizard/steps";
 import {
   PROVIDER_WIZARD_STEP_LABELS,
   PROVIDER_WIZARD_STEPS,
+  type ProviderDraftImage,
   type ProviderDraftWizardValues,
   type ProviderWizardFieldErrors,
   type ProviderWizardStep,
@@ -30,6 +43,8 @@ type ProviderListingWizardProps = {
   initialStep: ProviderWizardStep;
   initialDraftId: string | null;
   initialValues: ProviderDraftWizardValues;
+  initialImages: ProviderDraftImage[];
+  providerOwnerId: string;
   mapStyleUrl: string;
 };
 
@@ -94,6 +109,8 @@ export function ProviderListingWizard({
   initialStep,
   initialDraftId,
   initialValues,
+  initialImages,
+  providerOwnerId,
   mapStyleUrl,
 }: ProviderListingWizardProps) {
   const router = useRouter();
@@ -103,8 +120,45 @@ export function ProviderListingWizard({
   const [draft, setDraft] = useState<ProviderDraftWizardValues>(initialValues);
   const [fieldErrors, setFieldErrors] = useState<ProviderWizardFieldErrors>({});
   const [reviewBlockers, setReviewBlockers] = useState<string[]>([]);
+  const [publishBlockers, setPublishBlockers] = useState<ProviderPublishBlocker[]>([]);
+  const [photoSelectionIssues, setPhotoSelectionIssues] = useState<ListingImageSelectionIssue[]>([]);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [statusTone, setStatusTone] = useState<"success" | "error" | "info">("info");
+  const {
+    images: draftImages,
+    addFiles,
+    setCoverImage,
+    moveImage,
+    removeImage,
+    markUploading,
+    markUploaded,
+    markUploadFailed,
+    replaceImages,
+  } = useListingImageUploadState(
+    initialImages.map((image) => ({
+      id: image.id,
+      storagePath: image.storagePath,
+      previewUrl: image.signedUrl ?? "",
+      sortOrder: image.sortOrder,
+      isCover: image.isCover,
+    }))
+  );
+
+  const hasPhotoUploadFailures = draftImages.some((image) => image.uploadState === "failed");
+  const hasPendingPhotoUploads = draftImages.some(
+    (image) => image.uploadState === "local" || image.uploadState === "uploading"
+  );
+
+  const clientReadiness = useMemo(
+    () =>
+      evaluateProviderPublishReadiness({
+        values: draft,
+        imageCount: draftImages.length,
+        hasCoverImage: draftImages.some((image) => image.isCover),
+      }),
+    [draft, draftImages]
+  );
+
   const createDraftId = useMemo(
     () =>
       typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
@@ -113,12 +167,16 @@ export function ProviderListingWizard({
     []
   );
 
+  const effectivePublishBlockers = publishBlockers.length > 0 ? publishBlockers : clientReadiness.blockers;
   const currentStepIndex = PROVIDER_WIZARD_STEPS.indexOf(currentStep);
   const previousStep = getPreviousProviderWizardStep(currentStep);
   const nextStep = getNextProviderWizardStep(currentStep);
 
   function setField<K extends keyof ProviderDraftWizardValues>(key: K, value: ProviderDraftWizardValues[K]) {
     setDraft((current) => ({ ...current, [key]: value }));
+    if (publishBlockers.length > 0) {
+      setPublishBlockers([]);
+    }
     if (fieldErrors[key]) {
       setFieldErrors((current) => {
         const next = { ...current };
@@ -135,11 +193,159 @@ export function ProviderListingWizard({
     }
   }
 
+  async function persistPhotosStepCore() {
+    if (!draftId) {
+      return {
+        ok: false as const,
+        message: "Create the draft in basics step before uploading photos.",
+      };
+    }
+
+    let stagedImages = [...draftImages];
+    const localImages = stagedImages.filter((image) => image.uploadState === "local");
+    const supabase = createClient();
+
+    for (const image of localImages) {
+      markUploading(image.id);
+      stagedImages = stagedImages.map((entry) =>
+        entry.id === image.id
+          ? {
+              ...entry,
+              uploadState: "uploading",
+              error: undefined,
+            }
+          : entry
+      );
+
+      if (!image.file) {
+        const errorMessage = "Local file handle is missing. Re-add this image and retry.";
+        markUploadFailed(image.id, errorMessage);
+        stagedImages = stagedImages.map((entry) =>
+          entry.id === image.id
+            ? {
+                ...entry,
+                uploadState: "failed",
+                error: errorMessage,
+              }
+            : entry
+        );
+        continue;
+      }
+
+      try {
+        const uploadResult = await uploadListingImage(supabase, {
+          ownerId: providerOwnerId,
+          listingId: draftId,
+          image: {
+            localId: image.id,
+            file: image.file,
+            sortOrder: image.sortOrder,
+            isCover: image.isCover,
+          },
+        });
+
+        markUploaded(image.id, uploadResult.storagePath);
+        stagedImages = stagedImages.map((entry) =>
+          entry.id === image.id
+            ? {
+                ...entry,
+                uploadState: "uploaded",
+                storagePath: uploadResult.storagePath,
+                error: undefined,
+              }
+            : entry
+        );
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : "Photo upload failed.";
+        markUploadFailed(image.id, errorMessage);
+        stagedImages = stagedImages.map((entry) =>
+          entry.id === image.id
+            ? {
+                ...entry,
+                uploadState: "failed",
+                error: errorMessage,
+              }
+            : entry
+        );
+      }
+    }
+
+    if (stagedImages.some((image) => image.uploadState === "failed")) {
+      return {
+        ok: false as const,
+        message: "Some photos failed to upload. Remove failed items or retry.",
+      };
+    }
+
+    const syncResult = await syncProviderListingPhotosAction({
+      draftId,
+      images: stagedImages
+        .filter((image) => Boolean(image.storagePath))
+        .map((image) => ({
+          storagePath: image.storagePath as string,
+          sortOrder: image.sortOrder,
+          isCover: image.isCover,
+        })),
+    });
+
+    if (!syncResult.ok) {
+      return {
+        ok: false as const,
+        message: syncResult.message,
+      };
+    }
+
+    replaceImages(
+      syncResult.images.map((image) => ({
+        id: image.id,
+        storagePath: image.storagePath,
+        previewUrl: image.signedUrl ?? "",
+        sortOrder: image.sortOrder,
+        isCover: image.isCover,
+      }))
+    );
+    setPublishBlockers([]);
+
+    return {
+      ok: true as const,
+      message: syncResult.message,
+    };
+  }
+
   function persistStep(stayOnStep = false) {
     setStatusMessage(null);
     setReviewBlockers([]);
+    setPublishBlockers([]);
 
     startTransition(async () => {
+      if (currentStep === "photos") {
+        const photosResult = await persistPhotosStepCore();
+        if (!photosResult.ok) {
+          setStatusTone("error");
+          setStatusMessage(photosResult.message);
+          toast.error(photosResult.message);
+          return;
+        }
+
+        setStatusTone("success");
+        setStatusMessage(photosResult.message);
+        toast.success(photosResult.message);
+
+        if (stayOnStep || !nextStep) {
+          return;
+        }
+
+        if (!draftId) {
+          setStatusTone("error");
+          setStatusMessage("Draft listing id is missing. Reload and retry.");
+          return;
+        }
+
+        setCurrentStep(nextStep);
+        router.replace(buildEditHref(draftId, nextStep), { scroll: false });
+        return;
+      }
+
       const result = await saveProviderWizardStepAction({
         step: currentStep,
         values: draft,
@@ -179,6 +385,73 @@ export function ProviderListingWizard({
       setCurrentStep(nextStep);
       router.replace(buildEditHref(resolvedDraftId, nextStep), { scroll: false });
     });
+  }
+
+  function publishDraft() {
+    if (!draftId) {
+      setStatusTone("error");
+      setStatusMessage("Draft listing id is missing. Restart from basics.");
+      return;
+    }
+
+    if (hasPendingPhotoUploads || hasPhotoUploadFailures) {
+      setStatusTone("error");
+      setStatusMessage("Resolve pending photo uploads in Photos step before publishing.");
+      setCurrentStep("photos");
+      router.replace(buildEditHref(draftId, "photos"), { scroll: false });
+      return;
+    }
+
+    setStatusMessage(null);
+    setReviewBlockers([]);
+    setPublishBlockers([]);
+
+    startTransition(async () => {
+      const publishResult = await publishProviderListingDraftAction({ draftId });
+
+      if (!publishResult.ok) {
+        setStatusTone("error");
+        setStatusMessage(publishResult.message);
+        setPublishBlockers(publishResult.blockers ?? []);
+        toast.error(publishResult.message);
+        return;
+      }
+
+      setStatusTone("success");
+      setStatusMessage(publishResult.message);
+      setPublishBlockers([]);
+      toast.success("Listing is now live.");
+      router.push(`/listing/${publishResult.listingSlug}`);
+    });
+  }
+
+  function addPhotoFiles(files: FileList | null) {
+    const issues = addFiles(files ?? []);
+    setPhotoSelectionIssues(issues);
+    if (publishBlockers.length > 0) {
+      setPublishBlockers([]);
+    }
+  }
+
+  function setCoverPhoto(imageId: string) {
+    setCoverImage(imageId);
+    if (publishBlockers.length > 0) {
+      setPublishBlockers([]);
+    }
+  }
+
+  function movePhoto(imageId: string, targetIndex: number) {
+    moveImage(imageId, targetIndex);
+    if (publishBlockers.length > 0) {
+      setPublishBlockers([]);
+    }
+  }
+
+  function removePhoto(imageId: string) {
+    removeImage(imageId);
+    if (publishBlockers.length > 0) {
+      setPublishBlockers([]);
+    }
   }
 
   function renderStatus() {
@@ -572,6 +845,45 @@ export function ProviderListingWizard({
     );
   }
 
+  function renderPhotosStep() {
+    const coverImage = draftImages.find((image) => image.isCover) ?? null;
+
+    return (
+      <div className="space-y-4">
+        <ProviderListingPhotoStep
+          images={draftImages}
+          selectionIssues={photoSelectionIssues}
+          disabled={isPending}
+          onAddFiles={addPhotoFiles}
+          onSetCover={setCoverPhoto}
+          onMoveImage={movePhoto}
+          onRemoveImage={removePhoto}
+        />
+
+        <div className="grid gap-3 md:grid-cols-3">
+          <div className="border-border/70 bg-card/45 rounded-lg border p-3 text-sm">
+            <p className="font-medium tracking-tight">Photo count</p>
+            <p className="text-muted-foreground mt-1">
+              {draftImages.length} image{draftImages.length === 1 ? "" : "s"}
+            </p>
+          </div>
+          <div className="border-border/70 bg-card/45 rounded-lg border p-3 text-sm">
+            <p className="font-medium tracking-tight">Cover image</p>
+            <p className="text-muted-foreground mt-1">
+              {coverImage ? `Photo ${coverImage.sortOrder + 1}` : "Not selected yet"}
+            </p>
+          </div>
+          <div className="border-border/70 bg-card/45 rounded-lg border p-3 text-sm">
+            <p className="font-medium tracking-tight">Publish note</p>
+            <p className="text-muted-foreground mt-1">
+              At least one image and one cover image are required before publish.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   function renderAmenitiesStep() {
     return (
       <div className="grid gap-3 sm:grid-cols-2">
@@ -667,16 +979,38 @@ export function ProviderListingWizard({
   }
 
   function renderReviewStep() {
+    const coverImage = draftImages.find((image) => image.isCover) ?? null;
+
     return (
       <div className="space-y-4">
-        {reviewBlockers.length > 0 ? (
+        {effectivePublishBlockers.length > 0 ? (
           <div className="border-destructive/40 bg-destructive/10 rounded-lg border px-4 py-3 text-sm">
-            <p className="font-semibold">Fix these sections before validating:</p>
+            <p className="font-semibold">Publish is blocked until these sections are fixed:</p>
+            <ul className="mt-2 space-y-2">
+              {effectivePublishBlockers.map((blocker) => (
+                <li key={blocker.id} className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="text-destructive-foreground text-xs">
+                    <span className="font-medium">{blocker.title}:</span> {blocker.description}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => goToStep(blocker.step)}
+                    className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "h-7 px-2 text-[11px]")}
+                  >
+                    Open {PROVIDER_WIZARD_STEP_LABELS[blocker.step]}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : reviewBlockers.length > 0 ? (
+          <div className="border-destructive/40 bg-destructive/10 rounded-lg border px-4 py-3 text-sm">
+            <p className="font-semibold">Fix these draft sections before final review:</p>
             <p className="mt-1">{reviewBlockers.join(", ")}</p>
           </div>
         ) : (
           <div className="border-emerald-500/35 bg-emerald-500/10 rounded-lg border px-4 py-3 text-sm text-emerald-100">
-            Draft is structurally complete for PT17.
+            Listing is publish-ready. You can publish as soon as you confirm this summary.
           </div>
         )}
 
@@ -743,7 +1077,8 @@ export function ProviderListingWizard({
           </div>
           <div className="border-border/70 bg-card/45 rounded-lg border p-3 text-sm">
             <p className="text-muted-foreground">
-              Contact: {draft.preferredContactMethod || "No preference"} {draft.contactPhone ? `• ${draft.contactPhone}` : ""}
+              Contact: {draft.preferredContactMethod || "No preference"}{" "}
+              {draft.contactPhone ? `• ${draft.contactPhone}` : ""}
             </p>
             <button
               type="button"
@@ -753,11 +1088,32 @@ export function ProviderListingWizard({
               Edit contact
             </button>
           </div>
+          <div className="border-border/70 bg-card/45 rounded-lg border p-3 text-sm">
+            <p className="font-medium">Photos: {draftImages.length}</p>
+            <p className="text-muted-foreground mt-1">
+              {coverImage ? `Cover is photo ${coverImage.sortOrder + 1}` : "Cover image not set"}
+            </p>
+            <p className="text-muted-foreground mt-1">
+              {hasPendingPhotoUploads
+                ? "Some photos are pending upload."
+                : hasPhotoUploadFailures
+                  ? "Some uploads failed and must be retried."
+                  : "Photo set is synced."}
+            </p>
+            <button
+              type="button"
+              onClick={() => goToStep("photos")}
+              className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "mt-2 h-8 px-2.5 text-xs")}
+            >
+              Edit photos
+            </button>
+          </div>
         </div>
 
-        <p className="text-muted-foreground text-xs">
-          Next: PT18 can now add photos and publish readiness on top of this persisted location flow.
-        </p>
+        <div className="border-border/70 bg-muted/20 rounded-lg border px-3.5 py-2.5 text-xs">
+          Publish checks include: core listing fields, location pin, and at least one photo with a cover
+          image.
+        </div>
       </div>
     );
   }
@@ -771,13 +1127,13 @@ export function ProviderListingWizard({
           </Badge>
           <CardTitle className="text-xl">{PROVIDER_WIZARD_STEP_LABELS[currentStep]}</CardTitle>
           <CardDescription>
-            Draft-safe, URL-driven wizard with provider pin placement built into the core posting flow.
+            Provider posting flow with draft-safe saves, persisted photos, and publish-readiness checks.
           </CardDescription>
         </div>
       </CardHeader>
 
       <CardContent className="space-y-5 pt-5">
-        <ol className="grid gap-2 sm:grid-cols-2 lg:grid-cols-7">
+        <ol className="grid gap-2 sm:grid-cols-2 lg:grid-cols-8">
           {PROVIDER_WIZARD_STEPS.map((step, index) => {
             const isActive = currentStep === step;
             const isClickable = Boolean(draftId) && index <= currentStepIndex;
@@ -814,6 +1170,7 @@ export function ProviderListingWizard({
         {currentStep === "location" ? renderLocationStep() : null}
         {currentStep === "amenities" ? renderAmenitiesStep() : null}
         {currentStep === "contact" ? renderContactStep() : null}
+        {currentStep === "photos" ? renderPhotosStep() : null}
         {currentStep === "review" ? renderReviewStep() : null}
       </CardContent>
 
@@ -844,14 +1201,21 @@ export function ProviderListingWizard({
           <button
             type="button"
             disabled={isPending}
-            onClick={() => persistStep(false)}
+            onClick={() => {
+              if (currentStep === "review") {
+                publishDraft();
+                return;
+              }
+
+              persistStep(false);
+            }}
             className={buttonVariants({ size: "sm" })}
           >
             {isPending ? <LoaderCircle className="size-4 animate-spin" aria-hidden="true" /> : null}
             {currentStep === "review" ? (
               <>
-                <CheckCircle2 className="size-4" aria-hidden="true" />
-                Validate draft
+                <Rocket className="size-4" aria-hidden="true" />
+                Publish listing
               </>
             ) : (
               <>

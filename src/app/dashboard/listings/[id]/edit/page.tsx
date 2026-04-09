@@ -12,7 +12,11 @@ import { getMapStyleUrl } from "@/lib/config/map";
 import { getProviderRouteContext } from "@/lib/listings/provider-wizard/access";
 import { buildWizardValuesFromDraft } from "@/lib/listings/provider-wizard/mapping";
 import { parseProviderWizardStep } from "@/lib/listings/provider-wizard/steps";
-import { loadProviderContactSettings, loadProviderDraftForEditor } from "@/lib/listings/provider-wizard/queries";
+import {
+  loadProviderContactSettings,
+  loadProviderDraftForEditor,
+  loadProviderDraftImages,
+} from "@/lib/listings/provider-wizard/queries";
 
 type EditDashboardListingPageProps = {
   params: Promise<{ id: string }>;
@@ -51,9 +55,10 @@ export default async function EditDashboardListingPage({
     return <ProviderAccessRequired />;
   }
 
-  const [draftResult, contactResult] = await Promise.all([
+  const [draftResult, contactResult, imagesResult] = await Promise.all([
     loadProviderDraftForEditor(context.supabase, context.profile.id, id, context.isAdmin),
     loadProviderContactSettings(context.supabase, context.profile.id),
+    loadProviderDraftImages(context.supabase, id),
   ]);
 
   if (!draftResult.ok || !draftResult.draft) {
@@ -71,7 +76,7 @@ export default async function EditDashboardListingPage({
         <h1 className="type-page-title max-w-4xl">Continue editing your listing draft.</h1>
         <p className="type-body-muted max-w-3xl">
           Progress is stored step by step. Keep location pin and privacy mode updated before moving into
-          photo and publish flow.
+          photos, readiness checks, and final publish.
         </p>
         <div className="flex flex-wrap gap-2">
           <Link href="/dashboard" className={buttonVariants({ variant: "outline", size: "sm" })}>
@@ -89,6 +94,8 @@ export default async function EditDashboardListingPage({
         initialStep={step}
         initialDraftId={draftResult.draft.id}
         initialValues={values}
+        initialImages={imagesResult.ok ? imagesResult.images : []}
+        providerOwnerId={context.profile.id}
         mapStyleUrl={mapStyleUrl}
       />
     </MainContainer>
