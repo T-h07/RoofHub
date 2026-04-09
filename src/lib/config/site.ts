@@ -39,7 +39,7 @@ export const siteConfig = {
     "Map-first real estate marketplace for rentals and homes for sale, with provider-ready onboarding paths and scalable Vercel + Supabase foundations.",
   repositoryUrl: "https://github.com/T-h07/nestmap",
   ctaLabel: "List a property",
-  ctaHref: "/dashboard",
+  ctaHref: "/dashboard/listings/new",
   primaryNav: primaryNavItems,
   futureNav: futureNavItems,
   footerLinks: footerLinkGroups,

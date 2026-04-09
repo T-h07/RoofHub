@@ -48,7 +48,7 @@ export function getCtaForViewer(viewer: NavViewer) {
   if (isProviderRole(viewer.role)) {
     return {
       label: "List a property",
-      href: "/dashboard",
+      href: "/dashboard/listings/new",
       detail: getRoleLabel(viewer.role ?? "seeker"),
     };
   }
