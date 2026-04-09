@@ -2,6 +2,7 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { loadProviderUnreadLeadCount } from "@/lib/messaging/queries";
 import { createListingImageSignedUrl } from "@/lib/supabase/storage/listing-images";
 import type { Database } from "@/types/database";
 
@@ -101,6 +102,7 @@ export async function loadProviderListingOverviewMetrics(
     soldResult,
     rentedResult,
     hiddenByAdminResult,
+    unreadResult,
   ] = await Promise.all([
     countProviderListingsByStatus(supabase, input),
     countProviderListingsByStatus(supabase, { ...input, status: "published" }),
@@ -110,6 +112,7 @@ export async function loadProviderListingOverviewMetrics(
     countProviderListingsByStatus(supabase, { ...input, status: "sold" }),
     countProviderListingsByStatus(supabase, { ...input, status: "rented" }),
     countProviderListingsByStatus(supabase, { ...input, status: "hidden_by_admin" }),
+    loadProviderUnreadLeadCount(supabase, input.userId),
   ]);
 
   const failedResult = [
@@ -136,7 +139,7 @@ export async function loadProviderListingOverviewMetrics(
         sold: 0,
         rented: 0,
         hiddenByAdmin: 0,
-        unreadLeadsPlaceholder: 0,
+        unreadLeadsCount: 0,
       } satisfies ProviderListingOverviewMetrics,
     };
   }
@@ -152,7 +155,7 @@ export async function loadProviderListingOverviewMetrics(
       sold: soldResult.count,
       rented: rentedResult.count,
       hiddenByAdmin: hiddenByAdminResult.count,
-      unreadLeadsPlaceholder: 0,
+      unreadLeadsCount: unreadResult.ok ? unreadResult.count : 0,
     } satisfies ProviderListingOverviewMetrics,
   };
 }

@@ -39,7 +39,7 @@ export type ProviderListingOverviewMetrics = {
   sold: number;
   rented: number;
   hiddenByAdmin: number;
-  unreadLeadsPlaceholder: number;
+  unreadLeadsCount: number;
 };
 
 export const PROVIDER_LISTING_STATUS_FILTERS = [

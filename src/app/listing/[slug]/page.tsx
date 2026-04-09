@@ -115,7 +115,7 @@ export default async function ListingDetailPage({
     listing.neighborhood,
     listing.listing_type
   );
-  const contactThreadHref = `/messages?listingId=${listing.id}&providerId=${listing.owner_id}`;
+  const contactThreadHref = `/messages?listingId=${listing.id}`;
   const contactHref = isAuthenticated
     ? contactThreadHref
     : toSignInPath(contactThreadHref);

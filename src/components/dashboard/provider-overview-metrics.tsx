@@ -90,10 +90,10 @@ export function ProviderOverviewMetrics({ metrics }: ProviderOverviewMetricsProp
             <MessagesSquare className="size-3.5" aria-hidden="true" />
             Unread leads
           </div>
-          <CardTitle className="text-2xl">{metrics.unreadLeadsPlaceholder}</CardTitle>
+          <CardTitle className="text-2xl">{metrics.unreadLeadsCount}</CardTitle>
         </CardHeader>
         <CardContent className="pt-0 text-xs text-muted-foreground">
-          Placeholder summary. Messaging and lead unread counts land in later PTs.
+          New inbound messages from seeker conversations that still need a provider response.
         </CardContent>
       </Card>
     </div>
