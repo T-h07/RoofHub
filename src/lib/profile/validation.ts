@@ -11,6 +11,7 @@ const DISPLAY_NAME_MIN = 2;
 const DISPLAY_NAME_MAX = 80;
 const BIO_MAX = 600;
 const PHONE_PATTERN = /^[+0-9().\-\s]{6,24}$/;
+const PHONE_REQUIRED_CONTACT_METHODS = new Set(["phone", "whatsapp", "viber"]);
 
 function normalizeTrimmed(value: FormDataEntryValue | null) {
   return typeof value === "string" ? value.trim() : "";
@@ -80,6 +81,14 @@ export function validateProfileFormInput(input: ProfileFormInput) {
 
   if (input.preferredContactMethod && !isPreferredContactMethod(input.preferredContactMethod)) {
     errors.preferredContactMethod = "Select a valid contact method.";
+  }
+
+  if (
+    input.preferredContactMethod &&
+    PHONE_REQUIRED_CONTACT_METHODS.has(input.preferredContactMethod) &&
+    !input.phone
+  ) {
+    errors.phone = "Phone is required when phone, WhatsApp, or Viber is preferred.";
   }
 
   if (!isEditableAppRole(input.role) && input.role !== "admin") {

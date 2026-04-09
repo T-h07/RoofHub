@@ -24,6 +24,7 @@ const MESSAGE_SELECT = "id, conversation_id, sender_id, body, read_at, created_a
 const LISTING_SNIPPET_SELECT =
   "id, slug, title, city, neighborhood, listing_status, listing_type, property_type, price_amount, currency_code";
 const LISTING_COVER_IMAGE_SELECT = "storage_path, is_cover, sort_order";
+const PROFILE_DISPLAY_NAME_SELECT = "id, display_name";
 
 type ConversationRow = Pick<
   Tables<"conversations">,
@@ -50,6 +51,7 @@ type ListingSnippetRow = Pick<
 >;
 
 type ListingCoverImageRow = Pick<Tables<"listing_images">, "storage_path" | "is_cover" | "sort_order">;
+type ProfileDisplayNameRow = Pick<Tables<"profiles">, "id" | "display_name">;
 
 export type ProviderUnreadLeadCountResult =
   | {
@@ -159,8 +161,15 @@ export async function loadMessagingConversationSummariesQuery(
 
   const conversationIds = conversations.map((conversation) => conversation.id);
   const listingIds = Array.from(new Set(conversations.map((conversation) => conversation.listing_id)));
+  const counterpartUserIds = Array.from(
+    new Set(
+      conversations.map((conversation) =>
+        conversation.provider_id === profile.id ? conversation.seeker_id : conversation.provider_id
+      )
+    )
+  );
 
-  const [latestMessageMap, unreadRowsResult, listingRowsResult] = await Promise.all([
+  const [latestMessageMap, unreadRowsResult, listingRowsResult, profileRowsResult] = await Promise.all([
     loadLatestMessagesMap(supabase, conversationIds),
     supabase
       .from("messages")
@@ -169,6 +178,9 @@ export async function loadMessagingConversationSummariesQuery(
       .neq("sender_id", profile.id)
       .is("read_at", null),
     supabase.from("listings").select(LISTING_SNIPPET_SELECT).in("id", listingIds),
+    counterpartUserIds.length === 0
+      ? Promise.resolve({ data: [], error: null })
+      : supabase.from("profiles").select(PROFILE_DISPLAY_NAME_SELECT).in("id", counterpartUserIds),
   ]);
 
   if (unreadRowsResult.error) {
@@ -202,6 +214,17 @@ export async function loadMessagingConversationSummariesQuery(
     }
   }
 
+  const profileDisplayNameMap = new Map<string, string>();
+  if (!profileRowsResult.error) {
+    for (const profileRow of profileRowsResult.data ?? []) {
+      const row = profileRow as ProfileDisplayNameRow;
+      const normalizedName = row.display_name.trim();
+      if (normalizedName.length > 0) {
+        profileDisplayNameMap.set(row.id, normalizedName);
+      }
+    }
+  }
+
   const summaries: MessagingConversationSummary[] = conversations.map((conversation) => {
     const participantRole = conversation.provider_id === profile.id ? "provider" : "seeker";
     const counterpartUserId =
@@ -212,6 +235,7 @@ export async function loadMessagingConversationSummariesQuery(
       listing: listingMap.get(conversation.listing_id) ?? null,
       participantRole,
       counterpartUserId,
+      counterpartDisplayName: profileDisplayNameMap.get(counterpartUserId) ?? null,
       unreadCount: unreadCountMap.get(conversation.id) ?? 0,
       lastMessage: latestMessageMap.get(conversation.id) ?? null,
     };
@@ -257,7 +281,8 @@ export async function loadMessagingThreadQuery(
   const counterpartUserId =
     participantRole === "provider" ? conversation.seeker_id : conversation.provider_id;
 
-  const [messagesResult, listingResult, unreadCountResult, listingCoverImageResult] = await Promise.all([
+  const [messagesResult, listingResult, unreadCountResult, listingCoverImageResult, counterpartProfileResult] =
+    await Promise.all([
     supabase
       .from("messages")
       .select(MESSAGE_SELECT)
@@ -283,7 +308,12 @@ export async function loadMessagingThreadQuery(
       .order("sort_order", { ascending: true })
       .limit(1)
       .maybeSingle(),
-  ]);
+    supabase
+      .from("profiles")
+      .select(PROFILE_DISPLAY_NAME_SELECT)
+      .eq("id", counterpartUserId)
+      .maybeSingle(),
+    ]);
 
   if (messagesResult.error) {
     return toMessagingFailure("internal", "Conversation messages could not be loaded right now.");
@@ -331,6 +361,11 @@ export async function loadMessagingThreadQuery(
     }
   }
 
+  const counterpartDisplayName =
+    !counterpartProfileResult.error && counterpartProfileResult.data
+      ? (counterpartProfileResult.data as ProfileDisplayNameRow).display_name.trim() || null
+      : null;
+
   return {
     ok: true,
     data: {
@@ -339,6 +374,7 @@ export async function loadMessagingThreadQuery(
       listingCoverImageUrl,
       participantRole,
       counterpartUserId,
+      counterpartDisplayName,
       messages,
       unreadCount: unreadCountResult.error ? 0 : unreadCountResult.count ?? 0,
     },

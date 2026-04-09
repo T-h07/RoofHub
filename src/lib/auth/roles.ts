@@ -7,7 +7,13 @@ export const APP_ROLE_VALUES = ["seeker", "provider", "admin"] as const;
 export const EDITABLE_APP_ROLE_VALUES = ["seeker", "provider"] as const;
 export const DEFAULT_APP_ROLE: AppRole = "seeker";
 
-export const PREFERRED_CONTACT_METHOD_VALUES = ["in_app", "phone", "email"] as const;
+export const PREFERRED_CONTACT_METHOD_VALUES = [
+  "in_app",
+  "phone",
+  "email",
+  "whatsapp",
+  "viber",
+] as const;
 
 export function isAppRole(value: unknown): value is AppRole {
   return typeof value === "string" && APP_ROLE_VALUES.includes(value as AppRole);

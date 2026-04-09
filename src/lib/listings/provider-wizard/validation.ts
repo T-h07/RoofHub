@@ -9,7 +9,7 @@ import type { ProviderWizardFieldErrors } from "./types";
 const LISTING_TYPES = new Set(["rent", "sale"]);
 const PROPERTY_TYPES = new Set(["apartment", "house", "studio", "land", "commercial"]);
 const HEATING_TYPES = new Set(["central", "electric", "gas", "district", "other"]);
-const PREFERRED_CONTACT_METHODS = new Set(["in_app", "phone", "email"]);
+const PREFERRED_CONTACT_METHODS = new Set(["in_app", "phone", "email", "whatsapp", "viber"]);
 const PUBLIC_LOCATION_MODES = new Set(["exact", "approximate"]);
 const PHONE_PATTERN = /^[+0-9().\-\s]{6,24}$/;
 
@@ -397,8 +397,13 @@ export function validateContactStep(values: ProviderDraftWizardValues): Validati
     errors.contactPhone = "Phone should include digits and optional +, spaces, (), dots, or dashes.";
   }
 
-  if (preferredContactMethod === "phone" && !phone) {
-    errors.contactPhone = "Add a phone number when phone is your preferred contact method.";
+  if (
+    (preferredContactMethod === "phone" ||
+      preferredContactMethod === "whatsapp" ||
+      preferredContactMethod === "viber") &&
+    !phone
+  ) {
+    errors.contactPhone = "Add a phone number when phone, WhatsApp, or Viber is preferred.";
   }
 
   if (Object.keys(errors).length > 0) {

@@ -87,7 +87,7 @@ export function ProfileForm({ profile }: ProfileFormProps) {
             aria-invalid={Boolean(state.errors?.phone)}
           />
           {state.errors?.phone ? <FieldError>{state.errors.phone}</FieldError> : null}
-          <FieldHelp>Optional public contact number.</FieldHelp>
+          <FieldHelp>Required when preferred contact method is phone, WhatsApp, or Viber.</FieldHelp>
         </Field>
 
         <Field>
@@ -101,6 +101,8 @@ export function ProfileForm({ profile }: ProfileFormProps) {
             <option value="">No preference</option>
             <option value="in_app">In-app messages</option>
             <option value="phone">Phone</option>
+            <option value="whatsapp">WhatsApp</option>
+            <option value="viber">Viber</option>
             <option value="email">Email</option>
           </Select>
           {state.errors?.preferredContactMethod ? (

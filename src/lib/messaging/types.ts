@@ -69,6 +69,7 @@ export type MessagingConversationSummary = {
   listing: MessagingListingSnippet | null;
   participantRole: MessagingParticipantRole;
   counterpartUserId: string;
+  counterpartDisplayName: string | null;
   unreadCount: number;
   lastMessage: MessagingMessageRecord | null;
 };
@@ -84,6 +85,7 @@ export type MessagingThreadResult = {
   listingCoverImageUrl: string | null;
   participantRole: MessagingParticipantRole;
   counterpartUserId: string;
+  counterpartDisplayName: string | null;
   messages: MessagingMessageRecord[];
   unreadCount: number;
 };

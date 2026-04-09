@@ -6,7 +6,7 @@ const STATUS_TRANSITION_MAP: Record<ProviderListingStatus, ProviderListingStatus
   paused: ["published", "archived", "sold", "rented"],
   archived: ["draft"],
   sold: ["archived"],
-  rented: ["archived"],
+  rented: ["published", "archived"],
   hidden_by_admin: [],
 };
 

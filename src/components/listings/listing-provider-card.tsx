@@ -33,6 +33,14 @@ function formatContactPreference(
     return "Prefers phone follow-up.";
   }
 
+  if (method === "whatsapp") {
+    return "Prefers WhatsApp follow-up.";
+  }
+
+  if (method === "viber") {
+    return "Prefers Viber follow-up.";
+  }
+
   return "Prefers email follow-up.";
 }
 

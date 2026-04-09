@@ -108,6 +108,25 @@ function parseCoordinateInput(value: string) {
   return Number(parsed.toFixed(6));
 }
 
+function formatContactMethodLabel(
+  method: ProviderDraftWizardValues["preferredContactMethod"]
+) {
+  switch (method) {
+    case "in_app":
+      return "In-app message";
+    case "phone":
+      return "Phone";
+    case "whatsapp":
+      return "WhatsApp";
+    case "viber":
+      return "Viber";
+    case "email":
+      return "Email";
+    default:
+      return "No preference";
+  }
+}
+
 function buildPhotoMetadataSignature(
   images: readonly {
     storagePath?: string;
@@ -1104,6 +1123,8 @@ export function ProviderListingWizard({
             <option value="">No preference</option>
             <option value="in_app">In-app message</option>
             <option value="phone">Phone</option>
+            <option value="whatsapp">WhatsApp</option>
+            <option value="viber">Viber</option>
             <option value="email">Email</option>
           </Select>
           {fieldErrors.preferredContactMethod ? <FieldError>{fieldErrors.preferredContactMethod}</FieldError> : null}
@@ -1119,7 +1140,7 @@ export function ProviderListingWizard({
             aria-invalid={Boolean(fieldErrors.contactPhone)}
           />
           {fieldErrors.contactPhone ? <FieldError>{fieldErrors.contactPhone}</FieldError> : null}
-          <FieldHelp>Required only if phone is preferred.</FieldHelp>
+          <FieldHelp>Required when preferred contact is phone, WhatsApp, or Viber.</FieldHelp>
         </Field>
       </div>
     );
@@ -1243,7 +1264,7 @@ export function ProviderListingWizard({
           </div>
           <div className="border-border/70 bg-card/45 rounded-lg border p-3 text-sm">
             <p className="text-muted-foreground">
-              Contact: {draft.preferredContactMethod || "No preference"}{" "}
+              Contact: {formatContactMethodLabel(draft.preferredContactMethod)}{" "}
               {draft.contactPhone ? `• ${draft.contactPhone}` : ""}
             </p>
             <button

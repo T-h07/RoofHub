@@ -442,7 +442,7 @@ export type Database = {
         | "rented"
         | "hidden_by_admin"
       listing_type: "rent" | "sale"
-      preferred_contact_method: "in_app" | "phone" | "email"
+      preferred_contact_method: "in_app" | "phone" | "email" | "whatsapp" | "viber"
       property_type: "apartment" | "house" | "studio" | "land" | "commercial"
       public_location_mode: "exact" | "approximate" | "hidden"
       report_reason:
@@ -595,7 +595,7 @@ export const Constants = {
         "hidden_by_admin",
       ],
       listing_type: ["rent", "sale"],
-      preferred_contact_method: ["in_app", "phone", "email"],
+      preferred_contact_method: ["in_app", "phone", "email", "whatsapp", "viber"],
       property_type: ["apartment", "house", "studio", "land", "commercial"],
       public_location_mode: ["exact", "approximate", "hidden"],
       report_reason: [

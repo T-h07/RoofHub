@@ -19,6 +19,12 @@ type MessagesConversationListProps = {
 };
 
 function getCounterpartLabel(summary: MessagingConversationSummary) {
+  if (summary.counterpartDisplayName) {
+    return summary.participantRole === "provider"
+      ? `Seeker • ${summary.counterpartDisplayName}`
+      : summary.counterpartDisplayName;
+  }
+
   if (summary.participantRole === "provider") {
     return `Seeker #${summary.counterpartUserId.slice(0, 6)}`;
   }

@@ -44,6 +44,10 @@ function formatPrice(thread: MessagingClientThread) {
 }
 
 function getCounterpartLabel(thread: MessagingClientThread) {
+  if (thread.counterpartDisplayName) {
+    return `Conversation with ${thread.counterpartDisplayName}`;
+  }
+
   if (thread.participantRole === "provider") {
     return `Conversation with seeker #${thread.counterpartUserId.slice(0, 6)}`;
   }
