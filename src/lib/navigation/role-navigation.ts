@@ -20,7 +20,10 @@ const AUTH_SHARED_NAV: NavItem[] = [
   { title: "Profile", href: "/profile" },
 ];
 
-const PROVIDER_EXTRA_NAV: NavItem[] = [{ title: "Dashboard", href: "/dashboard" }];
+const PROVIDER_EXTRA_NAV: NavItem[] = [
+  { title: "Dashboard", href: "/dashboard" },
+  { title: "My Listings", href: "/dashboard/listings" },
+];
 
 export function getPrimaryNavForViewer(viewer: NavViewer): NavItem[] {
   if (!viewer.isAuthenticated) {

@@ -82,6 +82,9 @@ export default async function EditDashboardListingPage({
           <Link href="/dashboard" className={buttonVariants({ variant: "outline", size: "sm" })}>
             Back to dashboard
           </Link>
+          <Link href="/dashboard/listings" className={buttonVariants({ variant: "ghost", size: "sm" })}>
+            My listings
+          </Link>
           <Link href="/dashboard/listings/new" className={buttonVariants({ size: "sm" })}>
             Create another draft
           </Link>

@@ -44,9 +44,12 @@ export default async function NewDashboardListingPage() {
           Build listing identity, pricing, facts, map pin placement, photos, and publish readiness in
           sequence. Drafts persist incrementally and can be safely resumed.
         </p>
-        <div>
+        <div className="flex flex-wrap gap-2">
           <Link href="/dashboard" className={buttonVariants({ variant: "outline", size: "sm" })}>
             Back to dashboard
+          </Link>
+          <Link href="/dashboard/listings" className={buttonVariants({ variant: "ghost", size: "sm" })}>
+            My listings
           </Link>
         </div>
       </section>

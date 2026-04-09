@@ -12,7 +12,7 @@ type ProviderAccessRequiredProps = {
 
 export function ProviderAccessRequired({
   title = "Provider access required",
-  description = "Switch your profile role to provider before creating and managing listing drafts.",
+  description = "Switch your profile role to provider before managing listing drafts and lifecycle states.",
 }: ProviderAccessRequiredProps) {
   return (
     <MainContainer size="content">
@@ -29,4 +29,3 @@ export function ProviderAccessRequired({
     </MainContainer>
   );
 }
-

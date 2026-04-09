@@ -1,0 +1,94 @@
+import type { ComponentType } from "react";
+import { Building2, CircleCheckBig, CirclePause, ClipboardList, LockKeyhole, MessagesSquare } from "lucide-react";
+
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import type { ProviderListingOverviewMetrics } from "@/lib/listings/provider-dashboard/types";
+
+type ProviderOverviewMetricsProps = {
+  metrics: ProviderListingOverviewMetrics;
+};
+
+type OverviewMetricCard = {
+  id: string;
+  label: string;
+  value: number;
+  detail: string;
+  icon: ComponentType<{ className?: string }>;
+};
+
+export function ProviderOverviewMetrics({ metrics }: ProviderOverviewMetricsProps) {
+  const cards: OverviewMetricCard[] = [
+    {
+      id: "total",
+      label: "Total listings",
+      value: metrics.total,
+      detail: "All owned listings across lifecycle states.",
+      icon: Building2,
+    },
+    {
+      id: "published",
+      label: "Active",
+      value: metrics.published,
+      detail: "Currently visible in public discovery.",
+      icon: CircleCheckBig,
+    },
+    {
+      id: "draft",
+      label: "Drafts",
+      value: metrics.draft,
+      detail: "Still in creation or revision workflow.",
+      icon: ClipboardList,
+    },
+    {
+      id: "paused",
+      label: "Paused",
+      value: metrics.paused,
+      detail: "Temporarily inactive and hidden from public browse.",
+      icon: CirclePause,
+    },
+    {
+      id: "archived",
+      label: "Archived",
+      value: metrics.archived,
+      detail: "Retained for record but not active in inventory.",
+      icon: LockKeyhole,
+    },
+    {
+      id: "terminal",
+      label: "Closed",
+      value: metrics.sold + metrics.rented,
+      detail: `${metrics.sold} sold • ${metrics.rented} rented`,
+      icon: Building2,
+    },
+  ];
+
+  return (
+    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+      {cards.map((card) => (
+        <Card key={card.id} className="overflow-hidden">
+          <CardHeader className="pb-2">
+            <div className="text-muted-foreground inline-flex items-center gap-2 text-xs">
+              <card.icon className="size-3.5" aria-hidden="true" />
+              {card.label}
+            </div>
+            <CardTitle className="text-2xl">{card.value}</CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0 text-xs text-muted-foreground">{card.detail}</CardContent>
+        </Card>
+      ))}
+
+      <Card className="overflow-hidden">
+        <CardHeader className="pb-2">
+          <div className="text-muted-foreground inline-flex items-center gap-2 text-xs">
+            <MessagesSquare className="size-3.5" aria-hidden="true" />
+            Unread leads
+          </div>
+          <CardTitle className="text-2xl">{metrics.unreadLeadsPlaceholder}</CardTitle>
+        </CardHeader>
+        <CardContent className="pt-0 text-xs text-muted-foreground">
+          Placeholder summary. Messaging and lead unread counts land in later PTs.
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
