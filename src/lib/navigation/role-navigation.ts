@@ -1,4 +1,4 @@
-import { getRoleLabel, isProviderRole, type AppRole } from "@/lib/auth/roles";
+import { getRoleLabel, isAdminRole, isProviderRole, type AppRole } from "@/lib/auth/roles";
 import type { NavItem } from "@/types/navigation";
 
 type NavViewer = {
@@ -25,15 +25,26 @@ const PROVIDER_EXTRA_NAV: NavItem[] = [
   { title: "My Listings", href: "/dashboard/listings" },
 ];
 
+const ADMIN_EXTRA_NAV: NavItem[] = [{ title: "Moderation", href: "/admin/moderation" }];
+
 export function getPrimaryNavForViewer(viewer: NavViewer): NavItem[] {
   if (!viewer.isAuthenticated) {
     return GUEST_PRIMARY_NAV;
   }
 
   const nav = [...AUTH_SHARED_NAV];
+  const workspaceNav: NavItem[] = [];
 
   if (isProviderRole(viewer.role)) {
-    nav.splice(2, 0, ...PROVIDER_EXTRA_NAV);
+    workspaceNav.push(...PROVIDER_EXTRA_NAV);
+  }
+
+  if (isAdminRole(viewer.role)) {
+    workspaceNav.push(...ADMIN_EXTRA_NAV);
+  }
+
+  if (workspaceNav.length > 0) {
+    nav.splice(2, 0, ...workspaceNav);
   }
 
   return [{ title: "Home", href: "/" }, ...nav];

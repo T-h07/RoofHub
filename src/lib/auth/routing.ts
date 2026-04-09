@@ -11,7 +11,7 @@ export const AUTH_GUEST_ROUTES = [
   AUTH_FORGOT_PASSWORD_ROUTE,
 ] as const;
 
-const PROTECTED_ROUTE_PREFIXES = ["/dashboard", "/favorites", "/messages", "/profile"] as const;
+const PROTECTED_ROUTE_PREFIXES = ["/dashboard", "/favorites", "/messages", "/profile", "/admin"] as const;
 
 export function isProtectedPath(pathname: string) {
   return PROTECTED_ROUTE_PREFIXES.some(
