@@ -4,6 +4,7 @@ export const PROVIDER_WIZARD_STEPS = [
   "basics",
   "pricing",
   "facts",
+  "location",
   "amenities",
   "contact",
   "review",
@@ -14,11 +15,13 @@ export type ProviderListingType = Enums<"listing_type">;
 export type ProviderPropertyType = Enums<"property_type">;
 export type ProviderHeatingType = Enums<"heating_type">;
 export type ProviderPreferredContactMethod = Enums<"preferred_contact_method">;
+export type ProviderPublicLocationMode = Enums<"public_location_mode">;
 
 export const PROVIDER_WIZARD_STEP_LABELS: Record<ProviderWizardStep, string> = {
   basics: "Basics",
   pricing: "Type & pricing",
   facts: "Property facts",
+  location: "Location pin",
   amenities: "Amenities",
   contact: "Contact settings",
   review: "Review draft",
@@ -40,6 +43,9 @@ export type ProviderDraftWizardValues = {
   city: string;
   neighborhood: string;
   addressText: string;
+  latitude: number | null;
+  longitude: number | null;
+  publicLocationMode: ProviderPublicLocationMode;
   availableFrom: string;
   furnished: boolean;
   parking: boolean;
@@ -69,6 +75,9 @@ export const PROVIDER_WIZARD_DEFAULT_VALUES: ProviderDraftWizardValues = {
   city: "",
   neighborhood: "",
   addressText: "",
+  latitude: null,
+  longitude: null,
+  publicLocationMode: "approximate",
   availableFrom: "",
   furnished: false,
   parking: false,
@@ -139,4 +148,3 @@ export type ProviderContactSettings = {
 };
 
 export type ProviderWizardFieldErrors = Partial<Record<keyof ProviderDraftWizardValues, string>>;
-

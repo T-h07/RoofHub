@@ -8,6 +8,7 @@ import { ProviderListingWizard } from "@/components/listings/provider-listing-wi
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
+import { getMapStyleUrl } from "@/lib/config/map";
 import { getProviderRouteContext } from "@/lib/listings/provider-wizard/access";
 import { buildWizardValuesFromDraft } from "@/lib/listings/provider-wizard/mapping";
 import { parseProviderWizardStep } from "@/lib/listings/provider-wizard/steps";
@@ -61,6 +62,7 @@ export default async function EditDashboardListingPage({
 
   const step = parseProviderWizardStep(readStepParam(resolvedSearchParams), "basics");
   const values = buildWizardValuesFromDraft(draftResult.draft, contactResult.settings);
+  const mapStyleUrl = getMapStyleUrl();
 
   return (
     <MainContainer size="wide" className="space-y-5">
@@ -68,7 +70,8 @@ export default async function EditDashboardListingPage({
         <Badge variant="primary">Draft editor</Badge>
         <h1 className="type-page-title max-w-4xl">Continue editing your listing draft.</h1>
         <p className="type-body-muted max-w-3xl">
-          Progress is stored step by step. Review should pass before you move into map pin placement and photo flow.
+          Progress is stored step by step. Keep location pin and privacy mode updated before moving into
+          photo and publish flow.
         </p>
         <div className="flex flex-wrap gap-2">
           <Link href="/dashboard" className={buttonVariants({ variant: "outline", size: "sm" })}>
@@ -86,6 +89,7 @@ export default async function EditDashboardListingPage({
         initialStep={step}
         initialDraftId={draftResult.draft.id}
         initialValues={values}
+        mapStyleUrl={mapStyleUrl}
       />
     </MainContainer>
   );

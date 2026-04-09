@@ -7,6 +7,7 @@ import { ProviderListingWizard } from "@/components/listings/provider-listing-wi
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
+import { getMapStyleUrl } from "@/lib/config/map";
 import { getProviderRouteContext } from "@/lib/listings/provider-wizard/access";
 import { PROVIDER_WIZARD_DEFAULT_VALUES } from "@/lib/listings/provider-wizard/types";
 import { loadProviderContactSettings } from "@/lib/listings/provider-wizard/queries";
@@ -32,6 +33,7 @@ export default async function NewDashboardListingPage() {
     preferredContactMethod: contactSettings.settings.preferredContactMethod,
     contactPhone: contactSettings.settings.phone,
   };
+  const mapStyleUrl = getMapStyleUrl();
 
   return (
     <MainContainer size="wide" className="space-y-5">
@@ -39,8 +41,8 @@ export default async function NewDashboardListingPage() {
         <Badge variant="primary">Provider wizard</Badge>
         <h1 className="type-page-title max-w-4xl">Create a listing draft in guided steps.</h1>
         <p className="type-body-muted max-w-3xl">
-          Start with listing identity and pricing, then add structured property details and contact settings.
-          Drafts are persisted incrementally and designed for location and media steps next.
+          Build listing identity, pricing, facts, map pin placement, and contact settings in sequence.
+          Drafts persist incrementally and stay ready for photo + publish flow next.
         </p>
         <div>
           <Link href="/dashboard" className={buttonVariants({ variant: "outline", size: "sm" })}>
@@ -55,6 +57,7 @@ export default async function NewDashboardListingPage() {
         initialStep="basics"
         initialDraftId={null}
         initialValues={initialValues}
+        mapStyleUrl={mapStyleUrl}
       />
     </MainContainer>
   );

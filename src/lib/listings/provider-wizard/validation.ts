@@ -1,10 +1,16 @@
-import type { ProviderDraftWizardValues, ProviderHeatingType, ProviderPreferredContactMethod } from "./types";
+import type {
+  ProviderDraftWizardValues,
+  ProviderHeatingType,
+  ProviderPreferredContactMethod,
+  ProviderPublicLocationMode,
+} from "./types";
 import type { ProviderWizardFieldErrors } from "./types";
 
 const LISTING_TYPES = new Set(["rent", "sale"]);
 const PROPERTY_TYPES = new Set(["apartment", "house", "studio", "land", "commercial"]);
 const HEATING_TYPES = new Set(["central", "electric", "gas", "district", "other"]);
 const PREFERRED_CONTACT_METHODS = new Set(["in_app", "phone", "email"]);
+const PUBLIC_LOCATION_MODES = new Set(["exact", "approximate"]);
 const PHONE_PATTERN = /^[+0-9().\-\s]{6,24}$/;
 
 function normalizeText(value: string, maxLength: number) {
@@ -105,8 +111,14 @@ export type FactsStepPayload = {
   total_floors: number | null;
   city: string;
   neighborhood: string | null;
-  address_text: string | null;
   available_from: string | null;
+};
+
+export type LocationStepPayload = {
+  address_text: string | null;
+  latitude: number;
+  longitude: number;
+  public_location_mode: ProviderPublicLocationMode;
 };
 
 export type AmenitiesStepPayload = {
@@ -136,6 +148,23 @@ type ValidationError = {
 };
 
 type ValidationResult<TPayload> = ValidationSuccess<TPayload> | ValidationError;
+
+function normalizeCoordinate(value: number | null, minimum: number, maximum: number) {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    return Number.NaN;
+  }
+
+  if (parsed < minimum || parsed > maximum) {
+    return Number.NaN;
+  }
+
+  return Number(parsed.toFixed(6));
+}
 
 export function validateBasicsStep(values: ProviderDraftWizardValues): ValidationResult<BasicsStepPayload> {
   const errors: ProviderWizardFieldErrors = {};
@@ -224,7 +253,6 @@ export function validateFactsStep(values: ProviderDraftWizardValues): Validation
   const totalFloors = parseInteger(values.totalFloors, { min: 1, max: 300, allowEmpty: true });
   const city = normalizeText(values.city, 80);
   const neighborhood = normalizeNullableText(values.neighborhood, 80);
-  const addressText = normalizeNullableText(values.addressText, 220);
   const availableFrom = parseDate(values.availableFrom);
 
   if (!Number.isFinite(area)) {
@@ -279,8 +307,47 @@ export function validateFactsStep(values: ProviderDraftWizardValues): Validation
       total_floors: totalFloors as number | null,
       city,
       neighborhood,
-      address_text: addressText,
       available_from: availableFrom,
+    },
+  };
+}
+
+export function validateLocationStep(
+  values: ProviderDraftWizardValues
+): ValidationResult<LocationStepPayload> {
+  const errors: ProviderWizardFieldErrors = {};
+  const latitude = normalizeCoordinate(values.latitude, -90, 90);
+  const longitude = normalizeCoordinate(values.longitude, -180, 180);
+  const publicLocationMode = values.publicLocationMode;
+  const addressText = normalizeNullableText(values.addressText, 220);
+
+  if (latitude === null || longitude === null) {
+    errors.latitude = "Place a pin on the map to continue.";
+  } else {
+    if (!Number.isFinite(latitude)) {
+      errors.latitude = "Latitude must be within -90 and 90.";
+    }
+
+    if (!Number.isFinite(longitude)) {
+      errors.longitude = "Longitude must be within -180 and 180.";
+    }
+  }
+
+  if (!PUBLIC_LOCATION_MODES.has(publicLocationMode)) {
+    errors.publicLocationMode = "Choose how the location should appear publicly.";
+  }
+
+  if (Object.keys(errors).length > 0) {
+    return { ok: false, errors };
+  }
+
+  return {
+    ok: true,
+    payload: {
+      address_text: addressText,
+      latitude: latitude as number,
+      longitude: longitude as number,
+      public_location_mode: publicLocationMode,
     },
   };
 }
@@ -365,6 +432,11 @@ export function validateReviewStep(values: ProviderDraftWizardValues) {
     blockers.push("Property facts");
   }
 
+  const location = validateLocationStep(values);
+  if (!location.ok) {
+    blockers.push("Location pin");
+  }
+
   const contact = validateContactStep(values);
   if (!contact.ok) {
     blockers.push("Contact settings");
@@ -375,4 +447,3 @@ export function validateReviewStep(values: ProviderDraftWizardValues) {
     blockers,
   };
 }
-

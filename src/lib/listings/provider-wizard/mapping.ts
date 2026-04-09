@@ -21,6 +21,15 @@ function formatDate(value: string | null) {
   return value.slice(0, 10);
 }
 
+function normalizeCoordinate(value: number | null) {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 export function buildWizardValuesFromDraft(
   draft: ProviderDraftEditorRecord,
   contact: ProviderContactSettings
@@ -42,6 +51,9 @@ export function buildWizardValuesFromDraft(
     city: draft.city,
     neighborhood: draft.neighborhood ?? "",
     addressText: draft.address_text ?? "",
+    latitude: normalizeCoordinate(draft.latitude),
+    longitude: normalizeCoordinate(draft.longitude),
+    publicLocationMode: draft.public_location_mode === "exact" ? "exact" : "approximate",
     availableFrom: formatDate(draft.available_from),
     furnished: draft.furnished,
     parking: draft.parking,
@@ -55,4 +67,3 @@ export function buildWizardValuesFromDraft(
     contactPhone: contact.phone,
   };
 }
-

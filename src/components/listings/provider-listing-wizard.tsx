@@ -2,9 +2,10 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ArrowRight, CheckCircle2, LoaderCircle } from "lucide-react";
+import { ArrowLeft, ArrowRight, CheckCircle2, LoaderCircle, MapPin } from "lucide-react";
 import { toast } from "sonner";
 
+import { ProviderLocationPickerMap } from "@/components/listings/provider-location-picker-map";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -29,6 +30,7 @@ type ProviderListingWizardProps = {
   initialStep: ProviderWizardStep;
   initialDraftId: string | null;
   initialValues: ProviderDraftWizardValues;
+  mapStyleUrl: string;
 };
 
 function buildEditHref(draftId: string, step: ProviderWizardStep) {
@@ -65,11 +67,34 @@ function formatDate(value: string) {
   return parsed.toLocaleDateString();
 }
 
+function formatCoordinate(value: number | null) {
+  if (value === null) {
+    return "--";
+  }
+
+  return value.toFixed(6);
+}
+
+function parseCoordinateInput(value: string) {
+  const trimmedValue = value.trim();
+  if (!trimmedValue) {
+    return null;
+  }
+
+  const parsed = Number.parseFloat(trimmedValue.replace(",", "."));
+  if (!Number.isFinite(parsed)) {
+    return Number.NaN;
+  }
+
+  return Number(parsed.toFixed(6));
+}
+
 export function ProviderListingWizard({
   mode,
   initialStep,
   initialDraftId,
   initialValues,
+  mapStyleUrl,
 }: ProviderListingWizardProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -409,16 +434,140 @@ export function ProviderListingWizard({
           {fieldErrors.availableFrom ? <FieldError>{fieldErrors.availableFrom}</FieldError> : null}
         </Field>
 
-        <Field className="lg:col-span-2">
-          <Label htmlFor="wizard-address">Address text</Label>
-          <Input
-            id="wizard-address"
-            value={draft.addressText}
-            onChange={(event) => setField("addressText", event.currentTarget.value)}
-            placeholder="Street and building details (optional at draft stage)"
+        <div className="border-border/70 bg-muted/25 lg:col-span-2 rounded-lg border p-3.5">
+          <p className="text-sm font-semibold tracking-tight">Location setup continues in the next step</p>
+          <p className="text-muted-foreground mt-1 text-xs leading-5">
+            Next, you will place a draggable map pin and choose whether seekers see exact or approximate
+            location publicly.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  function renderLocationStep() {
+    const hasPin = draft.latitude !== null && draft.longitude !== null;
+
+    return (
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,0.9fr)]">
+        <div className="space-y-3.5">
+          <ProviderLocationPickerMap
+            mapStyleUrl={mapStyleUrl}
+            latitude={draft.latitude}
+            longitude={draft.longitude}
+            onCoordinateChange={(next) => {
+              setField("latitude", next.latitude);
+              setField("longitude", next.longitude);
+            }}
+            onCoordinateClear={() => {
+              setField("latitude", null);
+              setField("longitude", null);
+            }}
           />
-          <FieldHelp>PT17 adds map-based pin placement. This field supports location context in draft stage.</FieldHelp>
-        </Field>
+          {fieldErrors.latitude ? <FieldError>{fieldErrors.latitude}</FieldError> : null}
+          {fieldErrors.longitude ? <FieldError>{fieldErrors.longitude}</FieldError> : null}
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field>
+              <Label htmlFor="wizard-latitude">Latitude</Label>
+              <Input
+                id="wizard-latitude"
+                inputMode="decimal"
+                value={draft.latitude === null || Number.isNaN(draft.latitude) ? "" : String(draft.latitude)}
+                onChange={(event) => {
+                  const value = parseCoordinateInput(event.currentTarget.value);
+                  setField("latitude", value);
+                }}
+                placeholder="52.520008"
+                aria-invalid={Boolean(fieldErrors.latitude)}
+              />
+            </Field>
+            <Field>
+              <Label htmlFor="wizard-longitude">Longitude</Label>
+              <Input
+                id="wizard-longitude"
+                inputMode="decimal"
+                value={draft.longitude === null || Number.isNaN(draft.longitude) ? "" : String(draft.longitude)}
+                onChange={(event) => {
+                  const value = parseCoordinateInput(event.currentTarget.value);
+                  setField("longitude", value);
+                }}
+                placeholder="13.404954"
+                aria-invalid={Boolean(fieldErrors.longitude)}
+              />
+            </Field>
+          </div>
+        </div>
+
+        <div className="space-y-3.5">
+          <Field>
+            <Label htmlFor="wizard-address">Address text</Label>
+            <Input
+              id="wizard-address"
+              value={draft.addressText}
+              onChange={(event) => setField("addressText", event.currentTarget.value)}
+              placeholder="Street and building details for internal listing context"
+            />
+            <FieldHelp>Address text complements the map pin and does not auto-place the marker.</FieldHelp>
+          </Field>
+
+          <div className="space-y-2">
+            <p className="text-sm font-medium tracking-tight">Public map visibility</p>
+            <div className="grid gap-2">
+              {(
+                [
+                  {
+                    mode: "approximate" as const,
+                    title: "Approximate area (recommended)",
+                    description:
+                      "Seekers see nearby map context, while exact building position stays less precise.",
+                  },
+                  {
+                    mode: "exact" as const,
+                    title: "Exact location",
+                    description: "Seekers see the precise map pin for this listing.",
+                  },
+                ] as const
+              ).map((option) => (
+                <label
+                  key={option.mode}
+                  className={cn(
+                    "border-border/70 bg-card/45 flex cursor-pointer items-start gap-2.5 rounded-lg border px-3 py-2.5",
+                    draft.publicLocationMode === option.mode ? "border-primary/55 bg-primary/10" : "hover:border-border"
+                  )}
+                >
+                  <input
+                    type="radio"
+                    name="wizard-public-location-mode"
+                    className="mt-1 size-4"
+                    checked={draft.publicLocationMode === option.mode}
+                    onChange={() => setField("publicLocationMode", option.mode)}
+                  />
+                  <span className="space-y-0.5">
+                    <span className="block text-sm font-medium">{option.title}</span>
+                    <span className="text-muted-foreground block text-xs leading-5">{option.description}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+            {fieldErrors.publicLocationMode ? <FieldError>{fieldErrors.publicLocationMode}</FieldError> : null}
+          </div>
+
+          <div className="border-border/70 bg-muted/25 space-y-1.5 rounded-lg border p-3">
+            <p className="text-sm font-semibold tracking-tight">Location preview</p>
+            <p className="text-muted-foreground text-xs leading-5">
+              {hasPin
+                ? "Pin selected and ready to save. Drag the marker to refine before continuing."
+                : "Place a map pin to enable accurate location for later publish flow."}
+            </p>
+            <p className="text-xs">
+              Coordinates: {formatCoordinate(draft.latitude)}, {formatCoordinate(draft.longitude)}
+            </p>
+            <p className="text-muted-foreground text-xs">
+              Public mode: {draft.publicLocationMode === "exact" ? "Exact location" : "Approximate area"}
+            </p>
+          </div>
+        </div>
       </div>
     );
   }
@@ -527,11 +676,11 @@ export function ProviderListingWizard({
           </div>
         ) : (
           <div className="border-emerald-500/35 bg-emerald-500/10 rounded-lg border px-4 py-3 text-sm text-emerald-100">
-            Draft is structurally complete for PT16.
+            Draft is structurally complete for PT17.
           </div>
         )}
 
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           <div className="border-border/70 bg-card/45 rounded-lg border p-3 text-sm">
             <p className="font-medium">{draft.title || "--"}</p>
             <p className="text-muted-foreground mt-1 line-clamp-3">{draft.description || "--"}</p>
@@ -572,6 +721,27 @@ export function ProviderListingWizard({
             </button>
           </div>
           <div className="border-border/70 bg-card/45 rounded-lg border p-3 text-sm">
+            <p className="inline-flex items-center gap-1.5 font-medium">
+              <MapPin className="size-3.5" aria-hidden="true" />
+              {draft.latitude !== null && draft.longitude !== null
+                ? `${formatCoordinate(draft.latitude)}, ${formatCoordinate(draft.longitude)}`
+                : "No pin selected"}
+            </p>
+            <p className="text-muted-foreground mt-1 line-clamp-2">
+              {draft.addressText || "Address text not provided yet."}
+            </p>
+            <p className="text-muted-foreground mt-1">
+              {draft.publicLocationMode === "exact" ? "Exact public map mode" : "Approximate public map mode"}
+            </p>
+            <button
+              type="button"
+              onClick={() => goToStep("location")}
+              className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "mt-2 h-8 px-2.5 text-xs")}
+            >
+              Edit location
+            </button>
+          </div>
+          <div className="border-border/70 bg-card/45 rounded-lg border p-3 text-sm">
             <p className="text-muted-foreground">
               Contact: {draft.preferredContactMethod || "No preference"} {draft.contactPhone ? `• ${draft.contactPhone}` : ""}
             </p>
@@ -586,7 +756,7 @@ export function ProviderListingWizard({
         </div>
 
         <p className="text-muted-foreground text-xs">
-          PT17 adds map pin placement and public location mode. PT18 adds photos and publish readiness.
+          Next: PT18 can now add photos and publish readiness on top of this persisted location flow.
         </p>
       </div>
     );
@@ -600,12 +770,14 @@ export function ProviderListingWizard({
             Step {currentStepIndex + 1} of {PROVIDER_WIZARD_STEPS.length}
           </Badge>
           <CardTitle className="text-xl">{PROVIDER_WIZARD_STEP_LABELS[currentStep]}</CardTitle>
-          <CardDescription>Draft-safe, URL-driven wizard built for provider listing creation.</CardDescription>
+          <CardDescription>
+            Draft-safe, URL-driven wizard with provider pin placement built into the core posting flow.
+          </CardDescription>
         </div>
       </CardHeader>
 
       <CardContent className="space-y-5 pt-5">
-        <ol className="grid gap-2 sm:grid-cols-2 lg:grid-cols-6">
+        <ol className="grid gap-2 sm:grid-cols-2 lg:grid-cols-7">
           {PROVIDER_WIZARD_STEPS.map((step, index) => {
             const isActive = currentStep === step;
             const isClickable = Boolean(draftId) && index <= currentStepIndex;
@@ -639,6 +811,7 @@ export function ProviderListingWizard({
         {currentStep === "basics" ? renderBasicsStep() : null}
         {currentStep === "pricing" ? renderPricingStep() : null}
         {currentStep === "facts" ? renderFactsStep() : null}
+        {currentStep === "location" ? renderLocationStep() : null}
         {currentStep === "amenities" ? renderAmenitiesStep() : null}
         {currentStep === "contact" ? renderContactStep() : null}
         {currentStep === "review" ? renderReviewStep() : null}

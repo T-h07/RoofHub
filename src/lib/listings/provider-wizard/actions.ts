@@ -10,6 +10,7 @@ import {
   validateBasicsStep,
   validateContactStep,
   validateFactsStep,
+  validateLocationStep,
   validatePricingStep,
   validateReviewStep,
 } from "./validation";
@@ -339,6 +340,32 @@ export async function saveProviderWizardStepAction(
       };
     }
 
+    if (input.step === "location") {
+      const locationValidation = validateLocationStep(input.values);
+
+      if (!locationValidation.ok) {
+        return {
+          ok: false,
+          draftId: candidateDraftId,
+          message: "Set map pin placement details and retry.",
+          fieldErrors: locationValidation.errors,
+        };
+      }
+
+      const updateResult = await updateDraftListing(supabase, {
+        draftId: candidateDraftId,
+        userId: profile.id,
+        isAdmin,
+        patch: locationValidation.payload,
+      });
+
+      return {
+        ok: updateResult.ok,
+        draftId: candidateDraftId,
+        message: updateResult.ok ? "Location pin saved." : updateResult.message,
+      };
+    }
+
     if (input.step === "amenities") {
       const amenitiesValidation = validateAmenitiesStep(input.values);
 
@@ -414,7 +441,7 @@ export async function saveProviderWizardStepAction(
     return {
       ok: true,
       draftId: candidateDraftId,
-      message: "Draft is saved and ready for location and media steps.",
+      message: "Draft is saved and ready for photo and publish-prep steps.",
     };
   } catch {
     return {
