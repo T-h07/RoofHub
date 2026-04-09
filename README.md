@@ -4,7 +4,7 @@ Map-first real estate marketplace for rental and sale listings.
 
 ## Current Stage
 
-`NM-PT14 Listing Detail Page` is established:
+`NM-PT15 Favorites System` is established:
 
 - Next.js App Router + TypeScript scaffold
 - Supabase App Router SSR integration (`@supabase/supabase-js`, `@supabase/ssr`)
@@ -37,6 +37,9 @@ Map-first real estate marketplace for rental and sale listings.
 - structured detail surfaces: summary, location, specs, features, description, provider card
 - detail-page map snippet aligned with public location privacy mode (`exact`, `approximate`, `hidden`)
 - conversion CTA surfaces: favorite toggle, contact entry, and report submission
+- reusable persisted favorite toggle with optimistic rollback behavior
+- authenticated favorites page (`/favorites`) with saved-list management and polished empty/error/loading states
+- explore listing cards now show account-level saved state for authenticated viewers
 - explore/map listing links now route into detail pages
 - generated TypeScript database types in `src/types/database.ts` (schema + policy helper functions)
 - existing PT02 shell and PT03 integration structure preserved
@@ -209,6 +212,12 @@ Map scaling and bounds-search documentation:
 Listing detail architecture documentation:
 
 - `docs/listing-detail-page.md`
+
+## Favorites System (PT15)
+
+Favorites system documentation:
+
+- `docs/favorites-system.md`
 
 ## Local Development
 

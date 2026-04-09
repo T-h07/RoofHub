@@ -79,7 +79,8 @@ Provider surface uses only data available under current policy boundaries:
 Implemented CTA surfaces:
 
 - Favorite CTA:
-  - wired with server action toggle (`favorites` table)
+  - wired with reusable favorite mutation action (`favorites` table)
+  - uses shared `FavoriteToggle` component
   - guest flow prompts sign-in
 - Contact CTA:
   - future-ready entry to `/messages` thread context
@@ -90,11 +91,12 @@ Implemented CTA surfaces:
 
 Server actions:
 
-- `src/lib/listings/detail-actions.ts`
+- favorites: `src/lib/listings/favorite-actions.ts`
+- reports: `src/lib/listings/detail-actions.ts`
 
 Client CTA forms:
 
-- `src/components/listings/favorite-listing-form.tsx`
+- `src/components/listings/favorite-toggle.tsx`
 - `src/components/listings/report-listing-dialog.tsx`
 
 ## Discovery Continuity
