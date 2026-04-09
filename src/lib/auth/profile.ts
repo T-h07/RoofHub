@@ -1,12 +1,18 @@
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 
-import { DEFAULT_APP_ROLE } from "@/lib/auth/roles";
+import { DEFAULT_APP_ROLE, isPreferredContactMethod } from "@/lib/auth/roles";
 import type { Database, Tables } from "@/types/database";
 
 const PROFILE_SELECT =
   "id, role, display_name, avatar_url, phone, bio, preferred_contact_method, contact_methods, created_at, updated_at";
+const LEGACY_PROFILE_SELECT =
+  "id, role, display_name, avatar_url, phone, bio, preferred_contact_method, created_at, updated_at";
 
 export type AppProfile = Tables<"profiles">;
+type LegacyAppProfileRow = Omit<AppProfile, "contact_methods">;
+type CompatibleAppProfileRow = LegacyAppProfileRow & {
+  contact_methods?: unknown;
+};
 
 type EnsureProfileResult = {
   ok: boolean;
@@ -28,6 +34,41 @@ function getDisplayNameFromUser(user: User) {
   const fallback = metadataValue || emailPrefix || "NestMap User";
 
   return fallback.length >= 2 ? fallback : `User ${fallback}`.slice(0, 50);
+}
+
+function isMissingContactMethodsColumnError(message: string | undefined) {
+  if (!message) {
+    return false;
+  }
+
+  const normalized = message.toLowerCase();
+  return (
+    normalized.includes("contact_methods") &&
+    (normalized.includes("does not exist") || normalized.includes("column"))
+  );
+}
+
+function normalizeProfileRow(row: CompatibleAppProfileRow): AppProfile {
+  const normalizedPreferredMethod = isPreferredContactMethod(row.preferred_contact_method)
+    ? row.preferred_contact_method
+    : null;
+  const normalizedContactMethods = Array.isArray(row.contact_methods)
+    ? row.contact_methods.filter((method): method is AppProfile["contact_methods"][number] =>
+        isPreferredContactMethod(method)
+      )
+    : [];
+  const fallbackContactMethods =
+    normalizedContactMethods.length > 0
+      ? normalizedContactMethods
+      : normalizedPreferredMethod
+        ? [normalizedPreferredMethod]
+        : ["in_app"];
+
+  return {
+    ...row,
+    preferred_contact_method: normalizedPreferredMethod,
+    contact_methods: fallbackContactMethods,
+  } as AppProfile;
 }
 
 async function getAuthenticatedUser(supabase: SupabaseClient<Database>) {
@@ -53,6 +94,26 @@ async function fetchProfileByUserId(
     .eq("id", userId)
     .maybeSingle();
 
+  if (error && isMissingContactMethodsColumnError(error.message)) {
+    const { data: legacyData, error: legacyError } = await supabase
+      .from("profiles")
+      .select(LEGACY_PROFILE_SELECT)
+      .eq("id", userId)
+      .maybeSingle();
+
+    if (legacyError) {
+      return {
+        ok: false,
+        message: "Could not load your profile. Please refresh and try again.",
+      };
+    }
+
+    return {
+      ok: true,
+      profile: legacyData ? normalizeProfileRow(legacyData as CompatibleAppProfileRow) : null,
+    };
+  }
+
   if (error) {
     return {
       ok: false,
@@ -62,7 +123,7 @@ async function fetchProfileByUserId(
 
   return {
     ok: true,
-    profile: data,
+    profile: data ? normalizeProfileRow(data as CompatibleAppProfileRow) : null,
   };
 }
 

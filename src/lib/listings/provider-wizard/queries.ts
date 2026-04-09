@@ -63,6 +63,19 @@ const PROVIDER_DRAFT_EDITOR_SELECT = `
 `;
 
 const PROVIDER_CONTACT_SELECT = "preferred_contact_method, contact_methods, phone";
+const PROVIDER_CONTACT_LEGACY_SELECT = "preferred_contact_method, phone";
+
+function isMissingContactMethodsColumnError(message: string | undefined) {
+  if (!message) {
+    return false;
+  }
+
+  const normalized = message.toLowerCase();
+  return (
+    normalized.includes("contact_methods") &&
+    (normalized.includes("does not exist") || normalized.includes("column"))
+  );
+}
 
 export async function loadProviderDraftSummaries(
   supabase: SupabaseClient<Database>,
@@ -137,7 +150,25 @@ export async function loadProviderContactSettings(
     .eq("id", userId)
     .maybeSingle();
 
-  if (error || !data) {
+  let resolvedData = data;
+  let resolvedError = error;
+
+  if (resolvedError && isMissingContactMethodsColumnError(resolvedError.message)) {
+    const { data: legacyData, error: legacyError } = await supabase
+      .from("profiles")
+      .select(PROVIDER_CONTACT_LEGACY_SELECT)
+      .eq("id", userId)
+      .maybeSingle();
+    resolvedData = legacyData
+      ? {
+          ...legacyData,
+          contact_methods: [],
+        }
+      : null;
+    resolvedError = legacyError;
+  }
+
+  if (resolvedError || !resolvedData) {
     return {
       ok: false as const,
       message: "Contact settings could not be loaded.",
@@ -151,7 +182,7 @@ export async function loadProviderContactSettings(
 
   const normalizedMethods = Array.from(
     new Set(
-      (data.contact_methods ?? []).filter((method): method is ProviderContactSettings["contactMethods"][number] =>
+      (resolvedData.contact_methods ?? []).filter((method): method is ProviderContactSettings["contactMethods"][number] =>
         isPreferredContactMethod(method)
       )
     )
@@ -159,17 +190,17 @@ export async function loadProviderContactSettings(
   const fallbackMethods: ProviderContactSettings["contactMethods"] =
     normalizedMethods.length > 0
       ? normalizedMethods
-      : data.preferred_contact_method
-        ? [data.preferred_contact_method]
+      : resolvedData.preferred_contact_method
+        ? [resolvedData.preferred_contact_method]
         : ["in_app"];
-  const preferredContactMethod = data.preferred_contact_method ?? "";
+  const preferredContactMethod = resolvedData.preferred_contact_method ?? "";
 
   return {
     ok: true as const,
     settings: {
       preferredContactMethod,
       contactMethods: fallbackMethods,
-      phone: data.phone ?? "",
+      phone: resolvedData.phone ?? "",
     } satisfies ProviderContactSettings,
   };
 }
