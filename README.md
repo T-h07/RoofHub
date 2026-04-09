@@ -4,7 +4,7 @@ Map-first real estate marketplace for rental and sale listings.
 
 ## Current Stage
 
-`NM-PT13 Map Bounds, Clustering, and Search This Area` is established:
+`NM-PT14 Listing Detail Page` is established:
 
 - Next.js App Router + TypeScript scaffold
 - Supabase App Router SSR integration (`@supabase/supabase-js`, `@supabase/ssr`)
@@ -32,10 +32,16 @@ Map-first real estate marketplace for rental and sale listings.
 - bounds-aware server queries that still reuse PT11 filter parsing
 - refined desktop map/list split with synchronized applied result counts
 - reusable listing card component for map/list/detail-adjacent surfaces
+- public listing detail route (`/listing/[slug]`) with server-first published-only fetching
+- responsive listing image gallery with signed private-bucket image URLs
+- structured detail surfaces: summary, location, specs, features, description, provider card
+- detail-page map snippet aligned with public location privacy mode (`exact`, `approximate`, `hidden`)
+- conversion CTA surfaces: favorite toggle, contact entry, and report submission
+- explore/map listing links now route into detail pages
 - generated TypeScript database types in `src/types/database.ts` (schema + policy helper functions)
 - existing PT02 shell and PT03 integration structure preserved
 
-This stage intentionally excludes business features beyond foundational auth/session plumbing (full role workflows, listings CRUD, listing detail conversion behavior, moderation, and messaging product behavior).
+This stage intentionally excludes business features beyond foundational auth/session plumbing (full role workflows, listings CRUD, advanced provider trust enrichment, full favorites collections UX, and full messaging product behavior).
 
 ## Stack
 
@@ -197,6 +203,12 @@ Map page documentation:
 Map scaling and bounds-search documentation:
 
 - `docs/map-bounds-clustering.md`
+
+## Listing Detail Page (PT14)
+
+Listing detail architecture documentation:
+
+- `docs/listing-detail-page.md`
 
 ## Local Development
 

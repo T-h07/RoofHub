@@ -115,10 +115,14 @@ PT13 keeps explicit states:
   - no mapped results in applied bounds
   - no mapped inventory yet
 
-## PT14 Extension Path
+## PT14 Status
 
-PT14 can build directly on this foundation by:
+PT14 now builds on this foundation with:
 
-- replacing list/popup “Open in list” affordances with listing detail routing (`/listing/[slug]` or equivalent)
-- adding selected-listing synchronization between desktop split list and map marker/popup state
-- preserving `bbox` + shared filters while deep-linking into detail and returning to map context
+- listing detail routing from map popup and desktop side-pane (`/listing/[slug]`)
+- continuity paths back into `/map` and `/explore`
+
+Next map/detail refinement can focus on:
+
+- selected-listing synchronization between desktop split list and marker/popup state
+- deeper return-context behavior while preserving `bbox` + shared filters
