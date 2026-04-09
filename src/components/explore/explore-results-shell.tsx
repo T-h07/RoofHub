@@ -488,12 +488,13 @@ export function ExploreResultsShell({
           <Input
             id="filter-keyword"
             value={draft.keyword}
-            onChange={(event) =>
+            onChange={(event) => {
+              const nextKeyword = event.currentTarget.value;
               setDraft((currentDraft) => ({
                 ...currentDraft,
-                keyword: event.currentTarget.value,
-              }))
-            }
+                keyword: nextKeyword,
+              }));
+            }}
             placeholder="Title, description, city..."
             autoComplete="off"
           />
@@ -508,12 +509,13 @@ export function ExploreResultsShell({
               id="filter-city"
               list="explore-city-options"
               value={draft.city}
-              onChange={(event) =>
+              onChange={(event) => {
+                const nextCity = event.currentTarget.value;
                 setDraft((currentDraft) => ({
                   ...currentDraft,
-                  city: event.currentTarget.value,
-                }))
-              }
+                  city: nextCity,
+                }));
+              }}
               placeholder="City"
               autoComplete="off"
             />
@@ -525,12 +527,13 @@ export function ExploreResultsShell({
             <Input
               id="filter-neighborhood"
               value={draft.neighborhood}
-              onChange={(event) =>
+              onChange={(event) => {
+                const nextNeighborhood = event.currentTarget.value;
                 setDraft((currentDraft) => ({
                   ...currentDraft,
-                  neighborhood: event.currentTarget.value,
-                }))
-              }
+                  neighborhood: nextNeighborhood,
+                }));
+              }}
               placeholder="Neighborhood"
               autoComplete="off"
             />
@@ -549,12 +552,13 @@ export function ExploreResultsShell({
           <Select
             id="filter-property-type"
             value={draft.propertyType}
-            onChange={(event) =>
+            onChange={(event) => {
+              const nextPropertyType = event.currentTarget.value;
               setDraft((currentDraft) => ({
                 ...currentDraft,
-                propertyType: event.currentTarget.value,
-              }))
-            }
+                propertyType: nextPropertyType,
+              }));
+            }}
           >
             <option value="">All property types</option>
             {Object.entries(EXPLORE_PROPERTY_TYPE_LABELS).map(([value, label]) => (
@@ -574,12 +578,13 @@ export function ExploreResultsShell({
               min="0"
               step="1"
               value={draft.priceMin}
-              onChange={(event) =>
+              onChange={(event) => {
+                const nextPriceMin = event.currentTarget.value;
                 setDraft((currentDraft) => ({
                   ...currentDraft,
-                  priceMin: event.currentTarget.value,
-                }))
-              }
+                  priceMin: nextPriceMin,
+                }));
+              }}
               placeholder="Min"
             />
             <Input
@@ -588,12 +593,13 @@ export function ExploreResultsShell({
               min="0"
               step="1"
               value={draft.priceMax}
-              onChange={(event) =>
+              onChange={(event) => {
+                const nextPriceMax = event.currentTarget.value;
                 setDraft((currentDraft) => ({
                   ...currentDraft,
-                  priceMax: event.currentTarget.value,
-                }))
-              }
+                  priceMax: nextPriceMax,
+                }));
+              }}
               placeholder="Max"
             />
           </div>
@@ -608,12 +614,13 @@ export function ExploreResultsShell({
               min="0"
               step="0.1"
               value={draft.areaMin}
-              onChange={(event) =>
+              onChange={(event) => {
+                const nextAreaMin = event.currentTarget.value;
                 setDraft((currentDraft) => ({
                   ...currentDraft,
-                  areaMin: event.currentTarget.value,
-                }))
-              }
+                  areaMin: nextAreaMin,
+                }));
+              }}
               placeholder="Min"
             />
             <Input
@@ -622,12 +629,13 @@ export function ExploreResultsShell({
               min="0"
               step="0.1"
               value={draft.areaMax}
-              onChange={(event) =>
+              onChange={(event) => {
+                const nextAreaMax = event.currentTarget.value;
                 setDraft((currentDraft) => ({
                   ...currentDraft,
-                  areaMax: event.currentTarget.value,
-                }))
-              }
+                  areaMax: nextAreaMax,
+                }));
+              }}
               placeholder="Max"
             />
           </div>
@@ -641,12 +649,13 @@ export function ExploreResultsShell({
             <Select
               id="filter-beds-min"
               value={draft.bedsMin}
-              onChange={(event) =>
+              onChange={(event) => {
+                const nextBedsMin = event.currentTarget.value;
                 setDraft((currentDraft) => ({
                   ...currentDraft,
-                  bedsMin: event.currentTarget.value,
-                }))
-              }
+                  bedsMin: nextBedsMin,
+                }));
+              }}
             >
               <option value="">Any</option>
               {EXPLORE_BEDS_MIN_OPTIONS.map((value) => (
@@ -664,12 +673,13 @@ export function ExploreResultsShell({
             <Select
               id="filter-baths-min"
               value={draft.bathsMin}
-              onChange={(event) =>
+              onChange={(event) => {
+                const nextBathsMin = event.currentTarget.value;
                 setDraft((currentDraft) => ({
                   ...currentDraft,
-                  bathsMin: event.currentTarget.value,
-                }))
-              }
+                  bathsMin: nextBathsMin,
+                }));
+              }}
             >
               <option value="">Any</option>
               {EXPLORE_BATHS_MIN_OPTIONS.map((value) => (
@@ -778,12 +788,13 @@ export function ExploreResultsShell({
             >
               <Input
                 value={draft.keyword}
-                onChange={(event) =>
+                onChange={(event) => {
+                  const nextKeyword = event.currentTarget.value;
                   setDraft((currentDraft) => ({
                     ...currentDraft,
-                    keyword: event.currentTarget.value,
-                  }))
-                }
+                    keyword: nextKeyword,
+                  }));
+                }}
                 placeholder="Search listings by title, description, city, or property type"
                 autoComplete="off"
               />
@@ -813,7 +824,10 @@ export function ExploreResultsShell({
               <Select
                 id="explore-sort"
                 value={state.sort}
-                onChange={(event) => handleSortChange(event.currentTarget.value)}
+                onChange={(event) => {
+                  const nextSort = event.currentTarget.value;
+                  handleSortChange(nextSort);
+                }}
                 className="w-[210px]"
               >
                 {Object.entries(EXPLORE_SORT_LABELS).map(([value, label]) => (
