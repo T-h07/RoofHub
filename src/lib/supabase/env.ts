@@ -5,6 +5,8 @@ const SERVER_SUPABASE_URL_ENV = "SUPABASE_URL";
 const SERVER_SUPABASE_PUBLISHABLE_KEY_ENV = "SUPABASE_PUBLISHABLE_KEY";
 const SERVER_SUPABASE_ANON_KEY_ENV = "SUPABASE_ANON_KEY";
 const LOCAL_DEV_SUPABASE_URL = "http://127.0.0.1:54321";
+const LOCAL_DEV_SUPABASE_PUBLISHABLE_KEY =
+  "<supabase-publishable-key>";
 
 function readEnv(names: readonly string[]) {
   for (const name of names) {
@@ -15,19 +17,6 @@ function readEnv(names: readonly string[]) {
   }
 
   return null;
-}
-
-function requireEnv(name: string, fallbackNames: readonly string[] = []): string {
-  const value = readEnv([name, ...fallbackNames]);
-
-  if (!value) {
-    const acceptedNames = [name, ...fallbackNames].join(", ");
-    throw new Error(
-      `[Supabase] Missing required environment variable: ${name}. Also checked: ${acceptedNames}. Set it in .env.local (local) or Vercel Environment Variables (Development/Preview/Production).`
-    );
-  }
-
-  return value;
 }
 
 export function getSupabaseEnv() {
@@ -41,11 +30,29 @@ export function getSupabaseEnv() {
     );
   }
 
-  const publishableKey = requireEnv(SUPABASE_PUBLISHABLE_KEY_ENV, [
-    SUPABASE_ANON_KEY_ENV,
-    SERVER_SUPABASE_PUBLISHABLE_KEY_ENV,
-    SERVER_SUPABASE_ANON_KEY_ENV,
-  ]);
+  const publishableKey =
+    readEnv([
+      SUPABASE_PUBLISHABLE_KEY_ENV,
+      SUPABASE_ANON_KEY_ENV,
+      SERVER_SUPABASE_PUBLISHABLE_KEY_ENV,
+      SERVER_SUPABASE_ANON_KEY_ENV,
+    ]) ??
+    (process.env.NODE_ENV !== "production" && url === LOCAL_DEV_SUPABASE_URL
+      ? LOCAL_DEV_SUPABASE_PUBLISHABLE_KEY
+      : null);
+
+  if (!publishableKey) {
+    const acceptedNames = [
+      SUPABASE_PUBLISHABLE_KEY_ENV,
+      SUPABASE_ANON_KEY_ENV,
+      SERVER_SUPABASE_PUBLISHABLE_KEY_ENV,
+      SERVER_SUPABASE_ANON_KEY_ENV,
+    ].join(", ");
+
+    throw new Error(
+      `[Supabase] Missing required environment variable: ${SUPABASE_PUBLISHABLE_KEY_ENV}. Also checked: ${acceptedNames}. Set it in .env.local (local) or Vercel Environment Variables (Development/Preview/Production).`
+    );
+  }
 
   try {
     new URL(url);

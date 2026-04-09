@@ -108,6 +108,19 @@ function parseCoordinateInput(value: string) {
   return Number(parsed.toFixed(6));
 }
 
+function buildPhotoMetadataSignature(
+  images: readonly {
+    storagePath?: string;
+    sortOrder: number;
+    isCover: boolean;
+  }[]
+) {
+  return images
+    .filter((image) => Boolean(image.storagePath))
+    .map((image) => `${image.storagePath}:${image.sortOrder}:${image.isCover ? "1" : "0"}`)
+    .join("|");
+}
+
 export function ProviderListingWizard({
   mode,
   initialStep,
@@ -134,6 +147,15 @@ export function ProviderListingWizard({
   const [isPhotoMetadataSyncing, setIsPhotoMetadataSyncing] = useState(false);
   const photoMetadataSyncInFlightRef = useRef(false);
   const photoMetadataSyncQueuedRef = useRef(false);
+  const lastSyncedPhotoMetadataSignatureRef = useRef(
+    buildPhotoMetadataSignature(
+      initialImages.map((image) => ({
+        storagePath: image.storagePath,
+        sortOrder: image.sortOrder,
+        isCover: image.isCover,
+      }))
+    )
+  );
   const {
     images: draftImages,
     addFiles,
@@ -157,6 +179,17 @@ export function ProviderListingWizard({
   const hasPhotoUploadFailures = draftImages.some((image) => image.uploadState === "failed");
   const hasPendingPhotoUploads = draftImages.some(
     (image) => image.uploadState === "local" || image.uploadState === "uploading"
+  );
+  const photoMetadataSignature = useMemo(
+    () =>
+      buildPhotoMetadataSignature(
+        draftImages.map((image) => ({
+          storagePath: image.storagePath,
+          sortOrder: image.sortOrder,
+          isCover: image.isCover,
+        }))
+      ),
+    [draftImages]
   );
 
   const clientReadiness = useMemo(
@@ -316,6 +349,13 @@ export function ProviderListingWizard({
         isCover: image.isCover,
       }))
     );
+    lastSyncedPhotoMetadataSignatureRef.current = buildPhotoMetadataSignature(
+      syncResult.images.map((image) => ({
+        storagePath: image.storagePath,
+        sortOrder: image.sortOrder,
+        isCover: image.isCover,
+      }))
+    );
     setPublishBlockers([]);
 
     return {
@@ -337,7 +377,12 @@ export function ProviderListingWizard({
       return;
     }
 
+    if (photoMetadataSignature === lastSyncedPhotoMetadataSignatureRef.current) {
+      return;
+    }
+
     let isCancelled = false;
+    const currentSignature = photoMetadataSignature;
     const timeoutId = window.setTimeout(async () => {
       if (photoMetadataSyncInFlightRef.current) {
         photoMetadataSyncQueuedRef.current = true;
@@ -364,6 +409,7 @@ export function ProviderListingWizard({
           setStatusMessage(syncResult.message);
           toast.error(syncResult.message);
         } else {
+          lastSyncedPhotoMetadataSignatureRef.current = currentSignature;
           replaceImages(
             syncResult.images.map((image) => ({
               id: image.id,
@@ -396,6 +442,7 @@ export function ProviderListingWizard({
     draftImages,
     hasPendingPhotoUploads,
     hasPhotoUploadFailures,
+    photoMetadataSignature,
     photoAutosaveRevision,
     replaceImages,
   ]);
