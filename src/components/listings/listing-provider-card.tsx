@@ -152,7 +152,7 @@ export function ListingProviderCard({
   provider,
   isOwner,
 }: ListingProviderCardProps) {
-  const displayName = provider?.displayName ?? "NestMap Provider";
+  const displayName = provider?.displayName ?? "RoofHub Provider";
   const resolvedContactMethods: ContactMethod[] = provider
     ? provider.contactMethods.length > 0
       ? provider.contactMethods
@@ -191,7 +191,7 @@ export function ListingProviderCard({
             <p className="text-sm font-semibold tracking-tight">{displayName}</p>
             <p className="text-muted-foreground text-xs">
               {provider
-                ? "Registered provider account on NestMap."
+                ? "Registered provider account on RoofHub."
                 : "Provider profile details are privacy-limited on this public page."}
             </p>
           </div>

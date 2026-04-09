@@ -197,7 +197,7 @@ export async function signUpAction(
   return {
     status: "success",
     message:
-      "Check your email to confirm your account. After confirmation, you can continue in NestMap.",
+      "Check your email to confirm your account. After confirmation, you can continue in RoofHub.",
   };
 }
 
@@ -237,7 +237,7 @@ export async function requestPasswordResetAction(
   return {
     status: "success",
     message:
-      "If that email exists in NestMap, a reset link has been sent. Check your inbox and spam folder.",
+      "If that email exists in RoofHub, a reset link has been sent. Check your inbox and spam folder.",
   };
 }
 

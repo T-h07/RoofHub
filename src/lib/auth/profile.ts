@@ -31,7 +31,7 @@ function getDisplayNameFromUser(user: User) {
       ? user.user_metadata.display_name.trim()
       : "";
   const emailPrefix = user.email?.split("@")[0]?.trim() ?? "";
-  const fallback = metadataValue || emailPrefix || "NestMap User";
+  const fallback = metadataValue || emailPrefix || "RoofHub User";
 
   return fallback.length >= 2 ? fallback : `User ${fallback}`.slice(0, 50);
 }

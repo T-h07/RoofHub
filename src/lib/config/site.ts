@@ -33,8 +33,8 @@ export const footerLinkGroups: FooterLinkGroup[] = [
 ];
 
 export const siteConfig = {
-  name: "NestMap",
-  title: "NestMap | Map-first real estate marketplace",
+  name: "RoofHub",
+  title: "RoofHub | Map-first real estate marketplace",
   description:
     "Map-first real estate marketplace for rentals and homes for sale, with provider-ready onboarding paths and scalable Vercel + Supabase foundations.",
   repositoryUrl: "https://github.com/T-h07/nestmap",

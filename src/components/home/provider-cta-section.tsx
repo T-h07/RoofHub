@@ -16,7 +16,7 @@ export function ProviderCtaSection() {
             Put your property on the map and reach renters or buyers faster.
           </h2>
           <p className="type-body-muted">
-            NestMap is structured for map-aware listing discovery. Create an account now and move
+            RoofHub is structured for map-aware listing discovery. Create an account now and move
             into provider workflows as listing creation and management PTs ship.
           </p>
         </div>

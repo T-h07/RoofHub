@@ -81,7 +81,7 @@ export function SignInForm({ nextPath, callbackError }: SignInFormProps) {
       <AuthSubmitButton label="Sign in" pendingLabel="Signing in..." />
 
       <FieldHelp>
-        New to NestMap?{" "}
+        New to RoofHub?{" "}
         <Link href={`/auth/sign-up?next=${encodeURIComponent(nextPath)}`} className="text-primary">
           Create an account
         </Link>

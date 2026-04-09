@@ -16,7 +16,7 @@ export default async function SignUpPage({ searchParams }: SignUpPageProps) {
   return (
     <AuthShell
       badge="Create account"
-      title="Start your NestMap account"
+      title="Start your RoofHub account"
       description="Set up access for listing discovery, provider workflows, and messaging as those surfaces land."
       footer={
         <>

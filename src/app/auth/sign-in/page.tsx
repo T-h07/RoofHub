@@ -17,7 +17,7 @@ export default async function SignInPage({ searchParams }: SignInPageProps) {
   return (
     <AuthShell
       badge="Secure sign in"
-      title="Welcome back to NestMap"
+      title="Welcome back to RoofHub"
       description="Sign in to continue to your dashboard, saved listings, and conversations."
       footer={
         <>

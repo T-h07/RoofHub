@@ -63,7 +63,7 @@ export default async function ExplorePage({ searchParams }: ExplorePageProps) {
       <section className="border-border/75 bg-card/60 space-y-3 rounded-xl border p-5 sm:p-6">
         <Badge variant="primary">Explore listings</Badge>
         <h1 className="type-page-title max-w-4xl">
-          Browse published rentals and homes for sale across NestMap.
+          Browse published rentals and homes for sale across RoofHub.
         </h1>
         <p className="type-body-muted max-w-3xl">
           This list view is server-rendered from public listings, with URL-driven search,

@@ -7,7 +7,7 @@ export default function ForgotPasswordPage() {
   return (
     <AuthShell
       badge="Password recovery"
-      title="Reset your NestMap password"
+      title="Reset your RoofHub password"
       description="Request a secure reset link to regain access without losing your account session history."
       footer={
         <>

@@ -15,7 +15,7 @@ export function HomeHero() {
       <div className="relative grid items-start gap-8 xl:grid-cols-[minmax(0,1.18fr)_minmax(0,0.82fr)]">
         <div className="space-y-6">
           <div className="flex flex-wrap items-center gap-2.5">
-            <Badge variant="primary">NestMap</Badge>
+            <Badge variant="primary">RoofHub</Badge>
             <Badge variant="neutral">Rent + Buy</Badge>
             <Badge variant="neutral">Map-first</Badge>
           </div>
@@ -25,7 +25,7 @@ export function HomeHero() {
               Find rentals and homes for sale through one map-first discovery flow.
             </h1>
             <p className="type-body-muted max-w-3xl">
-              NestMap brings list and map exploration into the same path so seekers can scan faster,
+              RoofHub brings list and map exploration into the same path so seekers can scan faster,
               while providers get a clear way to publish properties and reach serious renters and
               buyers.
             </p>

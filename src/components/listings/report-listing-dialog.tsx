@@ -71,7 +71,7 @@ export function ReportListingDialog({
             Report this listing
           </DialogTitle>
           <DialogDescription>
-            Reports are reviewed by NestMap moderation. Include concise details to help triage.
+            Reports are reviewed by RoofHub moderation. Include concise details to help triage.
           </DialogDescription>
         </DialogHeader>
 

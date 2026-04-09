@@ -44,7 +44,7 @@ export function BrowseIntentSection() {
   return (
     <Section
       eyebrow="Browse by intent"
-      title="Choose the fastest path into NestMap"
+      title="Choose the fastest path into RoofHub"
       description="Each route is structured for a specific goal so first-time visitors can enter discovery without friction."
     >
       <div className="grid gap-4 sm:grid-cols-2">

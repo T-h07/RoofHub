@@ -24,7 +24,7 @@ export const metadata: Metadata = {
     template: `%s | ${siteConfig.name}`,
   },
   description: siteConfig.description,
-  metadataBase: new URL("https://nestmap.vercel.app"),
+  metadataBase: new URL("https://roofhub.vercel.app"),
 };
 
 export default function RootLayout({
