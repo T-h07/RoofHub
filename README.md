@@ -4,7 +4,7 @@ Map-first real estate marketplace for rental and sale listings.
 
 ## Current Stage
 
-`NM-PT16 Listing Creation Wizard` is established:
+`NM-PT17 Provider Map Pin Placement Flow` is established:
 
 - Next.js App Router + TypeScript scaffold
 - Supabase App Router SSR integration (`@supabase/supabase-js`, `@supabase/ssr`)
@@ -44,11 +44,14 @@ Map-first real estate marketplace for rental and sale listings.
 - provider listing creation wizard routes:
   - `/dashboard/listings/new`
   - `/dashboard/listings/[id]/edit?step=<wizard-step>`
-- server-backed multi-step provider draft flow (basics, pricing, facts, amenities, contact, review)
+- server-backed multi-step provider draft flow (basics, pricing, facts, location, amenities, contact, review)
 - provider-only wizard access control aligned with authenticated role model
 - draft persistence with id-based edit continuity and step-level validation
 - profile-backed contact settings integration in listing wizard flow
 - coordinates nullable for draft listings with published listings requiring coordinates
+- provider location step with click-to-place and drag-to-adjust map pin interactions
+- persisted listing coordinates, address text, and exact vs approximate public location mode controls
+- provider review step integration for location summary and edit jumpbacks
 - generated TypeScript database types in `src/types/database.ts` (schema + policy helper functions)
 - existing PT02 shell and PT03 integration structure preserved
 
@@ -232,6 +235,12 @@ Favorites system documentation:
 Provider listing wizard documentation:
 
 - `docs/listing-creation-wizard.md`
+
+## Provider Map Pin Placement Flow (PT17)
+
+Provider location-step documentation:
+
+- `docs/provider-map-pin-placement.md`
 
 ## Local Development
 

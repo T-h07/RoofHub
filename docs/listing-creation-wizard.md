@@ -18,6 +18,7 @@ Establish the first provider-side listing creation flow with real Supabase persi
 - `basics`
 - `pricing`
 - `facts`
+- `location` (added in PT17)
 - `amenities`
 - `contact`
 - `review`
@@ -108,13 +109,14 @@ Changes:
 
 This keeps PT16 map-free draft flow valid while preserving publish-time location guarantees for PT17/PT18.
 
-## PT17/PT18 Extension Path
+## PT18 Extension Path
 
-PT17 should extend `facts`/location continuity by adding:
+PT17 now extends the PT16 wizard with:
 
-- map pin placement
-- coordinate editing and persistence
-- exact vs approximate public location controls tied to listing location UX
+- dedicated location step
+- map pin placement + drag adjustment
+- coordinate persistence
+- exact vs approximate public location mode controls
 
 PT18 should extend review/publish lifecycle by adding:
 
