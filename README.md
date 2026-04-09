@@ -4,7 +4,7 @@ Map-first real estate marketplace for rental and sale listings.
 
 ## Current Stage
 
-`NM-PT15 Favorites System` is established:
+`NM-PT16 Listing Creation Wizard` is established:
 
 - Next.js App Router + TypeScript scaffold
 - Supabase App Router SSR integration (`@supabase/supabase-js`, `@supabase/ssr`)
@@ -41,6 +41,14 @@ Map-first real estate marketplace for rental and sale listings.
 - authenticated favorites page (`/favorites`) with saved-list management and polished empty/error/loading states
 - explore listing cards now show account-level saved state for authenticated viewers
 - explore/map listing links now route into detail pages
+- provider listing creation wizard routes:
+  - `/dashboard/listings/new`
+  - `/dashboard/listings/[id]/edit?step=<wizard-step>`
+- server-backed multi-step provider draft flow (basics, pricing, facts, amenities, contact, review)
+- provider-only wizard access control aligned with authenticated role model
+- draft persistence with id-based edit continuity and step-level validation
+- profile-backed contact settings integration in listing wizard flow
+- coordinates nullable for draft listings with published listings requiring coordinates
 - generated TypeScript database types in `src/types/database.ts` (schema + policy helper functions)
 - existing PT02 shell and PT03 integration structure preserved
 
@@ -218,6 +226,12 @@ Listing detail architecture documentation:
 Favorites system documentation:
 
 - `docs/favorites-system.md`
+
+## Listing Creation Wizard (PT16)
+
+Provider listing wizard documentation:
+
+- `docs/listing-creation-wizard.md`
 
 ## Local Development
 
