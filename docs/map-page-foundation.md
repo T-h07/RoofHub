@@ -1,6 +1,6 @@
 # Map Infrastructure and Public Map Page (NM-PT12)
 
-This document describes the first production map foundation for NestMap.
+This document describes the first production map foundation for RoofHub.
 
 ## Route
 

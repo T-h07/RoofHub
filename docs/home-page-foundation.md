@@ -2,7 +2,7 @@
 
 ## Scope Added
 
-The public `/` route is now a product-facing landing page built on the existing NestMap shell and design system.
+The public `/` route is now a product-facing landing page built on the existing RoofHub shell and design system.
 
 Included sections:
 

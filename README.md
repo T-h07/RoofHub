@@ -1,4 +1,4 @@
-# NestMap
+# RoofHub
 
 Map-first real estate marketplace for rental and sale listings.
 
@@ -110,7 +110,7 @@ This stage intentionally excludes business features beyond foundational auth/ses
 
 Theme direction:
 
-- default dark mode is intentionally locked for NestMap’s product shell at this stage.
+- default dark mode is intentionally locked for RoofHub’s product shell at this stage.
 
 ## Supabase Environment Setup
 
@@ -143,7 +143,7 @@ Where to get the Supabase values:
 
 - `NEXT_PUBLIC_SUPABASE_URL`: Supabase Dashboard -> Project Settings -> Data API -> Project URL
 - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`: Supabase Dashboard -> Project Settings -> Data API -> Project API keys -> `anon` / publishable key
-- `NEXT_PUBLIC_MAP_STYLE_URL`: optional override. If omitted or invalid, NestMap falls back to a public dark MapLibre style.
+- `NEXT_PUBLIC_MAP_STYLE_URL`: optional override. If omitted or invalid, RoofHub falls back to a public dark MapLibre style.
 
 Rules:
 

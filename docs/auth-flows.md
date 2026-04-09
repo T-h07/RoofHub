@@ -66,7 +66,7 @@ Supabase dashboard setup:
 1. Set **Auth > URL Configuration > Site URL** to your production app origin.
 2. Add redirect URLs for callback usage:
    - `http://localhost:3000/auth/callback`
-   - your production callback URL (for example `https://nestmap.vercel.app/auth/callback`)
+   - your production callback URL (for example `https://roofhub.vercel.app/auth/callback`)
    - your preview callback pattern/domain as needed by your Vercel setup
 
 ## Known Limits / Next PT Notes

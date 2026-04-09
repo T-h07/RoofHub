@@ -1,6 +1,6 @@
 # Database Schema v1 (NM-PT04)
 
-This document describes the first relational MVP schema for NestMap, implemented in:
+This document describes the first relational MVP schema for RoofHub, implemented in:
 
 - `supabase/migrations/20260406155410_nm_pt04_schema_v1.sql`
 
