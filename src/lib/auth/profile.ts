@@ -4,7 +4,7 @@ import { DEFAULT_APP_ROLE, isPreferredContactMethod } from "@/lib/auth/roles";
 import type { Database, Tables } from "@/types/database";
 
 const PROFILE_SELECT =
-  "id, role, display_name, avatar_url, phone, bio, preferred_contact_method, contact_methods, created_at, updated_at";
+  "id, role, display_name, avatar_url, phone, bio, preferred_contact_method, contact_methods, contact_email, whatsapp_phone, viber_phone, created_at, updated_at";
 const LEGACY_PROFILE_SELECT =
   "id, role, display_name, avatar_url, phone, bio, preferred_contact_method, created_at, updated_at";
 
@@ -48,6 +48,20 @@ function isMissingContactMethodsColumnError(message: string | undefined) {
   );
 }
 
+function isMissingContactChannelColumnError(message: string | undefined) {
+  if (!message) {
+    return false;
+  }
+
+  const normalized = message.toLowerCase();
+  return (
+    normalized.includes("column") &&
+    (normalized.includes("contact_email") ||
+      normalized.includes("whatsapp_phone") ||
+      normalized.includes("viber_phone"))
+  );
+}
+
 function normalizeProfileRow(row: CompatibleAppProfileRow): AppProfile {
   const normalizedPreferredMethod = isPreferredContactMethod(row.preferred_contact_method)
     ? row.preferred_contact_method
@@ -68,6 +82,18 @@ function normalizeProfileRow(row: CompatibleAppProfileRow): AppProfile {
     ...row,
     preferred_contact_method: normalizedPreferredMethod,
     contact_methods: fallbackContactMethods,
+    contact_email:
+      typeof row.contact_email === "string" && row.contact_email.trim().length > 0
+        ? row.contact_email.trim().toLowerCase()
+        : null,
+    whatsapp_phone:
+      typeof row.whatsapp_phone === "string" && row.whatsapp_phone.trim().length > 0
+        ? row.whatsapp_phone.trim()
+        : null,
+    viber_phone:
+      typeof row.viber_phone === "string" && row.viber_phone.trim().length > 0
+        ? row.viber_phone.trim()
+        : null,
   } as AppProfile;
 }
 
@@ -94,6 +120,35 @@ async function fetchProfileByUserId(
     .eq("id", userId)
     .maybeSingle();
 
+  if (error && isMissingContactChannelColumnError(error.message)) {
+    const { data: channelCompatibleData, error: channelCompatibleError } = await supabase
+      .from("profiles")
+      .select(
+        "id, role, display_name, avatar_url, phone, bio, preferred_contact_method, contact_methods, created_at, updated_at"
+      )
+      .eq("id", userId)
+      .maybeSingle();
+
+    if (channelCompatibleError && !isMissingContactMethodsColumnError(channelCompatibleError.message)) {
+      return {
+        ok: false,
+        message: "Could not load your profile. Please refresh and try again.",
+      };
+    }
+
+    if (channelCompatibleData) {
+      return {
+        ok: true,
+        profile: normalizeProfileRow({
+          ...(channelCompatibleData as CompatibleAppProfileRow),
+          contact_email: null,
+          whatsapp_phone: null,
+          viber_phone: null,
+        }),
+      };
+    }
+  }
+
   if (error && isMissingContactMethodsColumnError(error.message)) {
     const { data: legacyData, error: legacyError } = await supabase
       .from("profiles")
@@ -110,7 +165,14 @@ async function fetchProfileByUserId(
 
     return {
       ok: true,
-      profile: legacyData ? normalizeProfileRow(legacyData as CompatibleAppProfileRow) : null,
+      profile: legacyData
+        ? normalizeProfileRow({
+            ...(legacyData as CompatibleAppProfileRow),
+            contact_email: null,
+            whatsapp_phone: null,
+            viber_phone: null,
+          })
+        : null,
     };
   }
 

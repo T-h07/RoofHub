@@ -10,9 +10,9 @@ const LISTING_TYPES = new Set(["rent", "sale"]);
 const PROPERTY_TYPES = new Set(["apartment", "house", "studio", "land", "commercial"]);
 const HEATING_TYPES = new Set(["central", "electric", "gas", "district", "other"]);
 const PREFERRED_CONTACT_METHODS = new Set(["in_app", "phone", "email", "whatsapp", "viber"]);
-const PHONE_REQUIRED_CONTACT_METHODS = new Set(["phone", "whatsapp", "viber"]);
 const PUBLIC_LOCATION_MODES = new Set(["exact", "approximate"]);
 const PHONE_PATTERN = /^[+0-9().\-\s]{6,24}$/;
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function normalizeText(value: string, maxLength: number) {
   return value.trim().replace(/\s+/g, " ").slice(0, maxLength);
@@ -136,7 +136,10 @@ export type AmenitiesStepPayload = {
 export type ContactStepPayload = {
   preferred_contact_method: ProviderPreferredContactMethod | null;
   contact_methods: ProviderPreferredContactMethod[];
+  contact_email: string | null;
   phone: string | null;
+  whatsapp_phone: string | null;
+  viber_phone: string | null;
 };
 
 type ValidationSuccess<TPayload> = {
@@ -394,6 +397,9 @@ export function validateContactStep(values: ProviderDraftWizardValues): Validati
     )
   );
   const phone = normalizeNullableText(values.contactPhone, 24);
+  const whatsappPhone = normalizeNullableText(values.whatsappPhone, 24);
+  const viberPhone = normalizeNullableText(values.viberPhone, 24);
+  const contactEmail = normalizeNullableText(values.contactEmail, 160)?.toLowerCase() ?? null;
 
   if (
     preferredContactMethod !== null &&
@@ -410,15 +416,45 @@ export function validateContactStep(values: ProviderDraftWizardValues): Validati
     errors.contactPhone = "Phone should include digits and optional +, spaces, (), dots, or dashes.";
   }
 
+  if (whatsappPhone && !PHONE_PATTERN.test(whatsappPhone)) {
+    errors.whatsappPhone =
+      "WhatsApp number should include digits and optional +, spaces, (), dots, or dashes.";
+  }
+
+  if (viberPhone && !PHONE_PATTERN.test(viberPhone)) {
+    errors.viberPhone =
+      "Viber number should include digits and optional +, spaces, (), dots, or dashes.";
+  }
+
+  if (contactEmail && !EMAIL_PATTERN.test(contactEmail)) {
+    errors.contactEmail = "Enter a valid contact email address.";
+  }
+
   const effectiveMethods = preferredContactMethod
     ? Array.from(new Set([preferredContactMethod, ...contactMethods]))
     : contactMethods;
-  const requiresPhone = effectiveMethods.some((method) =>
-    PHONE_REQUIRED_CONTACT_METHODS.has(method)
-  );
 
-  if (requiresPhone && !phone) {
-    errors.contactPhone = "Add a phone number when phone, WhatsApp, or Viber is preferred.";
+  if (effectiveMethods.includes("phone") && !phone) {
+    errors.contactPhone = "Add a phone number when phone contact is enabled.";
+  }
+
+  if (effectiveMethods.includes("whatsapp") && !whatsappPhone) {
+    errors.whatsappPhone = "Add a WhatsApp number when WhatsApp contact is enabled.";
+  }
+
+  if (effectiveMethods.includes("viber") && !viberPhone) {
+    errors.viberPhone = "Add a Viber number when Viber contact is enabled.";
+  }
+
+  if (effectiveMethods.includes("email") && !contactEmail) {
+    errors.contactEmail = "Add a contact email when email contact is enabled.";
+  }
+
+  if (
+    preferredContactMethod !== null &&
+    !effectiveMethods.includes(preferredContactMethod)
+  ) {
+    errors.preferredContactMethod = "Primary method must be included in enabled contact methods.";
   }
 
   if (Object.keys(errors).length > 0) {
@@ -430,7 +466,10 @@ export function validateContactStep(values: ProviderDraftWizardValues): Validati
     payload: {
       preferred_contact_method: preferredContactMethod,
       contact_methods: effectiveMethods,
+      contact_email: contactEmail,
       phone,
+      whatsapp_phone: whatsappPhone,
+      viber_phone: viberPhone,
     },
   };
 }

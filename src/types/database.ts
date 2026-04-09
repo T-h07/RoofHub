@@ -376,6 +376,7 @@ export type Database = {
         Row: {
           avatar_url: string | null
           bio: string | null
+          contact_email: string | null
           contact_methods: Database["public"]["Enums"]["preferred_contact_method"][]
           created_at: string
           display_name: string
@@ -386,10 +387,13 @@ export type Database = {
             | null
           role: Database["public"]["Enums"]["app_role"]
           updated_at: string
+          viber_phone: string | null
+          whatsapp_phone: string | null
         }
         Insert: {
           avatar_url?: string | null
           bio?: string | null
+          contact_email?: string | null
           contact_methods?: Database["public"]["Enums"]["preferred_contact_method"][]
           created_at?: string
           display_name: string
@@ -400,10 +404,13 @@ export type Database = {
             | null
           role?: Database["public"]["Enums"]["app_role"]
           updated_at?: string
+          viber_phone?: string | null
+          whatsapp_phone?: string | null
         }
         Update: {
           avatar_url?: string | null
           bio?: string | null
+          contact_email?: string | null
           contact_methods?: Database["public"]["Enums"]["preferred_contact_method"][]
           created_at?: string
           display_name?: string
@@ -414,6 +421,8 @@ export type Database = {
             | null
           role?: Database["public"]["Enums"]["app_role"]
           updated_at?: string
+          viber_phone?: string | null
+          whatsapp_phone?: string | null
         }
         Relationships: []
       }

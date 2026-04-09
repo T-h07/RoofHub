@@ -447,7 +447,10 @@ export async function publishProviderListingDraftAction(
   const draftValues = buildWizardValuesFromDraft(draftResult.draft, {
     preferredContactMethod: "",
     contactMethods: ["in_app"],
+    contactEmail: "",
     phone: "",
+    whatsappPhone: "",
+    viberPhone: "",
   });
 
   const hasCoverImage = imagesResult.images.some((image) => image.isCover);

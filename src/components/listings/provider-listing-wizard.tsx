@@ -320,11 +320,20 @@ export function ProviderListingWizard({
     if (publishBlockers.length > 0) {
       setPublishBlockers([]);
     }
-    if (fieldErrors.contactMethods || fieldErrors.contactPhone) {
+    if (
+      fieldErrors.contactMethods ||
+      fieldErrors.contactPhone ||
+      fieldErrors.contactEmail ||
+      fieldErrors.whatsappPhone ||
+      fieldErrors.viberPhone
+    ) {
       setFieldErrors((current) => {
         const next = { ...current };
         delete next.contactMethods;
         delete next.contactPhone;
+        delete next.contactEmail;
+        delete next.whatsappPhone;
+        delete next.viberPhone;
         return next;
       });
     }
@@ -355,12 +364,22 @@ export function ProviderListingWizard({
     if (publishBlockers.length > 0) {
       setPublishBlockers([]);
     }
-    if (fieldErrors.contactMethods || fieldErrors.preferredContactMethod || fieldErrors.contactPhone) {
+    if (
+      fieldErrors.contactMethods ||
+      fieldErrors.preferredContactMethod ||
+      fieldErrors.contactPhone ||
+      fieldErrors.contactEmail ||
+      fieldErrors.whatsappPhone ||
+      fieldErrors.viberPhone
+    ) {
       setFieldErrors((current) => {
         const next = { ...current };
         delete next.contactMethods;
         delete next.preferredContactMethod;
         delete next.contactPhone;
+        delete next.contactEmail;
+        delete next.whatsappPhone;
+        delete next.viberPhone;
         return next;
       });
     }
@@ -1230,6 +1249,9 @@ export function ProviderListingWizard({
     const phoneIsRequired = effectiveContactMethods.some((method) =>
       PHONE_REQUIRED_CONTACT_METHODS.has(method)
     );
+    const emailIsRequired = effectiveContactMethods.includes("email");
+    const whatsappIsRequired = effectiveContactMethods.includes("whatsapp");
+    const viberIsRequired = effectiveContactMethods.includes("viber");
 
     return (
       <div className="space-y-4">
@@ -1316,22 +1338,82 @@ export function ProviderListingWizard({
             <FieldHelp>Primary method is shown first in listing contact guidance.</FieldHelp>
           </Field>
 
-          <Field>
-            <Label htmlFor="wizard-contact-phone">Public phone</Label>
-            <Input
-              id="wizard-contact-phone"
-              value={draft.contactPhone}
-              onChange={(event) => setField("contactPhone", event.currentTarget.value)}
-              placeholder="+49 123 456 789"
-              aria-invalid={Boolean(fieldErrors.contactPhone)}
-            />
-            {fieldErrors.contactPhone ? <FieldError>{fieldErrors.contactPhone}</FieldError> : null}
-            <FieldHelp>
-              {phoneIsRequired
-                ? "Required because phone-based channels are enabled."
-                : "Optional unless phone-based channels are enabled."}
-            </FieldHelp>
-          </Field>
+          {effectiveContactMethods.includes("email") ? (
+            <Field>
+              <Label htmlFor="wizard-contact-email">Contact email</Label>
+              <Input
+                id="wizard-contact-email"
+                value={draft.contactEmail}
+                onChange={(event) => setField("contactEmail", event.currentTarget.value)}
+                placeholder="provider@example.com"
+                inputMode="email"
+                aria-invalid={Boolean(fieldErrors.contactEmail)}
+              />
+              {fieldErrors.contactEmail ? <FieldError>{fieldErrors.contactEmail}</FieldError> : null}
+              <FieldHelp>
+                {emailIsRequired
+                  ? "Required because email contact is enabled."
+                  : "Optional unless email contact is enabled."}
+              </FieldHelp>
+            </Field>
+          ) : null}
+
+          {effectiveContactMethods.includes("phone") ? (
+            <Field>
+              <Label htmlFor="wizard-contact-phone">Phone number</Label>
+              <Input
+                id="wizard-contact-phone"
+                value={draft.contactPhone}
+                onChange={(event) => setField("contactPhone", event.currentTarget.value)}
+                placeholder="+49 123 456 789"
+                aria-invalid={Boolean(fieldErrors.contactPhone)}
+              />
+              {fieldErrors.contactPhone ? <FieldError>{fieldErrors.contactPhone}</FieldError> : null}
+              <FieldHelp>
+                {phoneIsRequired
+                  ? "Required because phone contact is enabled."
+                  : "Optional unless phone contact is enabled."}
+              </FieldHelp>
+            </Field>
+          ) : null}
+
+          {effectiveContactMethods.includes("whatsapp") ? (
+            <Field>
+              <Label htmlFor="wizard-contact-whatsapp">WhatsApp number</Label>
+              <Input
+                id="wizard-contact-whatsapp"
+                value={draft.whatsappPhone}
+                onChange={(event) => setField("whatsappPhone", event.currentTarget.value)}
+                placeholder="+49 151 000 000"
+                aria-invalid={Boolean(fieldErrors.whatsappPhone)}
+              />
+              {fieldErrors.whatsappPhone ? <FieldError>{fieldErrors.whatsappPhone}</FieldError> : null}
+              <FieldHelp>
+                {whatsappIsRequired
+                  ? "Required because WhatsApp contact is enabled."
+                  : "Optional unless WhatsApp contact is enabled."}
+              </FieldHelp>
+            </Field>
+          ) : null}
+
+          {effectiveContactMethods.includes("viber") ? (
+            <Field>
+              <Label htmlFor="wizard-contact-viber">Viber number</Label>
+              <Input
+                id="wizard-contact-viber"
+                value={draft.viberPhone}
+                onChange={(event) => setField("viberPhone", event.currentTarget.value)}
+                placeholder="+49 151 000 111"
+                aria-invalid={Boolean(fieldErrors.viberPhone)}
+              />
+              {fieldErrors.viberPhone ? <FieldError>{fieldErrors.viberPhone}</FieldError> : null}
+              <FieldHelp>
+                {viberIsRequired
+                  ? "Required because Viber contact is enabled."
+                  : "Optional unless Viber contact is enabled."}
+              </FieldHelp>
+            </Field>
+          ) : null}
         </div>
       </div>
     );
@@ -1339,9 +1421,37 @@ export function ProviderListingWizard({
 
   function renderReviewStep() {
     const coverImage = draftImages.find((image) => image.isCover) ?? null;
-    const contactMethodSummary = normalizeContactMethods(draft.contactMethods)
+    const effectiveContactMethods = normalizeContactMethods(draft.contactMethods);
+    const contactMethodSummary = effectiveContactMethods
       .map((method) => formatContactMethodLabel(method))
       .join(", ");
+    const contactDetailSummary = effectiveContactMethods
+      .map((method) => {
+        switch (method) {
+          case "email":
+            return draft.contactEmail
+              ? `Email: ${draft.contactEmail}`
+              : null;
+          case "phone":
+            return draft.contactPhone
+              ? `Phone: ${draft.contactPhone}`
+              : null;
+          case "whatsapp":
+            return draft.whatsappPhone
+              ? `WhatsApp: ${draft.whatsappPhone}`
+              : null;
+          case "viber":
+            return draft.viberPhone
+              ? `Viber: ${draft.viberPhone}`
+              : null;
+          case "in_app":
+            return "In-app messages enabled";
+          default:
+            return null;
+        }
+      })
+      .filter((value): value is string => Boolean(value))
+      .join(" • ");
 
     return (
       <div className="space-y-4">
@@ -1462,7 +1572,9 @@ export function ProviderListingWizard({
             </p>
             <p className="text-muted-foreground mt-1">
               Primary: {formatContactMethodLabel(draft.preferredContactMethod)}
-              {draft.contactPhone ? ` • ${draft.contactPhone}` : ""}
+            </p>
+            <p className="text-muted-foreground mt-1">
+              {contactDetailSummary || "No contact details configured yet."}
             </p>
             <button
               type="button"

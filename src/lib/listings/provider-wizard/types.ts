@@ -60,7 +60,10 @@ export type ProviderDraftWizardValues = {
   heatingType: ProviderHeatingType | "";
   preferredContactMethod: ProviderPreferredContactMethod | "";
   contactMethods: ProviderPreferredContactMethod[];
+  contactEmail: string;
   contactPhone: string;
+  whatsappPhone: string;
+  viberPhone: string;
 };
 
 export const PROVIDER_WIZARD_DEFAULT_VALUES: ProviderDraftWizardValues = {
@@ -93,7 +96,10 @@ export const PROVIDER_WIZARD_DEFAULT_VALUES: ProviderDraftWizardValues = {
   heatingType: "",
   preferredContactMethod: "",
   contactMethods: ["in_app"],
+  contactEmail: "",
   contactPhone: "",
+  whatsappPhone: "",
+  viberPhone: "",
 };
 
 export type ProviderDraftEditorRecord = Pick<
@@ -158,7 +164,10 @@ export type ProviderDraftImage = {
 export type ProviderContactSettings = {
   preferredContactMethod: ProviderPreferredContactMethod | "";
   contactMethods: ProviderPreferredContactMethod[];
+  contactEmail: string;
   phone: string;
+  whatsappPhone: string;
+  viberPhone: string;
 };
 
 export type ProviderWizardFieldErrors = Partial<Record<keyof ProviderDraftWizardValues, string>>;

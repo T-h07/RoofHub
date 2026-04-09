@@ -62,7 +62,9 @@ const PROVIDER_DRAFT_EDITOR_SELECT = `
   created_at
 `;
 
-const PROVIDER_CONTACT_SELECT = "preferred_contact_method, contact_methods, phone";
+const PROVIDER_CONTACT_SELECT =
+  "preferred_contact_method, contact_methods, phone, contact_email, whatsapp_phone, viber_phone";
+const PROVIDER_CONTACT_COMPAT_SELECT = "preferred_contact_method, contact_methods, phone";
 const PROVIDER_CONTACT_LEGACY_SELECT = "preferred_contact_method, phone";
 
 function isMissingContactMethodsColumnError(message: string | undefined) {
@@ -74,6 +76,20 @@ function isMissingContactMethodsColumnError(message: string | undefined) {
   return (
     normalized.includes("contact_methods") &&
     (normalized.includes("does not exist") || normalized.includes("column"))
+  );
+}
+
+function isMissingContactChannelColumnError(message: string | undefined) {
+  if (!message) {
+    return false;
+  }
+
+  const normalized = message.toLowerCase();
+  return (
+    normalized.includes("column") &&
+    (normalized.includes("contact_email") ||
+      normalized.includes("whatsapp_phone") ||
+      normalized.includes("viber_phone"))
   );
 }
 
@@ -150,8 +166,44 @@ export async function loadProviderContactSettings(
     .eq("id", userId)
     .maybeSingle();
 
-  let resolvedData = data;
+  let resolvedData:
+    | {
+        preferred_contact_method: Database["public"]["Enums"]["preferred_contact_method"] | null;
+        contact_methods?: unknown[];
+        phone: string | null;
+        contact_email?: string | null;
+        whatsapp_phone?: string | null;
+        viber_phone?: string | null;
+      }
+    | null = data as
+    | {
+        preferred_contact_method: Database["public"]["Enums"]["preferred_contact_method"] | null;
+        contact_methods?: unknown[];
+        phone: string | null;
+        contact_email?: string | null;
+        whatsapp_phone?: string | null;
+        viber_phone?: string | null;
+      }
+    | null;
   let resolvedError = error;
+
+  if (resolvedError && isMissingContactChannelColumnError(resolvedError.message)) {
+    const { data: compatData, error: compatError } = await supabase
+      .from("profiles")
+      .select(PROVIDER_CONTACT_COMPAT_SELECT)
+      .eq("id", userId)
+      .maybeSingle();
+
+    resolvedData = compatData
+      ? {
+          ...compatData,
+          contact_email: null,
+          whatsapp_phone: null,
+          viber_phone: null,
+        }
+      : null;
+    resolvedError = compatError;
+  }
 
   if (resolvedError && isMissingContactMethodsColumnError(resolvedError.message)) {
     const { data: legacyData, error: legacyError } = await supabase
@@ -175,7 +227,10 @@ export async function loadProviderContactSettings(
       settings: {
         preferredContactMethod: "",
         contactMethods: ["in_app"],
+        contactEmail: "",
         phone: "",
+        whatsappPhone: "",
+        viberPhone: "",
       } satisfies ProviderContactSettings,
     };
   }
@@ -200,7 +255,10 @@ export async function loadProviderContactSettings(
     settings: {
       preferredContactMethod,
       contactMethods: fallbackMethods,
+      contactEmail: resolvedData.contact_email ?? "",
       phone: resolvedData.phone ?? "",
+      whatsappPhone: resolvedData.whatsapp_phone ?? "",
+      viberPhone: resolvedData.viber_phone ?? "",
     } satisfies ProviderContactSettings,
   };
 }

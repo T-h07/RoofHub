@@ -32,7 +32,10 @@ export default async function NewDashboardListingPage() {
     ...PROVIDER_WIZARD_DEFAULT_VALUES,
     preferredContactMethod: contactSettings.settings.preferredContactMethod,
     contactMethods: contactSettings.settings.contactMethods,
+    contactEmail: contactSettings.settings.contactEmail,
     contactPhone: contactSettings.settings.phone,
+    whatsappPhone: contactSettings.settings.whatsappPhone,
+    viberPhone: contactSettings.settings.viberPhone,
   };
   const mapStyleUrl = getMapStyleUrl();
 

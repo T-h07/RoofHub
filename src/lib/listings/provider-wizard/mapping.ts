@@ -65,6 +65,9 @@ export function buildWizardValuesFromDraft(
     heatingType: draft.heating_type ?? "",
     preferredContactMethod: contact.preferredContactMethod,
     contactMethods: contact.contactMethods,
+    contactEmail: contact.contactEmail,
     contactPhone: contact.phone,
+    whatsappPhone: contact.whatsappPhone,
+    viberPhone: contact.viberPhone,
   };
 }

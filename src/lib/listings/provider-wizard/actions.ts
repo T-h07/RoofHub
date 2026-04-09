@@ -75,6 +75,32 @@ function normalizeSupabaseError(message: string) {
   return "Draft save failed. Please retry.";
 }
 
+function isMissingContactMethodsColumnError(message: string | undefined) {
+  if (!message) {
+    return false;
+  }
+
+  const normalized = message.toLowerCase();
+  return (
+    normalized.includes("contact_methods") &&
+    (normalized.includes("does not exist") || normalized.includes("column"))
+  );
+}
+
+function isMissingContactChannelColumnError(message: string | undefined) {
+  if (!message) {
+    return false;
+  }
+
+  const normalized = message.toLowerCase();
+  return (
+    normalized.includes("column") &&
+    (normalized.includes("contact_email") ||
+      normalized.includes("whatsapp_phone") ||
+      normalized.includes("viber_phone"))
+  );
+}
+
 function slugifyTitle(value: string) {
   const normalized = value
     .toLowerCase()
@@ -427,14 +453,40 @@ export async function saveProviderWizardStepAction(
         };
       }
 
-      const { error } = await supabase
+      let { error } = await supabase
         .from("profiles")
         .update({
           preferred_contact_method: contactValidation.payload.preferred_contact_method,
           contact_methods: contactValidation.payload.contact_methods,
+          contact_email: contactValidation.payload.contact_email,
           phone: contactValidation.payload.phone,
+          whatsapp_phone: contactValidation.payload.whatsapp_phone,
+          viber_phone: contactValidation.payload.viber_phone,
         })
         .eq("id", profile.id);
+
+      if (error && isMissingContactChannelColumnError(error.message)) {
+        const fallbackResult = await supabase
+          .from("profiles")
+          .update({
+            preferred_contact_method: contactValidation.payload.preferred_contact_method,
+            contact_methods: contactValidation.payload.contact_methods,
+            phone: contactValidation.payload.phone,
+          })
+          .eq("id", profile.id);
+        error = fallbackResult.error;
+      }
+
+      if (error && isMissingContactMethodsColumnError(error.message)) {
+        const legacyResult = await supabase
+          .from("profiles")
+          .update({
+            preferred_contact_method: contactValidation.payload.preferred_contact_method,
+            phone: contactValidation.payload.phone,
+          })
+          .eq("id", profile.id);
+        error = legacyResult.error;
+      }
 
       if (error) {
         return {
