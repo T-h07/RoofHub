@@ -4,7 +4,7 @@ Map-first real estate marketplace for rental and sale listings.
 
 ## Current Stage
 
-`NM-PT17 Provider Map Pin Placement Flow` is established:
+`NM-PT18 Listing Photos and Publish Flow` is established:
 
 - Next.js App Router + TypeScript scaffold
 - Supabase App Router SSR integration (`@supabase/supabase-js`, `@supabase/ssr`)
@@ -52,6 +52,11 @@ Map-first real estate marketplace for rental and sale listings.
 - provider location step with click-to-place and drag-to-adjust map pin interactions
 - persisted listing coordinates, address text, and exact vs approximate public location mode controls
 - provider review step integration for location summary and edit jumpbacks
+- provider photos step with real upload, reorder, cover-image selection, and persisted image state
+- publish-readiness blockers surfaced in the review step with direct step jumpbacks
+- real draft -> published action with server-enforced readiness checks
+- centralized listing status transition foundation for later provider management workflows
+- post-publish redirect to public listing detail route for immediate verification
 - generated TypeScript database types in `src/types/database.ts` (schema + policy helper functions)
 - existing PT02 shell and PT03 integration structure preserved
 
@@ -241,6 +246,12 @@ Provider listing wizard documentation:
 Provider location-step documentation:
 
 - `docs/provider-map-pin-placement.md`
+
+## Listing Photos and Publish Flow (PT18)
+
+Provider photo/publish documentation:
+
+- `docs/listing-photos-publish-flow.md`
 
 ## Local Development
 
