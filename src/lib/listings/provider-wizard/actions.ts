@@ -61,6 +61,13 @@ function normalizeSupabaseError(message: string) {
     return "You do not have permission to edit this listing draft.";
   }
 
+  if (
+    normalized.includes('null value in column "latitude"') ||
+    normalized.includes('null value in column "longitude"')
+  ) {
+    return "Listing draft location schema is out of date. Run Supabase migrations (including PT16 location-nullable) and retry.";
+  }
+
   if (normalized.includes("check constraint")) {
     return "Some values do not match listing requirements. Review highlighted fields and retry.";
   }
