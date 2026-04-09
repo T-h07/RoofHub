@@ -19,8 +19,11 @@
 - Preserve centralized redirect safety helpers (`src/lib/auth/routing.ts`) and do not bypass them with ad-hoc `next` handling.
 - Keep upload/storage flows ownership-aware and deterministic:
   - validate file type/size/count
+  - validate upload content signatures for supported image formats when handling media files
   - use deterministic path conventions
-  - avoid broad overwrite/upsert behavior as a default
+  - keep strict owner/listing-scoped object path structure and reject non-canonical path inputs
+  - avoid broad overwrite/upsert behavior as a default (`upsert: false` for listing media flow)
+  - do not reintroduce permissive object-update storage policies for listing media without explicit security review
 - Keep public/private visibility rules explicit. Do not accidentally expose draft, hidden, moderated, or private data.
 - User-facing errors must be human-readable and generic; logs may be diagnostic but must redact secrets and tokens.
 

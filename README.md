@@ -355,6 +355,11 @@ Security-sensitive changes must follow the baseline and complete the checklist b
   - `docs/security-baseline.md`
   - `docs/security-checklist.md`
 
+## Upload and Storage Hardening (SH-PT05)
+
+- Media/upload lifecycle and storage security contract: `docs/upload-storage-hardening.md`
+- Storage foundation details (bucket/policy/path baseline): `docs/storage-images-foundation.md`
+
 ## Supply Chain Guardrails (SH-PT07)
 
 - Repository-level supply-chain policy and scanner response workflow: `docs/supply-chain-guardrails.md`

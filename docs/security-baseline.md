@@ -58,10 +58,14 @@ Supply-chain execution details are defined in `docs/supply-chain-guardrails.md`.
 ### 4) Upload and storage flows
 
 - Enforce approved MIME types, max file size, and max file count.
+- Verify file signatures for accepted image types before upload; do not rely on browser picker or declared MIME alone.
 - Keep deterministic path format and parse/verify ownership before delete/sync operations.
+- Keep listing image path format strict (`owner/{owner_uuid}/listing/{listing_uuid}/{uuid}.{ext}`) and reject path-abuse patterns.
 - No broad public write access.
-- Do not rely on overwrite/upsert behavior as standard flow.
+- Do not rely on overwrite/upsert behavior as standard flow (`upsert: false` default for media uploads).
+- Keep object update semantics intentionally constrained for listing images; prefer append + delete flows.
 - Public/private bucket usage must be explicit and documented.
+- Preserve SH-PT05 media contract in `docs/upload-storage-hardening.md`.
 
 ### 5) Messaging, moderation, and privilege boundaries
 
@@ -127,6 +131,7 @@ The following changes require explicit security review before merge:
 - authorization logic, ownership checks, admin/provider boundaries
 - route handler/server action changes on sensitive data
 - storage/upload/delete path and bucket/policy behavior
+- storage path validation, object overwrite policy changes, or media lifecycle cleanup semantics
 - messaging participant rules and moderation status transitions
 - new external input parsers or render paths for user content
 - environment/secrets model changes

@@ -57,6 +57,8 @@ Treat these as untrusted input boundaries:
 
 - Validate upload payload structure server-side (ids, paths, sort order, cover flags).
 - Enforce max image count and deterministic owner/listing scoped paths.
+- Enforce strict canonical listing image path shape (`owner/{owner_uuid}/listing/{listing_uuid}/{uuid}.{ext}`).
+- Validate accepted image content via file signature checks where upload code handles media files directly.
 - Reject payloads with invalid/foreign storage paths before mutation.
 - Do not rely on client ordering/cover assumptions without server normalization.
 

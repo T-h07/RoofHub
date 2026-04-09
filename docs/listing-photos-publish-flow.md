@@ -40,8 +40,10 @@ This action:
 
 - validates payload paths belong to the draft listing owner/listing id
 - normalizes order + cover
-- removes dropped images from storage + DB
 - rewrites `listing_images` rows in stable order
+- restores previous `listing_images` snapshot when rewrite insert fails
+- cleans up dropped storage objects after successful metadata rewrite
+- surfaces explicit cleanup warnings when object deletion is partial
 - returns refreshed signed URLs for the wizard
 
 ## Cover Image Rules

@@ -32,7 +32,8 @@ Rules:
 
 - owner/listing IDs must be UUIDs
 - file extension must be `jpg|jpeg|png|webp`
-- filenames are generated UUID-based values (no user filename uniqueness assumptions)
+- filenames are generated UUID-based values and must follow `{uuid}.{ext}` (no user filename identity)
+- path length and whitespace/path-abuse inputs are rejected
 - normal flows should use new unique paths, not overwrite/upsert
 
 ## Storage Policies
@@ -47,7 +48,8 @@ Key behavior:
   - published listing, or
   - listing owner, or
   - admin
-- `authenticated` can `INSERT/UPDATE/DELETE` only for objects whose path owner/listing matches an owned listing (or admin)
+- `authenticated` can `INSERT/DELETE` only for objects whose path owner/listing matches an owned listing (or admin)
+- listing-image object update policy is intentionally removed in SH-PT05 to reduce ambiguous overwrite behavior; normal flow is insert + delete
 - public/anon writes are blocked
 - cross-owner path writes are blocked
 
@@ -88,6 +90,7 @@ Core modules:
 - Empty files and duplicate local selections are rejected
 
 Validation runs client-side for immediate UX and is also constrained by bucket MIME/size limits.
+Binary signature checks are also applied before upload so accepted MIME values are not trusted by metadata alone.
 
 ## Cleanup Strategy
 

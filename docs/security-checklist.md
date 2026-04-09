@@ -33,8 +33,11 @@ For dependency/lockfile/scanner specifics, also follow `docs/supply-chain-guardr
 ## Storage and visibility
 
 - [ ] Upload constraints are enforced (type, size, count).
+- [ ] Image content signature checks are enforced for accepted upload types where applicable.
 - [ ] Storage paths remain deterministic and ownership-scoped.
+- [ ] Listing image path shape remains strict (`owner/{owner_uuid}/listing/{listing_uuid}/{uuid}.{ext}`).
 - [ ] Delete/sync operations verify object ownership/path validity.
+- [ ] Upload flow avoids ambiguous overwrite behavior (`upsert: false` default unless explicitly justified).
 - [ ] Listing/report/message visibility still respects status and participant rules.
 - [ ] Moderation-related status transitions still enforce admin authority.
 
