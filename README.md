@@ -4,7 +4,7 @@ Map-first real estate marketplace for rental and sale listings.
 
 ## Current Stage
 
-`NM-PT22 Messaging UI` is established:
+`NM-PT23 Realtime Messaging` is established:
 
 - Next.js App Router + TypeScript scaffold
 - Supabase App Router SSR integration (`@supabase/supabase-js`, `@supabase/ssr`)
@@ -80,6 +80,10 @@ Map-first real estate marketplace for rental and sale listings.
 - unread cues now surface in conversation list and clear on thread-open via read-state mutation
 - responsive messaging layout now supports desktop split view and mobile drill-in/back navigation
 - messaging loading/empty/error states are now integrated for route and thread surfaces
+- scoped Supabase realtime subscriptions now sync message inserts/updates across active participant threads
+- optimistic send now renders immediate pending bubbles and reconciles against persisted message events
+- conversation list ordering/unread cues now update live from message events with participant-safe scoping
+- degraded realtime states now auto-fallback to periodic server refresh with manual refresh/retry controls
 - generated TypeScript database types in `src/types/database.ts` (schema + policy helper functions)
 - existing PT02 shell and PT03 integration structure preserved
 
@@ -299,6 +303,12 @@ Messaging backend documentation:
 Messaging UI documentation:
 
 - `docs/messaging-ui.md`
+
+## Realtime Messaging (PT23)
+
+Realtime messaging documentation:
+
+- `docs/realtime-messaging.md`
 
 ## Local Development
 
