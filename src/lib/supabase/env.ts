@@ -4,9 +4,6 @@ const SUPABASE_ANON_KEY_ENV = "NEXT_PUBLIC_SUPABASE_ANON_KEY";
 const SERVER_SUPABASE_URL_ENV = "SUPABASE_URL";
 const SERVER_SUPABASE_PUBLISHABLE_KEY_ENV = "SUPABASE_PUBLISHABLE_KEY";
 const SERVER_SUPABASE_ANON_KEY_ENV = "SUPABASE_ANON_KEY";
-const LOCAL_DEV_SUPABASE_URL = "http://127.0.0.1:54321";
-const LOCAL_DEV_SUPABASE_PUBLISHABLE_KEY =
-  "<supabase-publishable-key>";
 
 function readEnv(names: readonly string[]) {
   for (const name of names) {
@@ -20,9 +17,7 @@ function readEnv(names: readonly string[]) {
 }
 
 export function getSupabaseEnv() {
-  const url =
-    readEnv([SUPABASE_URL_ENV, SERVER_SUPABASE_URL_ENV]) ??
-    (process.env.NODE_ENV !== "production" ? LOCAL_DEV_SUPABASE_URL : null);
+  const url = readEnv([SUPABASE_URL_ENV, SERVER_SUPABASE_URL_ENV]);
 
   if (!url) {
     throw new Error(
@@ -36,10 +31,7 @@ export function getSupabaseEnv() {
       SUPABASE_ANON_KEY_ENV,
       SERVER_SUPABASE_PUBLISHABLE_KEY_ENV,
       SERVER_SUPABASE_ANON_KEY_ENV,
-    ]) ??
-    (process.env.NODE_ENV !== "production" && url === LOCAL_DEV_SUPABASE_URL
-      ? LOCAL_DEV_SUPABASE_PUBLISHABLE_KEY
-      : null);
+    ]);
 
   if (!publishableKey) {
     const acceptedNames = [
