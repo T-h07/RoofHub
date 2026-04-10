@@ -3,13 +3,29 @@
 import Image from "next/image";
 import { useActionState, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
-import { Camera, LoaderCircle, Shield, Sparkles, Trash2 } from "lucide-react";
+import {
+  AlertTriangle,
+  Camera,
+  LoaderCircle,
+  LogOut,
+  Mail,
+  Shield,
+  Trash2,
+  UserRound,
+} from "lucide-react";
 
 import { AuthStatusMessage } from "@/components/auth/auth-status-message";
-import { SignOutButton } from "@/components/auth/sign-out-button";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Field, FieldError, FieldHelp } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,6 +34,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { signOutAction } from "@/lib/auth/actions";
 import { getRoleDescription, getRoleLabel, isAdminRole, type AppRole } from "@/lib/auth/roles";
 import {
+  deleteAccountAction,
   removeProfileAvatarAction,
   updateProfileAction,
   uploadProfileAvatarAction,
@@ -25,6 +42,7 @@ import {
 import {
   PROFILE_ACTION_IDLE_STATE,
   PROFILE_AVATAR_ACTION_IDLE_STATE,
+  PROFILE_DELETE_ACTION_IDLE_STATE,
   type ProfileAvatarActionState,
 } from "@/lib/profile/types";
 import type { PreferredContactMethod } from "@/lib/auth/roles";
@@ -234,8 +252,15 @@ export function ProfileForm({ profile, account, experience }: ProfileFormProps) 
     removeProfileAvatarAction,
     PROFILE_AVATAR_ACTION_IDLE_STATE
   );
+  const [deleteState, deleteAction, isDeletePending] = useActionState(
+    deleteAccountAction,
+    PROFILE_DELETE_ACTION_IDLE_STATE
+  );
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [brokenAvatarUrl, setBrokenAvatarUrl] = useState<string | null>(null);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [deleteConfirmationText, setDeleteConfirmationText] = useState("");
+  const [deleteConfirmationEmail, setDeleteConfirmationEmail] = useState("");
 
   const uploadFormRef = useRef<HTMLFormElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -245,6 +270,7 @@ export function ProfileForm({ profile, account, experience }: ProfileFormProps) 
   const profileImageInitials = toInitials(profile.displayName, profile.role);
   const accountSince = formatDate(account.createdAt);
   const lastUpdated = formatDate(account.updatedAt);
+  const requiresEmailDeleteConfirmation = Boolean(account.email?.trim());
 
   const [selectedContactMethods, setSelectedContactMethods] = useState<PreferredContactMethod[]>(
     () => resolveInitialContactMethods(profile)
@@ -254,6 +280,10 @@ export function ProfileForm({ profile, account, experience }: ProfileFormProps) 
   >(() => profile.preferredContactMethod ?? resolveInitialContactMethods(profile)[0] ?? "");
 
   const avatarStatus = getAvatarStatusMessage(avatarUploadState, avatarRemoveState);
+  const deleteConfirmationReady =
+    deleteConfirmationText.trim() === "DELETE" &&
+    (!requiresEmailDeleteConfirmation ||
+      deleteConfirmationEmail.trim().toLowerCase() === account.email?.trim().toLowerCase());
 
   useEffect(() => {
     if (profileState.status === "success") {
@@ -272,6 +302,13 @@ export function ProfileForm({ profile, account, experience }: ProfileFormProps) 
       fileInputRef.current.value = "";
     }
   }, [avatarUploadState.status]);
+
+  useEffect(() => {
+    if (deleteState.status === "success") {
+      router.replace(deleteState.redirectTo ?? "/");
+      router.refresh();
+    }
+  }, [deleteState.redirectTo, deleteState.status, router]);
 
   const displayedAvatarUrl =
     profile.avatarUrl && brokenAvatarUrl !== profile.avatarUrl ? profile.avatarUrl : null;
@@ -323,9 +360,9 @@ export function ProfileForm({ profile, account, experience }: ProfileFormProps) 
         <div className="relative grid gap-6 xl:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
           <div className="space-y-5">
             <div className="flex flex-wrap items-center gap-2">
-              <p className="type-label">Profile hub</p>
+              <p className="type-label">RoofHub account hub</p>
               <Badge variant={isProvider ? "primary" : "neutral"}>{getRoleLabel(profile.role)}</Badge>
-              <Badge variant="outline">NM-PT profile overhaul</Badge>
+              <Badge variant="outline">Role-aware identity</Badge>
             </div>
 
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
@@ -725,13 +762,13 @@ export function ProfileForm({ profile, account, experience }: ProfileFormProps) 
 
             <div className="border-border/70 bg-background/45 rounded-xl border px-4 py-3.5">
               <p className="inline-flex items-center gap-2 text-sm font-semibold tracking-tight">
-                <Sparkles className="text-primary size-4" />
-                Role-aware presentation
+                <UserRound className="text-primary size-4" />
+                Public profile framing
               </p>
               <p className="text-muted-foreground mt-1 text-sm leading-6">
                 {isProvider
-                  ? "Provider profiles emphasize trust signals, response channels, and listing presence."
-                  : "Seeker profiles emphasize account identity, saved activity context, and messaging readiness."}
+                  ? "Provider mode prioritizes trust and response expectations across listing detail and message entry."
+                  : "Seeker mode keeps identity lightweight while preserving favorites and conversation continuity."}
               </p>
             </div>
           </div>
@@ -742,40 +779,51 @@ export function ProfileForm({ profile, account, experience }: ProfileFormProps) 
             <p className="type-label">Account controls</p>
             <h2 className="type-section-title">Security and lifecycle</h2>
             <p className="type-body-muted">
-              Access controls remain enforced server-side. This section keeps session and future account
-              lifecycle actions centralized.
+              Session controls and destructive account actions are handled through server-side
+              boundaries.
             </p>
           </header>
 
-          <div className="grid gap-4 xl:grid-cols-2">
-            <div className="border-border/70 bg-background/45 rounded-xl border px-4 py-3.5">
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
+            <div className="space-y-3 rounded-xl border border-border/70 bg-background/45 px-4 py-3.5">
               <p className="inline-flex items-center gap-2 text-sm font-semibold tracking-tight">
                 <Shield className="text-primary size-4" />
                 Active session controls
               </p>
+              <p className="text-muted-foreground inline-flex items-center gap-2 text-xs leading-5">
+                <Mail className="size-3.5" />
+                {account.email ?? "Signed-in email unavailable"}
+              </p>
               <p className="text-muted-foreground mt-1 text-sm leading-6">
                 Sign out from this browser session instantly.
               </p>
-              <form action={signOutAction} className="mt-3">
-                <SignOutButton className="w-full justify-center sm:w-auto" />
-              </form>
+              <Button
+                type="submit"
+                formAction={signOutAction}
+                variant="outline"
+                className="mt-3 w-full justify-center sm:w-auto"
+              >
+                <LogOut className="size-4" />
+                Sign out
+              </Button>
             </div>
 
-            <div className="border-destructive/30 bg-destructive/8 rounded-xl border px-4 py-3.5">
+            <div className="space-y-3 rounded-xl border border-destructive/30 bg-destructive/8 px-4 py-3.5">
               <p className="inline-flex items-center gap-2 text-sm font-semibold tracking-tight">
-                <Trash2 className="text-destructive size-4" />
+                <AlertTriangle className="text-destructive size-4" />
                 Danger zone
               </p>
               <p className="text-muted-foreground mt-1 text-sm leading-6">
-                Account hard-delete workflow will be introduced in a follow-up PT with explicit safety checks.
+                Permanent deletion removes your RoofHub account, listings, favorites, conversations,
+                messages, reports, and linked media.
               </p>
               <Button
                 type="button"
                 variant="destructive"
-                disabled
                 className="mt-3 w-full justify-center sm:w-auto"
+                onClick={() => setIsDeleteDialogOpen(true)}
               >
-                Delete account (coming soon)
+                Delete account permanently
               </Button>
             </div>
           </div>
@@ -795,6 +843,95 @@ export function ProfileForm({ profile, account, experience }: ProfileFormProps) 
           </div>
         </section>
       </form>
+
+      <Dialog
+        open={isDeleteDialogOpen}
+        onOpenChange={(open) => {
+          if (!isDeletePending) {
+            setIsDeleteDialogOpen(open);
+            if (!open) {
+              setDeleteConfirmationText("");
+              setDeleteConfirmationEmail("");
+            }
+          }
+        }}
+      >
+        <DialogContent showClose={!isDeletePending} className="sm:max-w-[37rem]">
+          <DialogHeader>
+            <DialogTitle className="inline-flex items-center gap-2 text-base">
+              <AlertTriangle className="text-destructive size-4" />
+              Permanently delete RoofHub account
+            </DialogTitle>
+            <DialogDescription className="text-sm leading-6">
+              This action cannot be undone. RoofHub will permanently remove your account identity,
+              listings, favorites, messages, reports, and linked media objects.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form action={deleteAction} className="mt-4 space-y-4">
+            <Field>
+              <Label htmlFor="delete-confirm-text">
+                Type <span className="font-semibold">DELETE</span> to confirm
+              </Label>
+              <Input
+                id="delete-confirm-text"
+                name="confirmDeleteText"
+                value={deleteConfirmationText}
+                onChange={(event) => setDeleteConfirmationText(event.currentTarget.value)}
+                placeholder="DELETE"
+                disabled={isDeletePending}
+                autoComplete="off"
+              />
+            </Field>
+
+            {requiresEmailDeleteConfirmation ? (
+              <Field>
+                <Label htmlFor="delete-confirm-email">Confirm account email</Label>
+                <Input
+                  id="delete-confirm-email"
+                  name="confirmEmail"
+                  type="email"
+                  value={deleteConfirmationEmail}
+                  onChange={(event) => setDeleteConfirmationEmail(event.currentTarget.value)}
+                  placeholder={account.email ?? ""}
+                  disabled={isDeletePending}
+                  autoComplete="off"
+                />
+                <FieldHelp>Enter {account.email} exactly to enable permanent deletion.</FieldHelp>
+              </Field>
+            ) : (
+              <input type="hidden" name="confirmEmail" value="" />
+            )}
+
+            {deleteState.status === "error" && deleteState.message ? (
+              <AuthStatusMessage tone="error" message={deleteState.message} />
+            ) : null}
+
+            {deleteState.status === "success" && deleteState.message ? (
+              <AuthStatusMessage tone="success" message={deleteState.message} />
+            ) : null}
+
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={isDeletePending}
+                onClick={() => setIsDeleteDialogOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                variant="destructive"
+                disabled={!deleteConfirmationReady || isDeletePending}
+              >
+                {isDeletePending ? <LoaderCircle className="size-4 animate-spin" /> : null}
+                {isDeletePending ? "Deleting account..." : "Delete account permanently"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
