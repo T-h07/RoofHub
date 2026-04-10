@@ -3,6 +3,7 @@
 import { createServerSupabaseClient } from "@/lib/supabase";
 import { getCurrentUserProfile } from "@/lib/auth/profile";
 import { isProviderRole } from "@/lib/auth/roles";
+import { enforceTrafficControl, TRAFFIC_CONTROL_RULES } from "@/lib/security/traffic-control";
 import {
   LISTING_IMAGE_MAX_COUNT,
   LISTING_IMAGE_MAX_PATH_LENGTH,
@@ -427,6 +428,25 @@ export async function syncProviderListingPhotosAction(
     };
   }
 
+  const photoSyncTrafficControl = await enforceTrafficControl({
+    supabase,
+    rule: TRAFFIC_CONTROL_RULES.providerPhotoSyncPerListing,
+    identity: {
+      userId: profile.id,
+      scope: draftAccess.listing.id,
+      includeIp: false,
+    },
+    throttledMessage: "Photo save limit reached for this listing.",
+    unavailableMessage: "Photo save is temporarily unavailable. Please retry shortly.",
+  });
+  if (!photoSyncTrafficControl.ok) {
+    return {
+      ok: false,
+      message: photoSyncTrafficControl.message,
+      images: [],
+    };
+  }
+
   const normalizedImages = normalizeCoverAndOrder(normalizedInput.images);
   const payloadValidation = validatePhotoPayload({
     images: normalizedImages,
@@ -579,6 +599,24 @@ export async function publishProviderListingDraftAction(
   }
 
   const { supabase, profile } = context;
+  const publishTrafficControl = await enforceTrafficControl({
+    supabase,
+    rule: TRAFFIC_CONTROL_RULES.providerPublishPerListing,
+    identity: {
+      userId: profile.id,
+      scope: input.draftId,
+      includeIp: false,
+    },
+    throttledMessage: "Publish attempt limit reached for this listing.",
+    unavailableMessage: "Publish action is temporarily unavailable. Please retry shortly.",
+  });
+  if (!publishTrafficControl.ok) {
+    return {
+      ok: false,
+      message: publishTrafficControl.message,
+    };
+  }
+
   const draftResult = await loadProviderDraftForEditor(supabase, profile.id, input.draftId);
 
   if (!draftResult.ok || !draftResult.draft) {

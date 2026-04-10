@@ -3,6 +3,7 @@
 import { createServerSupabaseClient } from "@/lib/supabase";
 import { getCurrentUserProfile } from "@/lib/auth/profile";
 import { isProviderRole } from "@/lib/auth/roles";
+import { enforceTrafficControl, TRAFFIC_CONTROL_RULES } from "@/lib/security/traffic-control";
 
 import {
   PROVIDER_WIZARD_DEFAULT_VALUES,
@@ -388,6 +389,24 @@ export async function saveProviderWizardStepAction(
   const { supabase, profile, userEmail } = providerContext;
   const { step, values, createDraftId } = normalizedInput;
   const candidateDraftId = normalizedInput.draftId;
+  const draftSaveTrafficControl = await enforceTrafficControl({
+    supabase,
+    rule: TRAFFIC_CONTROL_RULES.providerDraftSavePerUser,
+    identity: {
+      userId: profile.id,
+      scope: step,
+      includeIp: false,
+    },
+    throttledMessage: "Draft save limit reached. Please wait before saving again.",
+    unavailableMessage: "Draft save is temporarily unavailable. Please retry shortly.",
+  });
+  if (!draftSaveTrafficControl.ok) {
+    return {
+      ok: false,
+      draftId: candidateDraftId,
+      message: draftSaveTrafficControl.message,
+    };
+  }
 
   try {
     if (step === "basics") {

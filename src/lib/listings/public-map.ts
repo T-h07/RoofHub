@@ -8,7 +8,7 @@ import type { ExploreSearchState } from "./explore-search-params";
 import type { MapSearchBounds } from "./map-bounds";
 import { applyPublicListingFilters } from "./public-listing-filters";
 
-export const PUBLIC_MAP_MARKER_LIMIT = 350;
+export const PUBLIC_MAP_MARKER_LIMIT = 250;
 
 type PublicMapListingRow = Pick<
   Tables<"listings">,

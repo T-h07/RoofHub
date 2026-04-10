@@ -2,6 +2,7 @@
 
 import { getCurrentUserProfile } from "@/lib/auth/profile";
 import { isProviderRole } from "@/lib/auth/roles";
+import { enforceTrafficControl, TRAFFIC_CONTROL_RULES } from "@/lib/security/traffic-control";
 import { createServerSupabaseClient } from "@/lib/supabase";
 import { canTransitionProviderListingStatus } from "@/lib/listings/provider-wizard/status-transitions";
 import { isProviderListingStatus } from "./types";
@@ -213,6 +214,23 @@ export async function updateProviderListingLifecycleStatusAction(
   }
 
   const { supabase, profile } = context;
+  const lifecycleTrafficControl = await enforceTrafficControl({
+    supabase,
+    rule: TRAFFIC_CONTROL_RULES.providerStatusUpdatePerListing,
+    identity: {
+      userId: profile.id,
+      scope: listingId,
+      includeIp: false,
+    },
+    throttledMessage: "Too many status changes for this listing. Please wait before trying again.",
+    unavailableMessage: "Listing status updates are temporarily unavailable. Please retry shortly.",
+  });
+  if (!lifecycleTrafficControl.ok) {
+    return {
+      ok: false,
+      message: lifecycleTrafficControl.message,
+    };
+  }
 
   if (nextStatus === "hidden_by_admin") {
     return {

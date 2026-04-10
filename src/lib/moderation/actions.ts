@@ -2,6 +2,7 @@
 
 import { getCurrentUserProfile } from "@/lib/auth/profile";
 import { isAdminRole } from "@/lib/auth/roles";
+import { enforceTrafficControl, TRAFFIC_CONTROL_RULES } from "@/lib/security/traffic-control";
 import { createServerSupabaseClient } from "@/lib/supabase";
 
 import type {
@@ -124,7 +125,23 @@ export async function updateListingModerationVisibilityAction(
     };
   }
 
-  const { supabase } = context;
+  const { supabase, profile } = context;
+  const moderationTrafficControl = await enforceTrafficControl({
+    supabase,
+    rule: TRAFFIC_CONTROL_RULES.adminModerationPerUser,
+    identity: {
+      userId: profile.id,
+      includeIp: false,
+    },
+    throttledMessage: "Moderation action limit reached. Please wait before submitting more changes.",
+    unavailableMessage: "Moderation actions are temporarily unavailable. Please retry shortly.",
+  });
+  if (!moderationTrafficControl.ok) {
+    return {
+      ok: false,
+      message: moderationTrafficControl.message,
+    };
+  }
 
   const listingResult = await supabase
     .from("listings")

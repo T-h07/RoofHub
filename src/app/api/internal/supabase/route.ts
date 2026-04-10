@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { enforceTrafficControl, TRAFFIC_CONTROL_RULES } from "@/lib/security/traffic-control";
 import { createServerSupabaseClient, getSupabaseEnv } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
@@ -10,6 +11,29 @@ export async function GET() {
   try {
     const { url } = getSupabaseEnv();
     const supabase = await createServerSupabaseClient();
+    const trafficControl = await enforceTrafficControl({
+      supabase,
+      rule: TRAFFIC_CONTROL_RULES.internalSupabaseProbePerIp,
+      identity: { includeIp: true },
+      throttledMessage: "Supabase probe request limit reached.",
+      unavailableMessage: "Supabase probe is temporarily unavailable.",
+    });
+
+    if (!trafficControl.ok) {
+      return NextResponse.json(
+        {
+          ok: false,
+          check: "supabase-auth-endpoint",
+          note: trafficControl.message,
+        },
+        {
+          status: trafficControl.reason === "throttled" ? 429 : 503,
+          headers: {
+            "Retry-After": String(Math.max(1, trafficControl.retryAfterSeconds)),
+          },
+        }
+      );
+    }
 
     // Probe auth endpoint without requiring a real user session.
     const { error } = await supabase.auth.getUser("supabase_probe_invalid_token");

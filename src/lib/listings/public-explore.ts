@@ -123,7 +123,7 @@ async function loadPublishedCityOptions() {
     .select("city")
     .eq("listing_status", PUBLIC_DISCOVERY_STATUS)
     .order("city", { ascending: true })
-    .limit(250);
+    .limit(180);
 
   return normalizeCityOptions((data ?? []) as Array<{ city: string }>);
 }
