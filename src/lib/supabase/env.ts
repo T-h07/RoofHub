@@ -1,37 +1,46 @@
 const SUPABASE_URL_ENV = "NEXT_PUBLIC_SUPABASE_URL";
 const SUPABASE_PUBLISHABLE_KEY_ENV = "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY";
 const SUPABASE_ANON_KEY_ENV = "NEXT_PUBLIC_SUPABASE_ANON_KEY";
-const SERVER_SUPABASE_URL_ENV = "SUPABASE_URL";
 const SERVER_SUPABASE_PUBLISHABLE_KEY_ENV = "SUPABASE_PUBLISHABLE_KEY";
 const SERVER_SUPABASE_ANON_KEY_ENV = "SUPABASE_ANON_KEY";
 
-function readEnv(names: readonly string[]) {
-  for (const name of names) {
-    const value = process.env[name];
-    if (value) {
-      return value;
-    }
-  }
+type SupabaseResolvedEnv = {
+  url: string | null;
+  publishableKey: string | null;
+};
 
-  return null;
+function resolveClientSupabaseEnv(): SupabaseResolvedEnv {
+  return {
+    url: process.env.NEXT_PUBLIC_SUPABASE_URL ?? null,
+    publishableKey:
+      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
+      null,
+  };
+}
+
+function resolveServerSupabaseEnv(): SupabaseResolvedEnv {
+  const clientEnv = resolveClientSupabaseEnv();
+
+  return {
+    url: clientEnv.url ?? process.env.SUPABASE_URL ?? null,
+    publishableKey:
+      clientEnv.publishableKey ??
+      process.env.SUPABASE_PUBLISHABLE_KEY ??
+      process.env.SUPABASE_ANON_KEY ??
+      null,
+  };
 }
 
 export function getSupabaseEnv() {
-  const url = readEnv([SUPABASE_URL_ENV, SERVER_SUPABASE_URL_ENV]);
+  const { url, publishableKey } =
+    typeof window === "undefined" ? resolveServerSupabaseEnv() : resolveClientSupabaseEnv();
 
   if (!url) {
     throw new Error(
       `[Supabase] Missing required environment variable: ${SUPABASE_URL_ENV}. Set it in .env.local (local) or Vercel Environment Variables (Development/Preview/Production).`
     );
   }
-
-  const publishableKey =
-    readEnv([
-      SUPABASE_PUBLISHABLE_KEY_ENV,
-      SUPABASE_ANON_KEY_ENV,
-      SERVER_SUPABASE_PUBLISHABLE_KEY_ENV,
-      SERVER_SUPABASE_ANON_KEY_ENV,
-    ]);
 
   if (!publishableKey) {
     const acceptedNames = [
