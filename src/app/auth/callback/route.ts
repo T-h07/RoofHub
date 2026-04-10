@@ -3,6 +3,12 @@ import type { EmailOtpType } from "@supabase/supabase-js";
 
 import { ensureProfileForCurrentUser } from "@/lib/auth/profile";
 import {
+  buildOAuthEntryPath,
+  isOAuthIntent,
+  normalizeOAuthIntent,
+  type OAuthStatus,
+} from "@/lib/auth/oauth";
+import {
   AUTH_DEFAULT_REDIRECT_PATH,
   resolveAuthenticatedRedirect,
   toSignInPath,
@@ -26,6 +32,23 @@ const SUPPORTED_OTP_TYPES = new Set<EmailOtpType>([
 
 function toRedirectUrl(request: Request, path: string) {
   return new URL(path, request.url);
+}
+
+function getCallbackFailurePath(input: {
+  hasOAuthIntent: boolean;
+  intent: ReturnType<typeof normalizeOAuthIntent>;
+  nextPath: string;
+  oauthStatus?: OAuthStatus;
+}) {
+  if (!input.hasOAuthIntent) {
+    return toSignInPath(input.nextPath, "callback_invalid");
+  }
+
+  return buildOAuthEntryPath({
+    intent: input.intent,
+    nextPath: input.nextPath,
+    status: input.oauthStatus ?? "callback_exchange_failed",
+  });
 }
 
 function categorizeCallbackError(message: string | null | undefined) {
@@ -103,6 +126,10 @@ export async function GET(request: Request) {
   const code = url.searchParams.get("code");
   const tokenHash = url.searchParams.get("token_hash");
   const otpType = url.searchParams.get("type");
+  const providerError = url.searchParams.get("error");
+  const rawIntent = url.searchParams.get("intent");
+  const intent = normalizeOAuthIntent(rawIntent);
+  const hasOAuthIntent = isOAuthIntent(rawIntent);
   const nextPath = resolveAuthenticatedRedirect(
     url.searchParams.get("next"),
     AUTH_DEFAULT_REDIRECT_PATH
@@ -133,7 +160,15 @@ export async function GET(request: Request) {
       },
     });
     const throttledRedirect = NextResponse.redirect(
-      toRedirectUrl(request, toSignInPath(nextPath, "callback_invalid"))
+      toRedirectUrl(
+        request,
+        getCallbackFailurePath({
+          hasOAuthIntent,
+          intent,
+          nextPath,
+          oauthStatus: "callback_exchange_failed",
+        })
+      )
     );
     throttledRedirect.headers.set(
       "Retry-After",
@@ -164,6 +199,25 @@ export async function GET(request: Request) {
           outcome: "failed",
           callback_mode: "code_exchange",
           reason_category: categorizeCallbackError(error.message),
+          ...requestFingerprint,
+        },
+      },
+    });
+    callbackFailureLogged = true;
+  }
+
+  if (providerError) {
+    await recordSecurityAuditEvent({
+      supabase,
+      event: {
+        eventType: AUDIT_EVENT_TYPES.authCallbackFailed,
+        targetType: "auth",
+        targetId: "callback",
+        metadata: {
+          outcome: "failed",
+          callback_mode: "provider_error_param",
+          provider_error: providerError.toLowerCase(),
+          reason_category: "provider_error",
           ...requestFingerprint,
         },
       },
@@ -221,7 +275,10 @@ export async function GET(request: Request) {
     });
   }
 
-  return NextResponse.redirect(
-    toRedirectUrl(request, toSignInPath(nextPath, "callback_invalid"))
-  );
+  return NextResponse.redirect(toRedirectUrl(request, getCallbackFailurePath({
+    hasOAuthIntent,
+    intent,
+    nextPath,
+    oauthStatus: providerError ? "callback_provider_error" : "callback_exchange_failed",
+  })));
 }

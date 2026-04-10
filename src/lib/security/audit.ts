@@ -27,6 +27,8 @@ export const AUDIT_EVENT_TYPES = {
   authPasswordResetRequested: "auth.password_reset.requested",
   authPasswordResetCompleted: "auth.password_reset.completed",
   authSignOut: "auth.sign_out.completed",
+  authOAuthStartInitiated: "auth.oauth.start.initiated",
+  authOAuthStartFailed: "auth.oauth.start.failed",
   authCallbackSucceeded: "auth.callback.succeeded",
   authCallbackFailed: "auth.callback.failed",
   authProfileBootstrapFailed: "auth.profile_bootstrap.failed",
