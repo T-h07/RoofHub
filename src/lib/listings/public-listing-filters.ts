@@ -1,4 +1,8 @@
-import type { ExploreSearchState } from "./explore-search-params";
+import type {
+  ExploreListingType,
+  ExplorePropertyType,
+  ExploreSearchState,
+} from "./explore-search-params";
 import { PUBLIC_DISCOVERY_STATUS } from "./visibility";
 
 type PublicListingFilterQuery<TQuery> = {
@@ -14,6 +18,35 @@ function sanitizeKeywordForOrQuery(keyword: string) {
     .replace(/[^a-z0-9\s-]/gi, " ")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+const PROPERTY_TYPE_KEYWORD_ALIASES: Record<ExplorePropertyType, readonly string[]> = {
+  apartment: ["apartment", "flat", "condo"],
+  house: ["house", "home", "villa", "townhouse"],
+  studio: ["studio", "loft"],
+  land: ["land", "plot"],
+  commercial: ["commercial", "office", "retail", "shop", "warehouse"],
+};
+
+const LISTING_TYPE_KEYWORD_ALIASES: Record<ExploreListingType, readonly string[]> = {
+  rent: ["rent", "rental", "lease", "monthly"],
+  sale: ["sale", "buy", "purchase", "owned"],
+};
+
+function collectEnumKeywordMatches<TValue extends string>(
+  keyword: string,
+  aliases: Record<TValue, readonly string[]>
+) {
+  const normalizedKeyword = keyword.toLowerCase();
+  const matchedValues: TValue[] = [];
+
+  for (const [value, aliasList] of Object.entries(aliases) as Array<[TValue, readonly string[]]>) {
+    if (aliasList.some((alias) => normalizedKeyword.includes(alias))) {
+      matchedValues.push(value);
+    }
+  }
+
+  return matchedValues;
 }
 
 export function applyPublicListingFilters<TQuery extends PublicListingFilterQuery<TQuery>>(
@@ -34,15 +67,31 @@ export function applyPublicListingFilters<TQuery extends PublicListingFilterQuer
     const keyword = sanitizeKeywordForOrQuery(state.keyword);
 
     if (keyword.length > 0) {
-      query = query.or(
-        [
-          `title.ilike.%${keyword}%`,
-          `description.ilike.%${keyword}%`,
-          `city.ilike.%${keyword}%`,
-          `neighborhood.ilike.%${keyword}%`,
-          `property_type.ilike.%${keyword}%`,
-        ].join(",")
+      const orConditions = [
+        `title.ilike.%${keyword}%`,
+        `description.ilike.%${keyword}%`,
+        `city.ilike.%${keyword}%`,
+        `neighborhood.ilike.%${keyword}%`,
+      ];
+
+      const propertyTypeMatches = collectEnumKeywordMatches(
+        keyword,
+        PROPERTY_TYPE_KEYWORD_ALIASES
       );
+      const listingTypeMatches = collectEnumKeywordMatches(
+        keyword,
+        LISTING_TYPE_KEYWORD_ALIASES
+      );
+
+      for (const propertyType of propertyTypeMatches) {
+        orConditions.push(`property_type.eq.${propertyType}`);
+      }
+
+      for (const listingType of listingTypeMatches) {
+        orConditions.push(`listing_type.eq.${listingType}`);
+      }
+
+      query = query.or(orConditions.join(","));
     }
   }
 

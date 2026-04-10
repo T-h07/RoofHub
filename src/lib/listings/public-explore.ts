@@ -167,9 +167,13 @@ export async function loadPublicExploreListings(state: ExploreSearchState): Prom
     const { data, error, count } = await query.range(rangeStart, rangeEnd);
 
     if (error) {
+      console.error("[Explore] public listings query failed", {
+        code: error.code,
+        message: error.message,
+      });
       return {
         ok: false,
-        message: "Listings are temporarily unavailable. Please refresh and try again.",
+        message: "We couldn’t load listings right now. Please refresh and try again.",
         listings: [],
         totalCount: 0,
         totalPages: 0,
@@ -251,8 +255,7 @@ export async function loadPublicExploreListings(state: ExploreSearchState): Prom
   } catch {
     return {
       ok: false,
-      message:
-        "Explore is not configured yet. Set Supabase environment variables and restart the app.",
+      message: "Listings couldn’t load because core configuration is incomplete.",
       listings: [],
       totalCount: 0,
       totalPages: 0,
