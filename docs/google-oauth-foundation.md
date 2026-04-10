@@ -1,8 +1,8 @@
-# Google OAuth Logic Foundation
+# Google OAuth Live Flow
 
 ## Purpose
 
-This document captures the app-side Google OAuth implementation completed before external provider setup is finalized.
+This document captures the live app-side Google OAuth flow.
 
 The app now includes:
 
@@ -11,7 +11,7 @@ The app now includes:
 - callback code exchange + SSR session handling
 - profile bootstrap compatibility after OAuth session creation
 - safe redirect/next handling
-- graceful failure states when provider setup is incomplete
+- clean failure states for real provider/runtime errors
 
 ## Callback URLs
 
@@ -41,36 +41,30 @@ The callback URL is generated from trusted origins through:
 - Proxy route protection and session refresh behavior remain unchanged.
 - Profile bootstrap still uses `ensureProfileForCurrentUser` (no second profile path).
 
-## Graceful pre-configuration behavior
-
-If provider setup is not ready yet:
-
-- Google button remains visible.
-- OAuth start/callback failures are handled with bounded, user-safe error states.
-- App does not pretend OAuth is fully live.
+## Controlled OAuth status states
 
 Common controlled statuses:
 
 - `provider_not_ready`
 - `origin_not_trusted`
-- `start_temporarily_unavailable`
+- `start_rate_limited`
 - `callback_exchange_failed`
 - `callback_provider_error`
 
-## Manual setup still required
+## Ongoing manual platform requirements
 
 ### Supabase (Dashboard)
 
-1. Enable Google provider in Auth settings.
-2. Set Google client id/secret in provider configuration.
-3. Ensure Auth URL config includes:
+1. Keep Google provider enabled in Auth settings.
+2. Keep Google client id/secret configured in provider configuration.
+3. Keep Auth URL config aligned with deployed environments:
    - Site URL for production domain
    - Additional redirect URLs for local/preview callback URLs.
 
 ### Google Cloud Console
 
 1. Configure OAuth consent screen.
-2. Create OAuth client credentials.
+2. Keep OAuth client credentials active.
 3. Add authorized redirect URI values:
    - `http://localhost:3000/auth/callback`
    - `https://YOUR_DOMAIN/auth/callback`
@@ -84,7 +78,7 @@ Common controlled statuses:
 
 ## Validation notes
 
-Validate after setup:
+Validate flow behavior:
 
 - sign-in page Google start
 - sign-up page Google start

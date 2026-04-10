@@ -78,9 +78,9 @@ Supabase dashboard setup:
 
 Google OAuth foundation note:
 
-- App-side Google OAuth logic is implemented (`/auth/oauth/google` start route + `/auth/callback` exchange).
-- Provider enablement and credentials are still dashboard/provider configuration work.
-- See `docs/google-oauth-foundation.md` for exact implementation and remaining manual setup.
+- Google OAuth start + callback exchange are live (`/auth/oauth/google` + `/auth/callback`).
+- Provider credentials remain dashboard-managed and are never stored in app code.
+- See `docs/google-oauth-foundation.md` for exact flow and required redirect URL maintenance.
 
 ## Known Limits / Next PT Notes
 

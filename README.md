@@ -388,9 +388,9 @@ Security-sensitive changes must follow the baseline and complete the checklist b
 - Auth/session hardening model and threat-focused controls: `docs/auth-session-hardening.md`
 - Foundational auth flow behavior and route map: `docs/auth-flows.md`
 
-## Google OAuth Logic Foundation
+## Google OAuth Live Flow
 
-- App-side Google OAuth start and callback plumbing: `docs/google-oauth-foundation.md`
+- Live Google OAuth start + callback behavior: `docs/google-oauth-foundation.md`
 
 ## Authorization Boundary Audit (SH-PT03)
 
