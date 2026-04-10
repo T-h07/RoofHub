@@ -46,6 +46,7 @@ Behavior:
   - confirmation-required flow (if enabled)
 - Forgot password sends users through callback then to `/auth/reset-password`.
 - Google OAuth uses `/auth/oauth/google` and returns through `/auth/callback`.
+- `/auth/callback` uses route-handler cookie bridging so `exchangeCodeForSession` cookies persist through redirect responses.
 - Sign out redirects to sign-in with explicit reason state (`signed_out`).
 
 ## Profile Bootstrap Integration
@@ -80,6 +81,7 @@ Google OAuth foundation note:
 
 - Google OAuth start + callback exchange are live (`/auth/oauth/google` + `/auth/callback`).
 - Provider credentials remain dashboard-managed and are never stored in app code.
+- Callback diagnostics now separate exchange/session issues from profile bootstrap failures.
 - See `docs/google-oauth-foundation.md` for exact flow and required redirect URL maintenance.
 
 ## Known Limits / Next PT Notes

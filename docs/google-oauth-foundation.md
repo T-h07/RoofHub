@@ -12,6 +12,7 @@ The app now includes:
 - profile bootstrap compatibility after OAuth session creation
 - safe redirect/next handling
 - clean failure states for real provider/runtime errors
+- callback-stage diagnostics that isolate exchange vs profile-bootstrap failures
 
 ## Callback URLs
 
@@ -50,6 +51,28 @@ Common controlled statuses:
 - `start_rate_limited`
 - `callback_exchange_failed`
 - `callback_provider_error`
+- `profile_bootstrap_failed`
+
+## Session finalization fix
+
+Observed failure:
+
+- users could complete Google account selection and return to `/auth/callback`, but then be redirected with profile-finalization messaging.
+
+Root cause addressed in app code:
+
+- callback processing previously depended on generic server-client cookie behavior that could drop exchanged auth cookies on redirect boundaries.
+
+Current callback handling now:
+
+- uses route-handler cookie bridging for `exchangeCodeForSession` and carries resulting session cookies into every redirect response
+- logs the exact callback failure stage without logging secrets:
+  - rate limit block
+  - limiter unavailable bypass
+  - exchange failure
+  - post-exchange session read failure
+  - profile bootstrap failure
+  - invalid callback payload
 
 ## Ongoing manual platform requirements
 
