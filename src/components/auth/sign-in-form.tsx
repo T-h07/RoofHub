@@ -6,10 +6,12 @@ import { useActionState } from "react";
 import { useRouter } from "next/navigation";
 
 import { AuthStatusMessage } from "@/components/auth/auth-status-message";
+import { GoogleAuthButton } from "@/components/auth/google-auth-button";
 import { AuthSubmitButton } from "@/components/auth/auth-submit-button";
 import { Field, FieldError, FieldHelp } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { getOAuthStatusMessage, type OAuthStatus } from "@/lib/auth/oauth";
 import type { AuthRedirectReason } from "@/lib/auth/routing";
 import { AUTH_ACTION_IDLE_STATE } from "@/lib/auth/types";
 import { signInAction } from "@/lib/auth/actions";
@@ -17,6 +19,7 @@ import { signInAction } from "@/lib/auth/actions";
 type SignInFormProps = {
   nextPath: string;
   reason?: AuthRedirectReason | null;
+  oauthStatus?: OAuthStatus | null;
 };
 
 function getReasonMessage(reason: AuthRedirectReason | null | undefined) {
@@ -38,7 +41,7 @@ function getReasonMessage(reason: AuthRedirectReason | null | undefined) {
   }
 }
 
-export function SignInForm({ nextPath, reason }: SignInFormProps) {
+export function SignInForm({ nextPath, reason, oauthStatus }: SignInFormProps) {
   const router = useRouter();
   const [state, formAction] = useActionState(signInAction, AUTH_ACTION_IDLE_STATE);
 
@@ -50,13 +53,23 @@ export function SignInForm({ nextPath, reason }: SignInFormProps) {
   }, [router, state.redirectTo, state.status]);
 
   const reasonMessage = getReasonMessage(reason);
-  const formErrorMessage = state.status === "error" ? state.message : reasonMessage ?? undefined;
+  const oauthMessage = oauthStatus ? getOAuthStatusMessage(oauthStatus) : null;
+  const formErrorMessage =
+    state.status === "error" ? state.message : oauthMessage ?? reasonMessage ?? undefined;
 
   return (
     <form action={formAction} className="space-y-4">
       <input type="hidden" name="next" value={nextPath} />
 
       {formErrorMessage ? <AuthStatusMessage tone="error" message={formErrorMessage} /> : null}
+
+      <GoogleAuthButton nextPath={nextPath} intent="sign_in" />
+
+      <div className="flex items-center gap-3 text-xs uppercase tracking-[0.12em] text-muted-foreground/90">
+        <span className="bg-border h-px flex-1" />
+        <span>Or continue with email</span>
+        <span className="bg-border h-px flex-1" />
+      </div>
 
       <Field>
         <Label htmlFor="sign-in-email">Email</Label>

@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { AuthShell } from "@/components/auth/auth-shell";
 import { SignUpForm } from "@/components/auth/sign-up-form";
+import { isOAuthStatus } from "@/lib/auth/oauth";
 import { AUTH_DEFAULT_REDIRECT_PATH, resolveAuthenticatedRedirect } from "@/lib/auth/routing";
 
 type SignUpPageProps = {
@@ -11,6 +12,8 @@ type SignUpPageProps = {
 export default async function SignUpPage({ searchParams }: SignUpPageProps) {
   const params = await searchParams;
   const nextParam = typeof params.next === "string" ? params.next : null;
+  const oauthParam = typeof params.oauth === "string" ? params.oauth : null;
+  const oauthStatus = isOAuthStatus(oauthParam) ? oauthParam : null;
   const nextPath = resolveAuthenticatedRedirect(nextParam, AUTH_DEFAULT_REDIRECT_PATH);
 
   return (
@@ -31,7 +34,7 @@ export default async function SignUpPage({ searchParams }: SignUpPageProps) {
         </>
       }
     >
-      <SignUpForm nextPath={nextPath} />
+      <SignUpForm nextPath={nextPath} oauthStatus={oauthStatus} />
     </AuthShell>
   );
 }

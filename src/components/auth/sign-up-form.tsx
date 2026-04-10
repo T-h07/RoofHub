@@ -5,18 +5,21 @@ import { useActionState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 
 import { AuthStatusMessage } from "@/components/auth/auth-status-message";
+import { GoogleAuthButton } from "@/components/auth/google-auth-button";
 import { AuthSubmitButton } from "@/components/auth/auth-submit-button";
 import { Field, FieldError, FieldHelp } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { signUpAction } from "@/lib/auth/actions";
+import { getOAuthStatusMessage, type OAuthStatus } from "@/lib/auth/oauth";
 import { AUTH_ACTION_IDLE_STATE } from "@/lib/auth/types";
 
 type SignUpFormProps = {
   nextPath: string;
+  oauthStatus?: OAuthStatus | null;
 };
 
-export function SignUpForm({ nextPath }: SignUpFormProps) {
+export function SignUpForm({ nextPath, oauthStatus }: SignUpFormProps) {
   const router = useRouter();
   const [state, formAction] = useActionState(signUpAction, AUTH_ACTION_IDLE_STATE);
 
@@ -37,6 +40,17 @@ export function SignUpForm({ nextPath }: SignUpFormProps) {
       {state.status === "success" && state.message ? (
         <AuthStatusMessage tone="success" message={state.message} />
       ) : null}
+      {state.status !== "error" && oauthStatus ? (
+        <AuthStatusMessage tone="error" message={getOAuthStatusMessage(oauthStatus)} />
+      ) : null}
+
+      <GoogleAuthButton nextPath={nextPath} intent="sign_up" />
+
+      <div className="flex items-center gap-3 text-xs uppercase tracking-[0.12em] text-muted-foreground/90">
+        <span className="bg-border h-px flex-1" />
+        <span>Or continue with email</span>
+        <span className="bg-border h-px flex-1" />
+      </div>
 
       <Field>
         <Label htmlFor="sign-up-display-name">Display name</Label>
