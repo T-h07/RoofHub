@@ -14,9 +14,9 @@ type AuthShellProps = {
 };
 
 const trustNotes = [
-  "Session-aware navigation and route protection for signed-in areas.",
-  "Cookie-based Supabase SSR auth aligned with Vercel deployment flows.",
-  "Stable foundation for provider dashboard, favorites, and messages PTs.",
+  "Session-aware access keeps protected routes available only to signed-in users.",
+  "Cookie-based authentication keeps account state consistent across page reloads.",
+  "One account connects your dashboard, favorites, messages, and profile settings.",
 ];
 
 export function AuthShell({ badge, title, description, children, footer }: AuthShellProps) {

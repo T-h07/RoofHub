@@ -298,7 +298,7 @@ export function ListingProviderCard({
         {!provider ? (
           <p className="text-muted-foreground inline-flex items-center gap-1.5 text-xs">
             <UserRound className="size-3.5" aria-hidden="true" />
-            Public profile expansion is planned in later trust-layer PTs.
+            Limited provider details are available before a conversation starts.
           </p>
         ) : null}
       </CardContent>

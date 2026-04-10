@@ -178,7 +178,7 @@ export function MapResultsPane({
 
       {isTruncated ? (
         <div className="border-border/70 bg-muted/20 border-t px-4 py-2.5 text-xs text-amber-300/90">
-          Result fetch capped at {markerLimit} rows for PT13 responsiveness.
+          Result fetch capped at {markerLimit} rows for stable map performance.
         </div>
       ) : null}
     </aside>

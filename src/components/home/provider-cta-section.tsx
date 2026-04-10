@@ -16,8 +16,8 @@ export function ProviderCtaSection() {
             Put your property on the map and reach renters or buyers faster.
           </h2>
           <p className="type-body-muted">
-            RoofHub is structured for map-aware listing discovery. Create an account now and move
-            into provider workflows as listing creation and management PTs ship.
+            RoofHub is built for map-aware discovery and high-intent inquiries. Create your provider
+            account to publish listings and manage responses from one workspace.
           </p>
         </div>
 

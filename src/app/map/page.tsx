@@ -144,12 +144,11 @@ export default async function MapPage({ searchParams }: MapPageProps) {
       <section className="border-border/75 bg-card/60 space-y-3 rounded-xl border p-5 sm:p-6">
         <Badge variant="primary">Map discovery</Badge>
         <h1 className="type-page-title max-w-4xl">
-          Search spatially with clustered listings, applied map-area bounds, and synchronized result
-          state.
+          Search listings spatially with map clusters and area-based filtering.
         </h1>
         <p className="type-body-muted max-w-3xl">
-          `/map` shares PT11 filters with `/explore`, then layers bounds-driven searching and
-          density-safe marker clustering on top for production-minded browsing.
+          Move the map, apply filters, and run area searches while keeping your list and map views in
+          sync.
         </p>
       </section>
 
@@ -174,8 +173,8 @@ export default async function MapPage({ searchParams }: MapPageProps) {
 
         {mapResult.ok && mapResult.isTruncated ? (
           <div className="border-warning/35 bg-warning/10 text-warning-foreground rounded-lg border px-3 py-2 text-xs">
-            Showing up to {mapResult.markerLimit} listings for current PT13 map responsiveness.
-            Tighten filters or search a smaller area to narrow results further.
+            Showing up to {mapResult.markerLimit} listings for smooth map performance. Tighten
+            filters or search a smaller area to narrow results further.
           </div>
         ) : null}
       </section>

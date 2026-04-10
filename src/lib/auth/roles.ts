@@ -58,7 +58,7 @@ export function getRoleLabel(role: AppRole) {
 export function getRoleDescription(role: AppRole) {
   switch (role) {
     case "provider":
-      return "You can publish and manage listings in upcoming PTs.";
+      return "Publish listings, manage inventory, and respond to inquiries.";
     case "admin":
       return "Admin access is managed securely and not editable from public profile settings.";
     case "seeker":

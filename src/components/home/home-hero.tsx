@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, Building2, Compass, Home, MapPinned } from "lucide-react";
+import { ArrowRight, Compass, ShieldCheck, Sparkles } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
@@ -45,43 +45,35 @@ export function HomeHero() {
         </div>
 
         <aside className="border-border/70 bg-background/65 rounded-xl border p-4 sm:p-5">
-          <p className="type-label">Discovery snapshot (placeholder)</p>
+          <p className="type-label">Why RoofHub works</p>
 
-          <div className="border-border/70 bg-muted/25 mt-3 rounded-lg border p-4">
-            <div className="text-muted-foreground mb-3 flex items-center justify-between text-xs">
-              <span>Map + list mode</span>
-              <span className="inline-flex items-center gap-1">
-                <Compass className="size-3.5" aria-hidden="true" />
-                Ready
-              </span>
+          <div className="mt-3 space-y-2.5">
+            <div className="border-border/70 bg-background/60 rounded-lg border px-3.5 py-3">
+              <p className="inline-flex items-center gap-2 text-sm font-semibold">
+                <Compass className="text-primary size-4" aria-hidden="true" />
+                Search map and list together
+              </p>
+              <p className="text-muted-foreground mt-1 text-xs leading-5">
+                Keep one search context while switching between visual map scanning and list-first comparison.
+              </p>
             </div>
-
-            <div className="grid gap-2.5 sm:grid-cols-2">
-              <div className="border-border/70 bg-card/70 rounded-md border p-3">
-                <div className="text-muted-foreground text-xs">Rentals sample</div>
-                <div className="mt-1 text-lg font-semibold tracking-tight">128</div>
-                <div className="type-caption mt-1">Live in current viewport</div>
-              </div>
-              <div className="border-border/70 bg-card/70 rounded-md border p-3">
-                <div className="text-muted-foreground text-xs">Sale sample</div>
-                <div className="mt-1 text-lg font-semibold tracking-tight">84</div>
-                <div className="type-caption mt-1">Ready to explore</div>
-              </div>
+            <div className="border-border/70 bg-background/60 rounded-lg border px-3.5 py-3">
+              <p className="inline-flex items-center gap-2 text-sm font-semibold">
+                <ShieldCheck className="text-primary size-4" aria-hidden="true" />
+                Trust-aware listing context
+              </p>
+              <p className="text-muted-foreground mt-1 text-xs leading-5">
+                Listing pages surface key provider and contact context without cluttering the browsing flow.
+              </p>
             </div>
-          </div>
-
-          <div className="mt-3 grid gap-2.5 sm:grid-cols-3">
-            <div className="border-border/70 bg-background/70 rounded-md border p-3">
-              <MapPinned className="text-primary size-4" aria-hidden="true" />
-              <p className="mt-2 text-xs font-medium">Map awareness</p>
-            </div>
-            <div className="border-border/70 bg-background/70 rounded-md border p-3">
-              <Home className="text-primary size-4" aria-hidden="true" />
-              <p className="mt-2 text-xs font-medium">Listing density</p>
-            </div>
-            <div className="border-border/70 bg-background/70 rounded-md border p-3">
-              <Building2 className="text-primary size-4" aria-hidden="true" />
-              <p className="mt-2 text-xs font-medium">Provider-ready</p>
+            <div className="border-border/70 bg-background/60 rounded-lg border px-3.5 py-3">
+              <p className="inline-flex items-center gap-2 text-sm font-semibold">
+                <Sparkles className="text-primary size-4" aria-hidden="true" />
+                Built for renters and buyers
+              </p>
+              <p className="text-muted-foreground mt-1 text-xs leading-5">
+                Browse rentals and for-sale inventory through one clean discovery experience.
+              </p>
             </div>
           </div>
 

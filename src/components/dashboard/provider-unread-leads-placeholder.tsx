@@ -11,14 +11,14 @@ export function ProviderUnreadLeadsPlaceholder() {
       <CardHeader className="space-y-2">
         <div className="text-muted-foreground inline-flex items-center gap-2 text-xs uppercase tracking-wide">
           <MailPlus className="size-3.5" aria-hidden="true" />
-          Messaging integration
+          Messaging
         </div>
-        <CardTitle>Unread lead count is live and inbox UI is now available.</CardTitle>
+        <CardTitle>Track incoming inquiries in one place.</CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
         <p className="text-muted-foreground text-sm leading-6">
-          Conversation list, thread history, and message composer now run through the protected listing-bound
-          messaging flow. Realtime updates still land in the next PT.
+          View conversation threads, message history, and follow-ups from the inbox. Unread counts
+          sync with your active listing conversations.
         </p>
         <Link
           href="/messages"

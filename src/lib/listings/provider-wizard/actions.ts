@@ -41,7 +41,7 @@ const DRAFT_DEFAULTS = {
 };
 
 const CONTACT_SCHEMA_OUT_OF_DATE_MESSAGE =
-  "Contact methods schema is out of date. Run Supabase migrations (PT24 contact methods + contact channel details) and retry.";
+  "Contact profile columns are out of date. Apply the latest Supabase migrations and retry.";
 
 export type SaveProviderWizardStepInput = {
   step: ProviderWizardStep;
@@ -210,7 +210,7 @@ function normalizeSupabaseError(message: string) {
     normalized.includes('null value in column "latitude"') ||
     normalized.includes('null value in column "longitude"')
   ) {
-    return "Listing draft location schema is out of date. Run Supabase migrations (including PT16 location-nullable) and retry.";
+    return "Listing location columns are out of date. Apply the latest Supabase migrations and retry.";
   }
 
   if (normalized.includes("check constraint")) {

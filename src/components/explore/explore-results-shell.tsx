@@ -778,15 +778,16 @@ export function ExploreResultsShell({
         </datalist>
 
         <div className="border-border/75 bg-card/60 space-y-3 rounded-xl border px-4 py-3">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-3">
             <form
-              className="flex w-full max-w-xl items-center gap-2"
+              className="flex w-full max-w-xl min-w-0 items-center gap-2"
               onSubmit={(event) => {
                 event.preventDefault();
                 applyDraftFilters();
               }}
             >
               <Input
+                className="min-w-0 flex-1"
                 value={draft.keyword}
                 onChange={(event) => {
                   const nextKeyword = event.currentTarget.value;
@@ -798,12 +799,12 @@ export function ExploreResultsShell({
                 placeholder="Search listings by title, description, city, or property type"
                 autoComplete="off"
               />
-              <Button type="submit" size="sm" disabled={!hasPendingChanges}>
+              <Button type="submit" size="sm" disabled={!hasPendingChanges} className="shrink-0">
                 Search
               </Button>
             </form>
 
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap sm:justify-end">
               <Link
                 href={buildMapHref(state)}
                 className={cn(
@@ -811,7 +812,7 @@ export function ExploreResultsShell({
                     variant: "outline",
                     size: "default",
                   }),
-                  "hidden md:inline-flex"
+                  "hidden md:inline-flex shrink-0"
                 )}
               >
                 <MapPinned className="size-4" aria-hidden="true" />
@@ -828,7 +829,7 @@ export function ExploreResultsShell({
                   const nextSort = event.currentTarget.value;
                   handleSortChange(nextSort);
                 }}
-                className="w-[210px]"
+                className="w-full min-w-0 sm:w-[210px]"
               >
                 {Object.entries(EXPLORE_SORT_LABELS).map(([value, label]) => (
                   <option key={value} value={value}>
@@ -851,7 +852,7 @@ export function ExploreResultsShell({
                       Search filters
                     </SheetTitle>
                     <SheetDescription>
-                      Filters are URL-synced and shared with the explore list view for stable map/list coordination.
+                      Filters are URL-synced so you can move between list and map views without resetting your search.
                     </SheetDescription>
                   </SheetHeader>
 
@@ -899,11 +900,11 @@ export function ExploreResultsShell({
                         size: "sm",
                         variant: "outline",
                       }),
-                      "h-7 gap-1 rounded-full px-2.5 text-xs"
+                      "h-7 max-w-full gap-1 rounded-full px-2.5 text-xs"
                     )}
                     onClick={() => pushUpdatedParams(chip.updates, { resetPage: true })}
                   >
-                    {chip.label}
+                    <span className="max-w-[12.5rem] truncate">{chip.label}</span>
                     <X className="size-3" aria-hidden="true" />
                   </button>
                 ))}
@@ -916,7 +917,7 @@ export function ExploreResultsShell({
                 </button>
               </>
             ) : (
-              <p className="type-caption">Public, published listings only. Search and filter state is URL-driven.</p>
+              <p className="type-caption">Showing public, published listings. Search state stays in the URL.</p>
             )}
           </div>
         </div>

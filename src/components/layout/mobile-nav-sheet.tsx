@@ -95,8 +95,8 @@ export function MobileNavSheet({ authState }: MobileNavSheetProps) {
           </SheetTitle>
           <SheetDescription className="text-muted-foreground text-sm">
             {isAuthenticated && authState.role
-              ? `${getRoleLabel(authState.role)} workspace`
-              : "Route shell for preview and production workflows on Vercel."}
+              ? `${getRoleLabel(authState.role)} account navigation`
+              : "Explore listings, map results, and account actions."}
           </SheetDescription>
         </SheetHeader>
 
@@ -120,7 +120,7 @@ export function MobileNavSheet({ authState }: MobileNavSheetProps) {
               <LayoutGrid className="text-primary size-4" />
               {isAuthenticated
                 ? authState.profileError
-                  ? "Profile setup issue"
+                  ? "Profile action required"
                   : "Account access"
                 : "Account access"}
             </div>

@@ -66,9 +66,8 @@ export default async function ExplorePage({ searchParams }: ExplorePageProps) {
           Browse published rentals and homes for sale across RoofHub.
         </h1>
         <p className="type-body-muted max-w-3xl">
-          This list view is server-rendered from public listings, with URL-driven search,
-          filtering, sorting, and pagination aligned with `/map` and ready for PT13 bounds and
-          clustering workflows.
+          Use keyword search, location filters, and smart sorting to scan listings quickly, then
+          switch to map view without losing your search state.
         </p>
       </section>
 

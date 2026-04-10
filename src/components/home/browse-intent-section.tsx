@@ -33,7 +33,7 @@ const intentItems = [
   {
     title: "List your property",
     description:
-      "Create your account and move into the provider flow as dashboard and listing tools expand.",
+      "Create your provider account to publish listings and manage inquiries from your workspace.",
     href: "/auth/sign-up?next=%2Fdashboard",
     ctaLabel: "Start provider path",
     icon: Compass,
