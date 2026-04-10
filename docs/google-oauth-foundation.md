@@ -74,6 +74,27 @@ Current callback handling now:
   - profile bootstrap failure
   - invalid callback payload
 
+## Profile bootstrap fix (OAuth users)
+
+Observed profile-stage failure:
+
+- OAuth sign-in and callback exchange could succeed, but profile ensure could still fail and return `profile_bootstrap_failed`.
+
+Actual code-level failure mode addressed:
+
+- profile fetch compatibility previously had a fallback gap when both newer optional profile columns and older profile-column sets diverged, which could cause profile reads to fail before/after insert in mixed-schema states.
+
+Current profile bootstrap behavior:
+
+- profile lookup now runs deterministic compatibility fallbacks in order:
+  1. full profile projection
+  2. channel-compatible projection
+  3. legacy projection
+- first-time OAuth profile create stays default-role safe (`seeker`)
+- profile creation is now verified with a re-fetch after insert
+- duplicate/conflict (`23505`) is handled idempotently by conflict re-fetch verification
+- callback/auth audit logs now include profile failure reason metadata (`reason`, `error_code`, `fetch_variant`, `fetch_reason_category`) without exposing secrets
+
 ## Ongoing manual platform requirements
 
 ### Supabase (Dashboard)

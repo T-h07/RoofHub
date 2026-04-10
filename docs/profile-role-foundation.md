@@ -9,6 +9,8 @@ Profile creation is now enforced through a backend-safe, idempotent path:
 - auth actions (sign-in/sign-up/callback) still call profile ensure logic
 - app shell loading (`AppShell`) resolves the authenticated user profile with `getCurrentUserProfile`
 - if profile row is missing, the app creates it safely and re-fetches it
+- profile fetch reads are compatibility-safe across full/channel-compatible/legacy column sets
+- insert conflict (`23505`) is treated as an idempotent race and validated through a re-fetch
 
 This keeps authenticated users from ending up with an identity but no usable `profiles` row.
 
