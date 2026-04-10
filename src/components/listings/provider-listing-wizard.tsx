@@ -173,6 +173,30 @@ function buildPhotoMetadataSignature(
     .join("|");
 }
 
+function toSupabaseClientConfigMessage(error: unknown) {
+  if (!(error instanceof Error)) {
+    return "Photo uploads are unavailable because Supabase client configuration is missing. Configure local environment variables and retry.";
+  }
+
+  const normalized = error.message.toLowerCase();
+  if (normalized.includes("next_public_supabase_url")) {
+    return "Photo uploads are unavailable because NEXT_PUBLIC_SUPABASE_URL is missing. Add it to .env.local and restart the dev server.";
+  }
+
+  if (
+    normalized.includes("next_public_supabase_publishable_key") ||
+    normalized.includes("next_public_supabase_anon_key")
+  ) {
+    return "Photo uploads are unavailable because NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY is missing. Add it to .env.local and restart the dev server.";
+  }
+
+  if (normalized.includes("[supabase]")) {
+    return "Photo uploads are unavailable because Supabase environment configuration is incomplete. Update .env.local and restart the dev server.";
+  }
+
+  return "Photo uploads are unavailable because Supabase client configuration failed. Update environment variables and retry.";
+}
+
 export function ProviderListingWizard({
   mode,
   initialStep,
@@ -404,7 +428,15 @@ export function ProviderListingWizard({
 
     let stagedImages = [...draftImages];
     const localImages = stagedImages.filter((image) => image.uploadState === "local");
-    const supabase = createClient();
+    let supabase: ReturnType<typeof createClient>;
+    try {
+      supabase = createClient();
+    } catch (error) {
+      return {
+        ok: false as const,
+        message: toSupabaseClientConfigMessage(error),
+      };
+    }
 
     for (const image of localImages) {
       markUploading(image.id);
