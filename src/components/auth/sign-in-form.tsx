@@ -33,7 +33,7 @@ function getReasonMessage(reason: AuthRedirectReason | null | undefined) {
     case "signed_out":
       return "You have been signed out.";
     case "profile_unavailable":
-      return "We couldn't finish setting up your account profile. Please sign in again.";
+      return "Your account authenticated, but profile setup did not complete. Please sign in again.";
     case "callback_invalid":
       return "Your sign-in link is invalid or expired. Sign in again to continue.";
     default:
@@ -55,7 +55,7 @@ export function SignInForm({ nextPath, reason, oauthStatus }: SignInFormProps) {
   const reasonMessage = getReasonMessage(reason);
   const oauthMessage = oauthStatus ? getOAuthStatusMessage(oauthStatus) : null;
   const formErrorMessage =
-    state.status === "error" ? state.message : oauthMessage ?? reasonMessage ?? undefined;
+    state.status === "error" ? state.message : (oauthMessage ?? reasonMessage ?? undefined);
 
   return (
     <form action={formAction} className="space-y-4">
@@ -65,7 +65,7 @@ export function SignInForm({ nextPath, reason, oauthStatus }: SignInFormProps) {
 
       <GoogleAuthButton nextPath={nextPath} intent="sign_in" />
 
-      <div className="flex items-center gap-3 text-xs uppercase tracking-[0.12em] text-muted-foreground/90">
+      <div className="text-muted-foreground/90 flex items-center gap-3 text-xs tracking-[0.12em] uppercase">
         <span className="bg-border h-px flex-1" />
         <span>Or continue with email</span>
         <span className="bg-border h-px flex-1" />

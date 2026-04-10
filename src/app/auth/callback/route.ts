@@ -44,11 +44,7 @@ function withSessionCookies(target: NextResponse, sessionResponse: NextResponse)
   return target;
 }
 
-function buildRedirectResponse(
-  request: NextRequest,
-  path: string,
-  sessionResponse: NextResponse
-) {
+function buildRedirectResponse(request: NextRequest, path: string, sessionResponse: NextResponse) {
   return withSessionCookies(NextResponse.redirect(toRedirectUrl(request, path)), sessionResponse);
 }
 
@@ -215,6 +211,10 @@ async function handleProfileBootstrapAfterCallback(input: {
         targetId: "callback",
         metadata: {
           phase: "callback",
+          reason: profileResult.reason,
+          error_code: profileResult.details?.errorCode ?? null,
+          fetch_variant: profileResult.details?.fetchVariant ?? null,
+          fetch_reason_category: profileResult.details?.fetchReasonCategory ?? null,
           ...requestFingerprint,
         },
       },
@@ -222,6 +222,10 @@ async function handleProfileBootstrapAfterCallback(input: {
     logCallbackFailure("profile_bootstrap_failed", {
       user_id: user.id,
       next_path: nextPath,
+      reason: profileResult.reason,
+      error_code: profileResult.details?.errorCode ?? null,
+      fetch_variant: profileResult.details?.fetchVariant ?? null,
+      fetch_reason_category: profileResult.details?.fetchReasonCategory ?? null,
     });
 
     await supabase.auth.signOut({ scope: "local" });

@@ -14,12 +14,41 @@ type CompatibleAppProfileRow = LegacyAppProfileRow & {
   contact_methods?: unknown;
 };
 
-type EnsureProfileResult = {
-  ok: boolean;
-  message?: string;
+type EnsureProfileResult =
+  | {
+      ok: true;
+      created: boolean;
+    }
+  | {
+      ok: false;
+      message: string;
+      reason:
+        | "session_unavailable"
+        | "profile_fetch_failed"
+        | "profile_insert_failed"
+        | "profile_insert_verification_failed"
+        | "profile_conflict_refetch_failed";
+      details?: {
+        errorCode?: string | null;
+        fetchVariant?: ProfileSelectVariant;
+        fetchReasonCategory?: "missing_column" | "query_failed";
+      };
+    };
+
+type ProfileSelectVariant = "full" | "channel_compatible" | "legacy";
+type ProfileFetchFailureDetails = {
+  variant: ProfileSelectVariant;
+  errorCode: string | null;
+  reasonCategory: "missing_column" | "query_failed";
 };
 
-type ProfileFetchResult = { ok: true; profile: AppProfile | null } | { ok: false; message: string };
+type ProfileFetchResult =
+  | { ok: true; profile: AppProfile | null; variant: ProfileSelectVariant }
+  | {
+      ok: false;
+      message: string;
+      details: ProfileFetchFailureDetails;
+    };
 
 export type CurrentAuthProfileResult =
   | { ok: true; user: User; profile: AppProfile; created: boolean }
@@ -34,6 +63,21 @@ function getDisplayNameFromUser(user: User) {
   const fallback = metadataValue || emailPrefix || "RoofHub User";
 
   return fallback.length >= 2 ? fallback : `User ${fallback}`.slice(0, 50);
+}
+
+function logProfileBootstrapFailure(
+  stage:
+    | "session_unavailable"
+    | "profile_fetch_failed"
+    | "profile_insert_failed"
+    | "profile_insert_verification_failed"
+    | "profile_conflict_refetch_failed",
+  details: Record<string, unknown>
+) {
+  console.error("[Auth][ProfileBootstrap] ensure profile failed", {
+    stage,
+    ...details,
+  });
 }
 
 function isMissingContactMethodsColumnError(message: string | undefined) {
@@ -114,78 +158,81 @@ async function fetchProfileByUserId(
   supabase: SupabaseClient<Database>,
   userId: string
 ): Promise<ProfileFetchResult> {
-  const { data, error } = await supabase
-    .from("profiles")
-    .select(PROFILE_SELECT)
-    .eq("id", userId)
-    .maybeSingle();
-
-  if (error && isMissingContactChannelColumnError(error.message)) {
-    const { data: channelCompatibleData, error: channelCompatibleError } = await supabase
-      .from("profiles")
-      .select(
-        "id, role, display_name, avatar_url, phone, bio, preferred_contact_method, contact_methods, created_at, updated_at"
-      )
-      .eq("id", userId)
-      .maybeSingle();
-
-    if (channelCompatibleError && !isMissingContactMethodsColumnError(channelCompatibleError.message)) {
-      return {
-        ok: false,
-        message: "Could not load your profile. Please refresh and try again.",
-      };
-    }
-
-    if (channelCompatibleData) {
-      return {
-        ok: true,
-        profile: normalizeProfileRow({
-          ...(channelCompatibleData as CompatibleAppProfileRow),
+  const queryVariants: Array<{
+    id: ProfileSelectVariant;
+    select: string;
+    normalize: (row: CompatibleAppProfileRow) => AppProfile;
+  }> = [
+    {
+      id: "full",
+      select: PROFILE_SELECT,
+      normalize: (row) => normalizeProfileRow(row as CompatibleAppProfileRow),
+    },
+    {
+      id: "channel_compatible",
+      select:
+        "id, role, display_name, avatar_url, phone, bio, preferred_contact_method, contact_methods, created_at, updated_at",
+      normalize: (row) =>
+        normalizeProfileRow({
+          ...(row as CompatibleAppProfileRow),
           contact_email: null,
           whatsapp_phone: null,
           viber_phone: null,
         }),
-      };
-    }
-  }
+    },
+    {
+      id: "legacy",
+      select: LEGACY_PROFILE_SELECT,
+      normalize: (row) =>
+        normalizeProfileRow({
+          ...(row as CompatibleAppProfileRow),
+          contact_email: null,
+          whatsapp_phone: null,
+          viber_phone: null,
+        }),
+    },
+  ];
 
-  if (error && isMissingContactMethodsColumnError(error.message)) {
-    const { data: legacyData, error: legacyError } = await supabase
+  let lastFailure: ProfileFetchFailureDetails = {
+    variant: "full",
+    errorCode: null,
+    reasonCategory: "query_failed",
+  };
+
+  for (const variant of queryVariants) {
+    const { data, error } = await supabase
       .from("profiles")
-      .select(LEGACY_PROFILE_SELECT)
+      .select(variant.select)
       .eq("id", userId)
       .maybeSingle();
 
-    if (legacyError) {
+    if (!error) {
       return {
-        ok: false,
-        message: "Could not load your profile. Please refresh and try again.",
+        ok: true,
+        profile: data ? variant.normalize(data as unknown as CompatibleAppProfileRow) : null,
+        variant: variant.id,
       };
     }
 
-    return {
-      ok: true,
-      profile: legacyData
-        ? normalizeProfileRow({
-            ...(legacyData as CompatibleAppProfileRow),
-            contact_email: null,
-            whatsapp_phone: null,
-            viber_phone: null,
-          })
-        : null,
-    };
-  }
+    const isMissingColumnError =
+      isMissingContactChannelColumnError(error.message) ||
+      isMissingContactMethodsColumnError(error.message);
 
-  if (error) {
-    return {
-      ok: false,
-      message: "Could not load your profile. Please refresh and try again.",
+    lastFailure = {
+      variant: variant.id,
+      errorCode: error.code ?? null,
+      reasonCategory: isMissingColumnError ? "missing_column" : "query_failed",
     };
+
+    if (!isMissingColumnError) {
+      break;
+    }
   }
 
   return {
-    ok: true,
-    profile: data ? normalizeProfileRow(data as CompatibleAppProfileRow) : null,
+    ok: false,
+    message: "Could not load your profile. Please refresh and try again.",
+    details: lastFailure,
   };
 }
 
@@ -196,19 +243,36 @@ export async function ensureProfileForCurrentUser(
   const user = await getAuthenticatedUser(supabase);
 
   if (!user) {
+    logProfileBootstrapFailure("session_unavailable", {});
     return {
       ok: false,
       message: "Unable to read your account session.",
+      reason: "session_unavailable",
     };
   }
 
   const existing = await fetchProfileByUserId(supabase, user.id);
   if (!existing.ok) {
-    return { ok: false, message: existing.message };
+    logProfileBootstrapFailure("profile_fetch_failed", {
+      user_id: user.id,
+      fetch_variant: existing.details.variant,
+      fetch_reason_category: existing.details.reasonCategory,
+      error_code: existing.details.errorCode,
+    });
+    return {
+      ok: false,
+      message: existing.message,
+      reason: "profile_fetch_failed",
+      details: {
+        errorCode: existing.details.errorCode,
+        fetchVariant: existing.details.variant,
+        fetchReasonCategory: existing.details.reasonCategory,
+      },
+    };
   }
 
   if (existing.profile) {
-    return { ok: true };
+    return { ok: true, created: false };
   }
 
   const trimmedPreferred = preferredDisplayName?.trim();
@@ -224,17 +288,74 @@ export async function ensureProfileForCurrentUser(
   });
 
   if (!error) {
-    return { ok: true };
+    const createdProfile = await fetchProfileByUserId(supabase, user.id);
+    if (!createdProfile.ok || !createdProfile.profile) {
+      logProfileBootstrapFailure("profile_insert_verification_failed", {
+        user_id: user.id,
+        fetch_variant: createdProfile.ok ? "full" : createdProfile.details.variant,
+        fetch_reason_category: createdProfile.ok
+          ? "query_failed"
+          : createdProfile.details.reasonCategory,
+        error_code: createdProfile.ok ? null : createdProfile.details.errorCode,
+      });
+      return {
+        ok: false,
+        message:
+          "Your account session is active, but profile setup could not be verified. Please retry.",
+        reason: "profile_insert_verification_failed",
+        details: createdProfile.ok
+          ? undefined
+          : {
+              errorCode: createdProfile.details.errorCode,
+              fetchVariant: createdProfile.details.variant,
+              fetchReasonCategory: createdProfile.details.reasonCategory,
+            },
+      };
+    }
+
+    return { ok: true, created: true };
   }
 
   if (error.code === "23505") {
-    // Profile already exists due to race.
-    return { ok: true };
+    const conflictedProfile = await fetchProfileByUserId(supabase, user.id);
+    if (conflictedProfile.ok && conflictedProfile.profile) {
+      return { ok: true, created: false };
+    }
+
+    logProfileBootstrapFailure("profile_conflict_refetch_failed", {
+      user_id: user.id,
+      fetch_variant: conflictedProfile.ok ? "full" : conflictedProfile.details.variant,
+      fetch_reason_category: conflictedProfile.ok
+        ? "query_failed"
+        : conflictedProfile.details.reasonCategory,
+      error_code: conflictedProfile.ok ? null : conflictedProfile.details.errorCode,
+    });
+    return {
+      ok: false,
+      message:
+        "Your account session is active, but profile setup could not be verified. Please retry.",
+      reason: "profile_conflict_refetch_failed",
+      details: conflictedProfile.ok
+        ? undefined
+        : {
+            errorCode: conflictedProfile.details.errorCode,
+            fetchVariant: conflictedProfile.details.variant,
+            fetchReasonCategory: conflictedProfile.details.reasonCategory,
+          },
+    };
   }
 
+  logProfileBootstrapFailure("profile_insert_failed", {
+    user_id: user.id,
+    error_code: error.code ?? null,
+  });
   return {
     ok: false,
     message: "Your account was created, but profile setup failed. Please try again.",
+    reason: "profile_insert_failed",
+    details: {
+      errorCode: error.code ?? null,
+    },
   };
 }
 

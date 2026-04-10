@@ -43,7 +43,7 @@ export function getOAuthStatusMessage(status: OAuthStatus) {
     case "callback_provider_error":
       return "Google sign-in was cancelled or denied. You can retry or use email and password.";
     case "profile_bootstrap_failed":
-      return "Google sign-in succeeded, but we couldn't finish your profile setup. Please retry.";
+      return "Google sign-in succeeded, but your RoofHub profile record could not be finalized. Please retry.";
     case "origin_not_trusted":
       return "This environment is not trusted for OAuth callbacks yet.";
     case "start_rate_limited":
@@ -85,10 +85,7 @@ export function buildGoogleOAuthStartPath(input: {
   return `${GOOGLE_OAUTH_START_ROUTE}?${params.toString()}`;
 }
 
-export function buildOAuthCallbackPath(input: {
-  nextPath?: string | null;
-  intent?: OAuthIntent;
-}) {
+export function buildOAuthCallbackPath(input: { nextPath?: string | null; intent?: OAuthIntent }) {
   const params = new URLSearchParams({
     next: getSafeRedirectPath(input.nextPath, AUTH_DEFAULT_REDIRECT_PATH),
     intent: normalizeOAuthIntent(input.intent),

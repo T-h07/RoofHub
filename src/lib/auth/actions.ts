@@ -261,6 +261,10 @@ export async function signInAction(
         targetId: "sign_in",
         metadata: {
           phase: "sign_in",
+          reason: profileResult.reason,
+          error_code: profileResult.details?.errorCode ?? null,
+          fetch_variant: profileResult.details?.fetchVariant ?? null,
+          fetch_reason_category: profileResult.details?.fetchReasonCategory ?? null,
           email_hash: hashAuditIdentifier(credentials.email),
           ...requestFingerprint,
         },
@@ -418,6 +422,10 @@ export async function signUpAction(
           targetId: "sign_up",
           metadata: {
             phase: "sign_up",
+            reason: profileResult.reason,
+            error_code: profileResult.details?.errorCode ?? null,
+            fetch_variant: profileResult.details?.fetchVariant ?? null,
+            fetch_reason_category: profileResult.details?.fetchReasonCategory ?? null,
             email_hash: hashAuditIdentifier(input.email),
             ...requestFingerprint,
           },
