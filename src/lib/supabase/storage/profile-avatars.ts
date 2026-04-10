@@ -50,7 +50,7 @@ export async function uploadProfileAvatar(
     });
 
   if (uploadError) {
-    throw new Error("Profile photo upload failed.");
+    throw new Error(`Profile photo upload failed: ${uploadError.message}`);
   }
 
   const { data } = supabase.storage.from(PROFILE_AVATARS_BUCKET).getPublicUrl(storagePath);
@@ -84,7 +84,7 @@ export async function removeProfileAvatarByPath(
     .remove([input.storagePath]);
 
   if (error) {
-    throw new Error("Profile photo removal failed.");
+    throw new Error(`Profile photo removal failed: ${error.message}`);
   }
 
   return {

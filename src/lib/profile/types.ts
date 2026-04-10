@@ -44,3 +44,13 @@ export type ProfileAvatarActionState = {
 export const PROFILE_AVATAR_ACTION_IDLE_STATE: ProfileAvatarActionState = {
   status: "idle",
 };
+
+export type ProfileDeleteActionState = {
+  status: "idle" | "error" | "success";
+  message?: string;
+  redirectTo?: string;
+};
+
+export const PROFILE_DELETE_ACTION_IDLE_STATE: ProfileDeleteActionState = {
+  status: "idle",
+};
