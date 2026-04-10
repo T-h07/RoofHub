@@ -15,7 +15,7 @@ export function EmptyState({ icon: Icon, title, description, action, className }
   return (
     <section
       className={cn(
-        "border-border bg-surface-soft rounded-xl border border-dashed px-6 py-9 text-center",
+        "border-border/70 bg-surface-soft rounded-xl border px-6 py-9 text-center shadow-[0_12px_28px_-26px_color-mix(in_oklch,var(--nav-background)_32%,transparent)]",
         className
       )}
     >

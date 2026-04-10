@@ -532,7 +532,7 @@ export function PublicListingsMap({ mapStyleUrl, listings, appliedBounds }: Publ
   }
 
   return (
-    <div className="border-border/75 bg-card/55 relative h-[68dvh] min-h-[26rem] overflow-hidden rounded-2xl border">
+    <div className="border-border/75 bg-card/88 relative h-[68dvh] min-h-[26rem] overflow-hidden rounded-2xl border">
       <MapLibre
         key={`public-map-${mapRenderKey}`}
         ref={mapRef}

@@ -352,10 +352,10 @@ export function ProfileForm({ profile, account, experience }: ProfileFormProps) 
       <section className="border-border bg-card relative overflow-hidden rounded-3xl border p-5 shadow-[0_28px_48px_-36px_color-mix(in_oklch,var(--nav-background)_40%,transparent)] sm:p-7">
         <div
           className={cn(
-            "pointer-events-none absolute inset-0 opacity-80",
+            "pointer-events-none absolute inset-0 opacity-55",
             isProvider
-              ? "bg-[radial-gradient(circle_at_88%_8%,color-mix(in_oklch,var(--primary)_18%,white),transparent_42%),radial-gradient(circle_at_0%_100%,color-mix(in_oklch,var(--accent)_24%,white),transparent_36%)]"
-              : "bg-[radial-gradient(circle_at_88%_8%,color-mix(in_oklch,var(--primary)_16%,white),transparent_42%),radial-gradient(circle_at_0%_100%,color-mix(in_oklch,var(--warm-accent)_34%,white),transparent_36%)]"
+              ? "bg-[linear-gradient(112deg,color-mix(in_oklch,var(--primary)_13%,white)_4%,transparent_54%),linear-gradient(340deg,color-mix(in_oklch,var(--accent)_11%,white)_0%,transparent_48%)]"
+              : "bg-[linear-gradient(112deg,color-mix(in_oklch,var(--primary)_12%,white)_4%,transparent_56%),linear-gradient(338deg,color-mix(in_oklch,var(--warm-accent)_15%,white)_0%,transparent_54%)]"
           )}
         />
         <div className="relative grid gap-6 xl:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
@@ -787,11 +787,11 @@ export function ProfileForm({ profile, account, experience }: ProfileFormProps) 
 
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
             <div className="space-y-4">
-              <div className="space-y-3 rounded-xl border border-border/70 bg-surface-soft px-4 py-3.5">
+              <div className="space-y-3 rounded-xl border border-border/70 bg-surface-soft/88 px-4 py-3.5">
                 <ThemePreferenceSelector />
               </div>
 
-              <div className="space-y-3 rounded-xl border border-border/70 bg-surface-soft px-4 py-3.5">
+              <div className="space-y-3 rounded-xl border border-border/70 bg-surface-soft/88 px-4 py-3.5">
                 <p className="inline-flex items-center gap-2 text-sm font-semibold tracking-tight">
                   <Shield className="text-primary size-4" />
                   Active session controls

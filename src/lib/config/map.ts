@@ -1,6 +1,6 @@
 const MAP_STYLE_URL_ENV = "NEXT_PUBLIC_MAP_STYLE_URL";
 export const DEFAULT_PUBLIC_MAP_STYLE_URL =
-  "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
+  "https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json";
 
 function isValidUrl(value: string) {
   try {

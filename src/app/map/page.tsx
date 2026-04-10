@@ -141,7 +141,7 @@ export default async function MapPage({ searchParams }: MapPageProps) {
 
   return (
     <MainContainer size="wide" className="space-y-5">
-      <section className="border-border/75 bg-card/60 space-y-3 rounded-xl border p-5 sm:p-6">
+      <section className="border-border/70 bg-card/88 space-y-3 rounded-xl border p-5 sm:p-6">
         <Badge variant="primary">Map discovery</Badge>
         <h1 className="type-page-title max-w-4xl">
           Search listings spatially with map clusters and area-based filtering.
@@ -152,7 +152,7 @@ export default async function MapPage({ searchParams }: MapPageProps) {
         </p>
       </section>
 
-      <section className="border-border/75 bg-card/60 space-y-4 rounded-xl border p-4 sm:p-5">
+      <section className="border-border/70 bg-card/88 space-y-4 rounded-xl border p-4 sm:p-5">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div className="space-y-1.5">
             <p className="text-sm font-semibold tracking-tight">{statusTitle}</p>
