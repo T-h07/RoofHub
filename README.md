@@ -18,6 +18,7 @@ Map-first real estate marketplace for rental and sale listings.
 - profile bootstrap on authenticated access with trusted `profiles` linkage
 - role model foundation: `seeker`, `provider`, `admin`
 - role-aware profile/account hub with identity hero, secure profile photo upload, and contact channel controls (`/profile`)
+- typed-confirmation hard-delete account flow in profile danger-zone with server-side cleanup + auth user deletion
 - role-aware desktop/mobile navigation visibility
 - route protection for `/dashboard`, `/favorites`, `/messages`, and `/profile`
 - public homepage foundation with hero, search CTA, intent entry points, featured listing placeholders, and provider CTA
@@ -152,6 +153,7 @@ Where to get the Supabase values:
 - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`: Supabase Dashboard -> Project Settings -> Data API -> Project API keys -> `anon` / publishable key
 - `NEXT_PUBLIC_MAP_STYLE_URL`: optional override. If omitted or invalid, RoofHub falls back to a public dark MapLibre style.
 - `AUTH_ALLOWED_ORIGINS`: server-side allowlist used for auth redirect/callback URL generation. Include all trusted local/preview/production app origins.
+- `SUPABASE_SERVICE_ROLE_KEY`: required server-only secret for account hard-delete operations from `/profile` danger-zone.
 
 Rules:
 

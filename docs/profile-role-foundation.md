@@ -70,7 +70,32 @@ Not included in this PT:
 - circular profile photo UX (upload/change/remove) replacing raw avatar URL input
 - role-adaptive seeker/provider emphasis and helper text
 - stronger sectioning for profile identity, contact channels, role visibility, and account controls
-- polished placeholder structure for upcoming account hard-delete danger-zone flow
+- destructive-danger-zone flow with typed confirmation and server-side hard-delete handling
+
+## Profile Photo Upload Reliability
+
+Profile photo upload depends on migration-backed storage configuration:
+
+- bucket: `profile-avatars`
+- strict object-path + owner policies from:
+  - `supabase/migrations/20260410193000_nm_pt_profile_avatar_storage.sql`
+
+If this migration is not applied on the target project, profile photo uploads fail by design.
+
+## Hard Delete Account Flow
+
+`/profile` now includes a real hard-delete path:
+
+- confirmation requires typed `DELETE`
+- email re-confirmation is required when account email exists
+- delete logic derives actor from authenticated server session (no client user-id trust)
+- privileged operations run server-side via service-role client only
+- flow removes:
+  - owned listing images in storage
+  - profile avatar storage objects
+  - actor/target-linked security audit rows
+  - auth user (which cascades profile/listings/favorites/conversations/messages/reports via FK rules)
+- Supabase auth cookies are cleared after delete finalization to avoid stale local session state
 
 ## Role-Aware Navigation
 
