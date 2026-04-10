@@ -120,11 +120,11 @@ Theme direction:
 Create `.env.local` in the project root:
 
 ```bash
-NEXT_PUBLIC_SUPABASE_URL=your-project-url
-NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
-NEXT_PUBLIC_MAP_STYLE_URL=your-map-style-url
-NEXT_PUBLIC_SITE_URL=your-base-url
-AUTH_ALLOWED_ORIGINS=comma-separated-trusted-origins
+NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<supabase-publishable-key>
+NEXT_PUBLIC_MAP_STYLE_URL=https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json
+NEXT_PUBLIC_SITE_URL=http://localhost:3000
+AUTH_ALLOWED_ORIGINS=http://localhost:3000
 ```
 
 Quick local setup (Windows PowerShell):
@@ -134,14 +134,16 @@ cd C:\Users\taulanth\Desktop\nestmap
 Copy-Item .env.example .env.local
 ```
 
-Then set `.env.local` to:
+Hosted project reference:
+
+- Project ref: `<project-ref>`
+- Project URL: `https://<project-ref>.supabase.co`
+- Publishable key: `<supabase-publishable-key>`
+
+Optional server-only connection string pattern (for CLI tooling only, never commit):
 
 ```bash
-NEXT_PUBLIC_SUPABASE_URL=https://<your-project-ref>.supabase.co
-NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<your-supabase-anon-publishable-key>
-NEXT_PUBLIC_MAP_STYLE_URL=https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json
-NEXT_PUBLIC_SITE_URL=http://localhost:3000
-AUTH_ALLOWED_ORIGINS=http://localhost:3000
+DATABASE_URL=postgresql://postgres:<db-password>@db.<project-ref>.supabase.co:5432/postgres
 ```
 
 Where to get the Supabase values:
@@ -156,6 +158,7 @@ Rules:
 - never commit `.env.local` or real secrets
 - do not hardcode keys in source
 - do not expose privileged keys (for example service role) to browser code
+- do not place direct DB credentials in client code or `NEXT_PUBLIC_*` env vars
 - configure the same variables in Vercel for Development, Preview, and Production environments
 - ensure `AUTH_ALLOWED_ORIGINS` in Vercel includes every trusted preview + production origin used by auth callbacks
 - `NEXT_PUBLIC_SITE_URL` should point to the canonical app origin for each environment (required for production-safe auth redirect fallback and metadata base)
@@ -164,6 +167,40 @@ Connectivity check:
 
 - run `npm run dev`
 - open `/api/internal/supabase` to verify server-side Supabase wiring
+
+## Supabase CLI Hosted Project Wiring
+
+This repo already includes `supabase/config.toml` and migration history under `supabase/migrations`.
+
+Link local CLI to hosted project:
+
+```bash
+npx supabase login
+npx supabase link --project-ref <project-ref>
+```
+
+Check local vs hosted migration state and push:
+
+```bash
+npx supabase migration list --local
+npx supabase migration list --linked
+npx supabase db push
+```
+
+If you use direct DB-url mode (server-only shell variable):
+
+```bash
+npx supabase migration list --db-url "$DATABASE_URL"
+npx supabase db push --db-url "$DATABASE_URL"
+```
+
+Google OAuth setup still requires manual platform configuration:
+
+- Supabase Dashboard: enable Google provider, set client ID/secret, and configure site/redirect URLs.
+- Google Cloud Console: configure OAuth consent and authorized redirect URIs:
+  - `http://localhost:3000/auth/callback`
+  - `https://YOUR_DOMAIN/auth/callback`
+  - any preview callback URLs used by Vercel.
 
 ## Database Schema (PT04)
 

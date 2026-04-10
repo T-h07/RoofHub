@@ -5,28 +5,66 @@
 - `@supabase/supabase-js`
 - `@supabase/ssr`
 
+## Hosted project wiring (current target)
+
+- Project ref: `<project-ref>`
+- Project URL: `https://<project-ref>.supabase.co`
+- Publishable key: `<supabase-publishable-key>`
+
 ## Environment variables
 
-Required variables:
+Required app variables:
 
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
 
-Optional project variable already present:
+Optional app variable already present:
 
 - `NEXT_PUBLIC_MAP_STYLE_URL`
 
-Local usage:
+Local `.env.local` (not committed):
 
-- set values in `.env.local`
-- never commit `.env.local`
+```bash
+NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<supabase-publishable-key>
+NEXT_PUBLIC_MAP_STYLE_URL=https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json
+NEXT_PUBLIC_SITE_URL=http://localhost:3000
+AUTH_ALLOWED_ORIGINS=http://localhost:3000
+```
 
-Vercel usage:
+Optional server-only connection string pattern for CLI tooling:
 
-- configure the same values in Project Settings for:
-  - Development
-  - Preview
-  - Production
+```bash
+DATABASE_URL=postgresql://postgres:<db-password>@db.<project-ref>.supabase.co:5432/postgres
+```
+
+Rules:
+
+- never commit `.env.local` or real credentials
+- never expose `DATABASE_URL` or service-role values to `NEXT_PUBLIC_*`
+- configure equivalent envs in Vercel Development/Preview/Production
+
+## Supabase CLI workflow (hosted project)
+
+This repository already includes:
+
+- `supabase/config.toml`
+- `supabase/migrations/*`
+- `supabase/seed.sql`
+
+To connect local CLI to the hosted project:
+
+1. `npx supabase login`
+2. `npx supabase link --project-ref <project-ref>`
+3. `npx supabase migration list --local`
+4. `npx supabase migration list --linked`
+5. `npx supabase db push`
+
+If you prefer direct DB-url mode for migration checks/push, use a server-only shell variable:
+
+1. set `DATABASE_URL` locally (never commit)
+2. `npx supabase migration list --db-url "$DATABASE_URL"`
+3. `npx supabase db push --db-url "$DATABASE_URL"`
 
 ## File layout
 
@@ -37,33 +75,35 @@ Vercel usage:
 - `src/lib/supabase/storage/listing-images.ts`: storage upload/delete/signed-url helper layer
 - `src/lib/storage/listing-images.ts`: image path + validation + DB mapping utilities
 - `src/hooks/use-listing-image-upload-state.ts`: local preview/cover/order/cleanup state helper
-- `src/types/database.ts`: generated Supabase database types (from local schema)
+- `src/types/database.ts`: generated Supabase database types
 - `src/app/api/internal/supabase/route.ts`: internal connectivity probe
 - `supabase/migrations/`: SQL-first schema migrations
+
+## Manual OAuth provider configuration (still required)
+
+App-side OAuth routes are implemented, but dashboard/provider setup is still manual:
+
+- Supabase Dashboard:
+  - enable Google provider
+  - set Google client ID + secret
+  - set site URL and additional redirect URLs (local/preview/production)
+- Google Cloud Console:
+  - configure OAuth consent screen
+  - add authorized redirect URIs:
+    - `http://localhost:3000/auth/callback`
+    - `https://YOUR_DOMAIN/auth/callback`
+    - any preview callback URLs used in Vercel
 
 ## Security rules
 
 - never hardcode keys in source
 - never expose privileged keys to client components
 - keep browser code on publishable key only
-- reserve service-role/privileged keys for explicit server-only workflows in future PTs
+- reserve service-role/privileged keys for explicit server-only workflows
 - fail early on missing required environment variables
 
-## RLS and authorization
-
-- PT05 enables RLS on all user-facing public tables.
-- Access control is enforced in DB policies for anon/authenticated/admin flows.
-- Policy details and storage policy direction are documented in `docs/rls-policies.md`.
-- PT06 implements storage bucket + `storage.objects` policies for listing images.
-- Storage behavior is documented in `docs/storage-images-foundation.md`.
-- PT07 adds SSR-safe auth flows and callback handling for sign-up/sign-in/password reset.
-- Auth flow details are documented in `docs/auth-flows.md`.
-- PT08 adds profile bootstrap + role model wiring aligned with `profiles` and RLS policy hardening.
-- Profile/role details are documented in `docs/profile-role-foundation.md`.
-
-Schema details and migration workflow remain documented in `docs/database-schema-v1.md`.
-
-Repository-wide security guardrails are defined in:
+Schema details remain documented in `docs/database-schema-v1.md`.
+Repository-wide guardrails remain in:
 
 - `docs/security-baseline.md`
 - `docs/security-checklist.md`
