@@ -8,6 +8,19 @@ import { siteConfig } from "@/lib/config/site";
 import "./globals.css";
 import "maplibre-gl/dist/maplibre-gl.css";
 
+function resolveMetadataBaseUrl() {
+  const configured = process.env.NEXT_PUBLIC_SITE_URL ?? "";
+  if (configured) {
+    try {
+      return new URL(configured);
+    } catch {
+      // Fall through to stable default.
+    }
+  }
+
+  return new URL("https://roofhub.vercel.app");
+}
+
 const manrope = Manrope({
   variable: "--font-manrope",
   subsets: ["latin"],
@@ -24,7 +37,7 @@ export const metadata: Metadata = {
     template: `%s | ${siteConfig.name}`,
   },
   description: siteConfig.description,
-  metadataBase: new URL("https://roofhub.vercel.app"),
+  metadataBase: resolveMetadataBaseUrl(),
 };
 
 export default function RootLayout({
