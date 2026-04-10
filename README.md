@@ -124,6 +124,7 @@ NEXT_PUBLIC_SUPABASE_URL=your-project-url
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
 NEXT_PUBLIC_MAP_STYLE_URL=your-map-style-url
 NEXT_PUBLIC_SITE_URL=your-base-url
+AUTH_ALLOWED_ORIGINS=comma-separated-trusted-origins
 ```
 
 Quick local setup (Windows PowerShell):
@@ -140,6 +141,7 @@ NEXT_PUBLIC_SUPABASE_URL=https://<your-project-ref>.supabase.co
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<your-supabase-anon-publishable-key>
 NEXT_PUBLIC_MAP_STYLE_URL=https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json
 NEXT_PUBLIC_SITE_URL=http://localhost:3000
+AUTH_ALLOWED_ORIGINS=http://localhost:3000
 ```
 
 Where to get the Supabase values:
@@ -147,6 +149,7 @@ Where to get the Supabase values:
 - `NEXT_PUBLIC_SUPABASE_URL`: Supabase Dashboard -> Project Settings -> Data API -> Project URL
 - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`: Supabase Dashboard -> Project Settings -> Data API -> Project API keys -> `anon` / publishable key
 - `NEXT_PUBLIC_MAP_STYLE_URL`: optional override. If omitted or invalid, RoofHub falls back to a public dark MapLibre style.
+- `AUTH_ALLOWED_ORIGINS`: server-side allowlist used for auth redirect/callback URL generation. Include all trusted local/preview/production app origins.
 
 Rules:
 
@@ -154,7 +157,8 @@ Rules:
 - do not hardcode keys in source
 - do not expose privileged keys (for example service role) to browser code
 - configure the same variables in Vercel for Development, Preview, and Production environments
-- `NEXT_PUBLIC_SITE_URL` is optional as a fallback; request-origin headers are used first for auth redirects
+- ensure `AUTH_ALLOWED_ORIGINS` in Vercel includes every trusted preview + production origin used by auth callbacks
+- `NEXT_PUBLIC_SITE_URL` should point to the canonical app origin for each environment (required for production-safe auth redirect fallback and metadata base)
 
 Connectivity check:
 
@@ -384,6 +388,12 @@ Security-sensitive changes must follow the baseline and complete the checklist b
 - Shared server-side audit helper: `src/lib/security/audit.ts`
 - Supabase audit storage + writer migration:
   - `supabase/migrations/20260410153000_nm_sh_pt08_audit_observability.sql`
+
+## Production Hardening and Launch Review (SH-PT09)
+
+- Production hardening review and ASVS-style launch checklist: `docs/production-hardening-launch-review.md`
+- Explicit launch blockers register: `docs/security-launch-blockers.md`
+- Prioritized non-blocking security debt register: `docs/security-debt-register.md`
 
 ## Local Development
 

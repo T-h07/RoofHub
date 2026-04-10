@@ -100,6 +100,7 @@ Audit and observability execution details are defined in `docs/audit-observabili
 - Supabase service-role key is server-only and must never appear in client bundles.
 - Keep Vercel envs separated per environment (Development, Preview, Production).
 - `NEXT_PUBLIC_SITE_URL` and Supabase redirect URL config must remain aligned with auth callback behavior.
+- `AUTH_ALLOWED_ORIGINS` must be configured server-side for trusted auth callback/reset URL generation across local/preview/production.
 
 Google OAuth note:
 - OAuth is not currently enabled.
@@ -128,6 +129,16 @@ Google OAuth note:
 - Use layered controls where appropriate (for example per-IP and per-account scopes for auth-sensitive behavior).
 - Keep limits explicit and documented in `docs/traffic-control-hardening.md`.
 - Throttled responses must remain bounded and user-safe.
+
+### 12) Production hardening and launch readiness
+
+- Browser-facing security headers and baseline CSP must remain explicitly configured and reviewed.
+- Release readiness must be tracked with an explicit checklist, blockers list, and security debt register.
+- Do not treat manual platform config (Supabase/Vercel/OAuth) as implicitly safe; required settings must be documented and verified per environment.
+- Preserve SH-PT09 release guardrails in:
+  - `docs/production-hardening-launch-review.md`
+  - `docs/security-launch-blockers.md`
+  - `docs/security-debt-register.md`
 
 ## Required review points for high-risk changes
 
@@ -179,7 +190,7 @@ Do not merge when any of the following is true:
 
 - adaptive risk-scoring abuse controls and challenge flows
 - advanced audit alerting/retention automation and SIEM integrations
-- CSP/header hardening program
+- strict nonce-based CSP/header hardening program
 - full historical security audit of all features
 - schema/RLS redesign
 

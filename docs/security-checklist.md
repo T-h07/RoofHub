@@ -76,3 +76,10 @@ For dependency/lockfile/scanner specifics, also follow `docs/supply-chain-guardr
 - [ ] Tests or validation notes cover the security-sensitive behavior.
 - [ ] `docs/security-baseline.md` was updated if assumptions/guardrails changed.
 - [ ] If scanner suppression/workflow changes were made, justification and scope are documented.
+
+## Production release readiness (when preparing launch or major environment rollout)
+
+- [ ] `docs/production-hardening-launch-review.md` is current and status markers are accurate.
+- [ ] `docs/security-launch-blockers.md` is reviewed and all blockers are either resolved or explicitly accepted by launch owner.
+- [ ] `docs/security-debt-register.md` is reviewed and does not contain disguised launch blockers.
+- [ ] Production `AUTH_ALLOWED_ORIGINS`, `NEXT_PUBLIC_SITE_URL`, and Supabase redirect/site URL settings are verified to match deployed domains.
