@@ -1,15 +1,204 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { redirect } from "next/navigation";
-import { BadgeCheck, UserRound } from "lucide-react";
+import { TriangleAlert, UserRound } from "lucide-react";
 
 import { MainContainer } from "@/components/layout/main-container";
-import { ProfileForm } from "@/components/profile/profile-form";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ProfileForm, type ProfileExperience } from "@/components/profile/profile-form";
 import { EmptyState } from "@/components/ui/empty-state";
 import { toSignInPath } from "@/lib/auth/routing";
 import { getCurrentUserProfile } from "@/lib/auth/profile";
-import { getRoleLabel, isAdminRole } from "@/lib/auth/roles";
+import { isProviderRole, type PreferredContactMethod } from "@/lib/auth/roles";
+import { loadProviderListingOverviewMetrics } from "@/lib/listings/provider-dashboard/queries";
 import { createServerSupabaseClient } from "@/lib/supabase";
+import type { Database, Tables } from "@/types/database";
+
+type CompletionCheck = {
+  label: string;
+  ready: boolean;
+};
+
+function formatCount(value: number | null) {
+  if (value === null || !Number.isFinite(value)) {
+    return "--";
+  }
+
+  return new Intl.NumberFormat("en").format(value);
+}
+
+function buildCompletionSummary(percent: number) {
+  if (percent >= 90) {
+    return "Launch-ready profile identity";
+  }
+
+  if (percent >= 75) {
+    return "Strong profile baseline";
+  }
+
+  if (percent >= 50) {
+    return "Solid progress, needs refinement";
+  }
+
+  return "Initial profile setup in progress";
+}
+
+function buildProfileCompletion(profile: Tables<"profiles">) {
+  const hasChannels = profile.contact_methods.length > 0;
+  const completionChecks: CompletionCheck[] = [
+    {
+      label: "display name",
+      ready: profile.display_name.trim().length >= 2,
+    },
+    {
+      label: "profile photo",
+      ready: Boolean(profile.avatar_url),
+    },
+    {
+      label: "about summary",
+      ready: Boolean(profile.bio?.trim()),
+    },
+    {
+      label: "contact channels",
+      ready: hasChannels,
+    },
+    {
+      label: "primary contact method",
+      ready: Boolean(profile.preferred_contact_method),
+    },
+  ];
+
+  if (isProviderRole(profile.role)) {
+    completionChecks.push(
+      {
+        label: "multiple response channels",
+        ready: profile.contact_methods.length >= 2,
+      },
+      {
+        label: "direct response detail",
+        ready: Boolean(
+          profile.phone?.trim() ||
+            profile.contact_email?.trim() ||
+            profile.whatsapp_phone?.trim() ||
+            profile.viber_phone?.trim()
+        ),
+      }
+    );
+  } else {
+    completionChecks.push({
+      label: "direct contact preference",
+      ready: Boolean(profile.phone?.trim() || profile.contact_email?.trim()),
+    });
+  }
+
+  const completedCount = completionChecks.filter((check) => check.ready).length;
+  const completionPercent = Math.round((completedCount / completionChecks.length) * 100);
+
+  return {
+    completionPercent,
+    completionSummary: buildCompletionSummary(completionPercent),
+    missingItems: completionChecks.filter((check) => !check.ready).map((check) => check.label),
+  };
+}
+
+async function loadSeekerProfileExperience(
+  supabase: SupabaseClient<Database>,
+  profile: Tables<"profiles">
+) {
+  const [favoritesCountResult, conversationCountResult] = await Promise.all([
+    supabase.from("favorites").select("listing_id", { count: "exact", head: true }).eq("user_id", profile.id),
+    supabase
+      .from("conversations")
+      .select("id", { count: "exact", head: true })
+      .or(`provider_id.eq.${profile.id},seeker_id.eq.${profile.id}`),
+  ]);
+
+  const favoritesCount = favoritesCountResult.error ? null : (favoritesCountResult.count ?? 0);
+  const conversationCount = conversationCountResult.error ? null : (conversationCountResult.count ?? 0);
+  const completion = buildProfileCompletion(profile);
+
+  return {
+    heroTitle: "Personal account identity",
+    heroDescription:
+      "Shape how your RoofHub account appears in saved listings, messaging threads, and activity history.",
+    roleDescriptor: "Seeker profile",
+    previewTitle: "How your account context is presented",
+    previewDescription:
+      "Seeker identity is private-first while still keeping your preferences and contact readiness consistent.",
+    completionPercent: completion.completionPercent,
+    completionSummary: completion.completionSummary,
+    missingItems: completion.missingItems,
+    metrics: [
+      {
+        label: "Saved listings",
+        value: formatCount(favoritesCount),
+        hint: "Keep favorites visible from explore and map flows.",
+        tone: "primary",
+      },
+      {
+        label: "Conversations",
+        value: formatCount(conversationCount),
+        hint: "Messaging threads linked to listing inquiries.",
+        tone: "neutral",
+      },
+      {
+        label: "Primary channel",
+        value: profile.preferred_contact_method
+          ? profile.preferred_contact_method.replace("_", " ")
+          : "Not selected",
+        hint: "Used as the first contact preference in messaging context.",
+        tone: "success",
+      },
+    ],
+  } satisfies ProfileExperience;
+}
+
+async function loadProviderProfileExperience(
+  supabase: SupabaseClient<Database>,
+  profile: Tables<"profiles">
+) {
+  const overviewResult = await loadProviderListingOverviewMetrics(supabase, {
+    userId: profile.id,
+  });
+  const completion = buildProfileCompletion(profile);
+
+  return {
+    heroTitle: "Marketplace-facing provider identity",
+    heroDescription:
+      "Your provider profile shapes trust on listing detail pages, contact surfaces, and lead response expectations.",
+    roleDescriptor: "Provider profile",
+    previewTitle: "How seekers evaluate your profile",
+    previewDescription:
+      "Provider-facing identity should feel professional, responsive, and consistent across listing and messaging flows.",
+    completionPercent: completion.completionPercent,
+    completionSummary: completion.completionSummary,
+    missingItems: completion.missingItems,
+    metrics: [
+      {
+        label: "Published listings",
+        value: overviewResult.ok ? formatCount(overviewResult.metrics.published) : "--",
+        hint: "Public inventory currently visible to seekers.",
+        tone: "primary",
+      },
+      {
+        label: "Draft pipeline",
+        value: overviewResult.ok ? formatCount(overviewResult.metrics.draft) : "--",
+        hint: "Listings still being prepared for publish.",
+        tone: "neutral",
+      },
+      {
+        label: "Unread leads",
+        value: overviewResult.ok ? formatCount(overviewResult.metrics.unreadLeadsCount) : "--",
+        hint: "New inbound threads requiring provider follow-up.",
+        tone: "success",
+      },
+      {
+        label: "Hidden by moderation",
+        value: overviewResult.ok ? formatCount(overviewResult.metrics.hiddenByAdmin) : "--",
+        hint: "Listings currently under moderation visibility controls.",
+        tone: "warning",
+      },
+    ],
+  } satisfies ProfileExperience;
+}
 
 export default async function ProfilePage() {
   const supabase = await createServerSupabaseClient();
@@ -36,54 +225,49 @@ export default async function ProfilePage() {
   }
 
   const profile = profileResult.profile;
-  const role = profile.role;
-  const roleBadgeVariant = isAdminRole(role)
-    ? "warning"
-    : role === "provider"
-      ? "primary"
-      : "neutral";
+  const roleExperience = isProviderRole(profile.role)
+    ? await loadProviderProfileExperience(supabase, profile)
+    : await loadSeekerProfileExperience(supabase, profile);
+
+  const contactMethods: PreferredContactMethod[] =
+    profile.contact_methods.length > 0
+      ? profile.contact_methods
+      : profile.preferred_contact_method
+        ? [profile.preferred_contact_method]
+        : ["in_app"];
 
   return (
-    <MainContainer size="content" className="space-y-6">
-      <section className="border-border/80 bg-card/60 rounded-2xl border p-6 shadow-[0_18px_38px_-28px_rgba(5,10,26,0.95)] sm:p-7">
-        <div className="space-y-3">
-          <p className="type-label">Profile</p>
-          <div className="flex flex-wrap items-center gap-3">
-            <h1 className="type-page-title">Account profile</h1>
-            <Badge variant={roleBadgeVariant}>{getRoleLabel(role)}</Badge>
-          </div>
-          <p className="type-body-muted max-w-2xl">
-            Manage your public profile details and account role visibility. Security and permissions
-            are enforced in Supabase RLS.
-          </p>
-        </div>
-      </section>
+    <MainContainer size="wide" className="space-y-6">
+      <ProfileForm
+        key={`${profile.updated_at}:${profile.avatar_url ?? "no-avatar"}:${profile.role}`}
+        profile={{
+          id: profile.id,
+          displayName: profile.display_name,
+          role: profile.role,
+          bio: profile.bio,
+          phone: profile.phone,
+          avatarUrl: profile.avatar_url,
+          preferredContactMethod: profile.preferred_contact_method,
+          contactMethods,
+          contactEmail: profile.contact_email,
+          whatsappPhone: profile.whatsapp_phone,
+          viberPhone: profile.viber_phone,
+        }}
+        account={{
+          email: profileResult.user.email ?? null,
+          createdAt: profile.created_at,
+          updatedAt: profile.updated_at,
+        }}
+        experience={roleExperience}
+      />
 
-      <Card>
-        <CardHeader>
-          <div className="space-y-2">
-            <CardTitle className="flex items-center gap-2">
-              <BadgeCheck className="text-primary size-4.5" />
-              Public profile settings
-            </CardTitle>
-            <CardDescription>
-              These fields are used across marketplace identity surfaces in upcoming PTs.
-            </CardDescription>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <ProfileForm
-            profile={{
-              displayName: profile.display_name,
-              role: profile.role,
-              bio: profile.bio,
-              phone: profile.phone,
-              avatarUrl: profile.avatar_url,
-              preferredContactMethod: profile.preferred_contact_method,
-            }}
-          />
-        </CardContent>
-      </Card>
+      {roleExperience.metrics.some((metric) => metric.value === "--") ? (
+        <EmptyState
+          icon={TriangleAlert}
+          title="Some profile insights are unavailable"
+          description="Operational metrics are partially unavailable right now. Profile editing remains fully functional."
+        />
+      ) : null}
     </MainContainer>
   );
 }
