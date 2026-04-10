@@ -145,7 +145,7 @@ export async function GET(request: Request) {
     throttledMessage: "Too many callback attempts. Please wait before retrying sign-in.",
     unavailableMessage: "Authentication callback is temporarily unavailable. Please retry shortly.",
   });
-  if (!callbackTrafficControl.ok) {
+  if (!callbackTrafficControl.ok && callbackTrafficControl.reason === "throttled") {
     await recordSecurityAuditEvent({
       supabase,
       event: {
@@ -175,6 +175,22 @@ export async function GET(request: Request) {
       String(Math.max(1, callbackTrafficControl.retryAfterSeconds))
     );
     return throttledRedirect;
+  }
+
+  if (!callbackTrafficControl.ok && callbackTrafficControl.reason === "unavailable") {
+    await recordSecurityAuditEvent({
+      supabase,
+      event: {
+        eventType: AUDIT_EVENT_TYPES.authCallbackFailed,
+        targetType: "auth",
+        targetId: "callback",
+        metadata: {
+          outcome: "rate_limiter_unavailable_bypassed",
+          reason_category: "rate_limiter_unavailable",
+          ...requestFingerprint,
+        },
+      },
+    });
   }
 
   if (code) {

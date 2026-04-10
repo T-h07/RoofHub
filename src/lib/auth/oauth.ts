@@ -17,7 +17,7 @@ const OAUTH_STATUS_VALUES = [
   "callback_exchange_failed",
   "callback_provider_error",
   "origin_not_trusted",
-  "start_temporarily_unavailable",
+  "start_rate_limited",
 ] as const;
 export type OAuthStatus = (typeof OAUTH_STATUS_VALUES)[number];
 
@@ -36,15 +36,15 @@ export function isOAuthStatus(value: string | null | undefined): value is OAuthS
 export function getOAuthStatusMessage(status: OAuthStatus) {
   switch (status) {
     case "provider_not_ready":
-      return "Google sign-in is not available yet. Finish provider setup and try again.";
+      return "Google sign-in could not be started. Please retry.";
     case "callback_exchange_failed":
       return "Google sign-in could not be completed. Please try again.";
     case "callback_provider_error":
       return "Google sign-in was cancelled or denied. You can retry or use email and password.";
     case "origin_not_trusted":
       return "This environment is not trusted for OAuth callbacks yet.";
-    case "start_temporarily_unavailable":
-      return "Google sign-in is temporarily unavailable. Please retry shortly.";
+    case "start_rate_limited":
+      return "Too many Google sign-in attempts from this connection. Please wait and retry.";
     default:
       return "Google sign-in is currently unavailable.";
   }

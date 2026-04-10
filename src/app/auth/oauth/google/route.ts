@@ -42,9 +42,9 @@ export async function GET(request: Request) {
     rule: TRAFFIC_CONTROL_RULES.authSignInPerIp,
     identity: { includeIp: true },
     throttledMessage: "Too many sign-in attempts from this connection.",
-    unavailableMessage: "Google sign-in is temporarily unavailable. Please try again shortly.",
+    unavailableMessage: "Google sign-in request limits are temporarily unavailable.",
   });
-  if (!trafficControl.ok) {
+  if (!trafficControl.ok && trafficControl.reason === "throttled") {
     await recordSecurityAuditEvent({
       supabase,
       event: {
@@ -66,10 +66,27 @@ export async function GET(request: Request) {
         buildOAuthEntryPath({
           intent,
           nextPath,
-          status: "start_temporarily_unavailable",
+          status: "start_rate_limited",
         })
       )
     );
+  }
+
+  if (!trafficControl.ok && trafficControl.reason === "unavailable") {
+    await recordSecurityAuditEvent({
+      supabase,
+      event: {
+        eventType: AUDIT_EVENT_TYPES.authOAuthStartFailed,
+        targetType: "auth",
+        targetId: "oauth_google_start",
+        metadata: {
+          provider: GOOGLE_OAUTH_PROVIDER,
+          intent,
+          outcome: "rate_limiter_unavailable_bypassed",
+          ...requestFingerprint,
+        },
+      },
+    });
   }
 
   const callbackPath = buildOAuthCallbackPath({ nextPath, intent });
