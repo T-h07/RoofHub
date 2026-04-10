@@ -29,6 +29,7 @@ type AdminModerationQueueProps = {
 };
 
 type VisibilityConfirmState = {
+  reportId: string;
   listingId: string;
   listingTitle: string;
   currentStatus: ModerationReportQueueItem["listing"]["listing_status"];
@@ -98,6 +99,7 @@ export function AdminModerationQueue({ reports }: AdminModerationQueueProps) {
     startTransition(async () => {
       const result = await updateListingModerationVisibilityAction({
         listingId: state.listingId,
+        reportId: state.reportId,
         action: state.action,
       });
 
@@ -198,6 +200,7 @@ export function AdminModerationQueue({ reports }: AdminModerationQueueProps) {
                       disabled={isPending}
                       onClick={() =>
                         setConfirmState({
+                          reportId: report.id,
                           listingId: report.listing.id,
                           listingTitle: report.listing.title,
                           currentStatus: report.listing.listing_status,

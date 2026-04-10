@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { getCurrentUserProfile } from "@/lib/auth/profile";
 import { isAdminRole } from "@/lib/auth/roles";
+import { AUDIT_EVENT_TYPES, recordSecurityAuditEvent } from "@/lib/security/audit";
 import { createServerSupabaseClient } from "@/lib/supabase";
 
 import type { ProfileActionState } from "./types";
@@ -72,6 +73,23 @@ export async function updateProfileAction(
       status: "error",
       message: toProfileSaveError(error.message),
     };
+  }
+
+  if (nextRole !== currentProfile.role) {
+    await recordSecurityAuditEvent({
+      supabase,
+      event: {
+        eventType: AUDIT_EVENT_TYPES.profileRoleChanged,
+        actorUserId: currentProfile.id,
+        actorRole: nextRole,
+        targetType: "profile",
+        targetId: currentProfile.id,
+        metadata: {
+          previous_role: currentProfile.role,
+          next_role: nextRole,
+        },
+      },
+    });
   }
 
   revalidatePath("/", "layout");

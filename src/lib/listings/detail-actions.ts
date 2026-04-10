@@ -2,6 +2,11 @@
 
 import { createServerSupabaseClient } from "@/lib/supabase";
 import { enforceTrafficControl, TRAFFIC_CONTROL_RULES } from "@/lib/security/traffic-control";
+import {
+  AUDIT_EVENT_TYPES,
+  getAuditRequestFingerprint,
+  recordSecurityAuditEvent,
+} from "@/lib/security/audit";
 import type { Enums } from "@/types/database";
 import { PUBLIC_DISCOVERY_STATUS } from "@/lib/listings/visibility";
 import { isListingReportReason } from "@/lib/moderation/reporting";
@@ -49,6 +54,7 @@ export async function submitListingReportAction(
   _: ReportListingActionState,
   formData: FormData
 ): Promise<ReportListingActionState> {
+  const requestFingerprint = await getAuditRequestFingerprint();
   const listingId = getString(formData, "listingId");
   const reason = getString(formData, "reason") as Enums<"report_reason">;
   const details = getString(formData, "details");
@@ -145,15 +151,44 @@ export async function submitListingReportAction(
       };
     }
 
-    const { error } = await supabase.from("listing_reports").insert({
-      listing_id: listingId,
-      reporter_id: user.id,
-      reason_code: reason,
-      details: details || null,
-    });
+    const { data: insertedReport, error } = await supabase
+      .from("listing_reports")
+      .insert({
+        listing_id: listingId,
+        reporter_id: user.id,
+        reason_code: reason,
+        details: details || null,
+      })
+      .select("id")
+      .maybeSingle();
 
     if (error) {
       if (error.code === "23505") {
+        const { data: existingReport } = await supabase
+          .from("listing_reports")
+          .select("id")
+          .eq("listing_id", listingId)
+          .eq("reporter_id", user.id)
+          .maybeSingle();
+
+        await recordSecurityAuditEvent({
+          supabase,
+          event: {
+            eventType: AUDIT_EVENT_TYPES.listingReportDuplicate,
+            actorUserId: user.id,
+            targetType: "listing_report",
+            targetId: existingReport?.id ?? null,
+            listingId,
+            reportId: existingReport?.id ?? null,
+            metadata: {
+              reason_code: reason,
+              details_length: details.length,
+              outcome: "duplicate",
+              ...requestFingerprint,
+            },
+          },
+        });
+
         return {
           status: "success",
           message: "You already submitted a report for this listing. Our moderation team will review it.",
@@ -162,6 +197,24 @@ export async function submitListingReportAction(
         };
       }
 
+      await recordSecurityAuditEvent({
+        supabase,
+        event: {
+          eventType: AUDIT_EVENT_TYPES.listingReportCreated,
+          actorUserId: user.id,
+          targetType: "listing_report",
+          targetId: null,
+          listingId,
+          metadata: {
+            reason_code: reason,
+            details_length: details.length,
+            outcome: "failed",
+            error_code: error.code ?? null,
+            ...requestFingerprint,
+          },
+        },
+      });
+
       return {
         status: "error",
         message: "Report submission failed. Please try again.",
@@ -169,6 +222,24 @@ export async function submitListingReportAction(
         requiresAuth: false,
       };
     }
+
+    await recordSecurityAuditEvent({
+      supabase,
+      event: {
+        eventType: AUDIT_EVENT_TYPES.listingReportCreated,
+        actorUserId: user.id,
+        targetType: "listing_report",
+        targetId: insertedReport?.id ?? null,
+        listingId,
+        reportId: insertedReport?.id ?? null,
+        metadata: {
+          reason_code: reason,
+          details_length: details.length,
+          outcome: "created",
+          ...requestFingerprint,
+        },
+      },
+    });
 
     return {
       status: "success",

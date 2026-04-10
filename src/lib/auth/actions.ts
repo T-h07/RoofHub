@@ -8,6 +8,12 @@ import {
   TRAFFIC_CONTROL_RULES,
   type TrafficControlResult,
 } from "@/lib/security/traffic-control";
+import {
+  AUDIT_EVENT_TYPES,
+  getAuditRequestFingerprint,
+  hashAuditIdentifier,
+  recordSecurityAuditEvent,
+} from "@/lib/security/audit";
 import { createServerSupabaseClient } from "@/lib/supabase";
 
 import { ensureProfileForCurrentUser } from "./profile";
@@ -96,6 +102,39 @@ function toResetPasswordError(message: string) {
   return "Could not update your password. Please try again.";
 }
 
+function categorizeAuthError(message: string) {
+  const normalized = message.toLowerCase();
+
+  if (normalized.includes("too many requests") || normalized.includes("rate limit")) {
+    return "rate_limited";
+  }
+
+  if (
+    normalized.includes("invalid login credentials") ||
+    normalized.includes("invalid credentials")
+  ) {
+    return "invalid_credentials";
+  }
+
+  if (normalized.includes("email not confirmed")) {
+    return "email_not_confirmed";
+  }
+
+  if (normalized.includes("already registered")) {
+    return "already_registered";
+  }
+
+  if (normalized.includes("password")) {
+    return "password_validation";
+  }
+
+  if (normalized.includes("session") || normalized.includes("token")) {
+    return "session_or_token_invalid";
+  }
+
+  return "provider_error";
+}
+
 function getRequestedNextPath(formData: FormData) {
   const next = formData.get("next");
   return typeof next === "string" ? next : null;
@@ -122,6 +161,7 @@ export async function signInAction(
   _: AuthActionState,
   formData: FormData
 ): Promise<AuthActionState> {
+  const requestFingerprint = await getAuditRequestFingerprint();
   const nextPath = resolveAuthenticatedRedirect(
     getRequestedNextPath(formData),
     AUTH_DEFAULT_REDIRECT_PATH
@@ -142,6 +182,20 @@ export async function signInAction(
     unavailableMessage: "Sign-in is temporarily unavailable. Please try again shortly.",
   });
   if (!ipControl.ok) {
+    await recordSecurityAuditEvent({
+      supabase,
+      event: {
+        eventType: AUDIT_EVENT_TYPES.authSignInFailed,
+        targetType: "auth",
+        targetId: "sign_in",
+        metadata: {
+          outcome: "rate_limited",
+          limit_scope: "ip",
+          email_hash: hashAuditIdentifier(credentials.email),
+          ...requestFingerprint,
+        },
+      },
+    });
     return toTrafficErrorState(ipControl);
   }
 
@@ -153,12 +207,40 @@ export async function signInAction(
     unavailableMessage: "Sign-in is temporarily unavailable. Please try again shortly.",
   });
   if (!emailControl.ok) {
+    await recordSecurityAuditEvent({
+      supabase,
+      event: {
+        eventType: AUDIT_EVENT_TYPES.authSignInFailed,
+        targetType: "auth",
+        targetId: "sign_in",
+        metadata: {
+          outcome: "rate_limited",
+          limit_scope: "email",
+          email_hash: hashAuditIdentifier(credentials.email),
+          ...requestFingerprint,
+        },
+      },
+    });
     return toTrafficErrorState(emailControl);
   }
 
   const { error } = await supabase.auth.signInWithPassword(credentials);
 
   if (error) {
+    await recordSecurityAuditEvent({
+      supabase,
+      event: {
+        eventType: AUDIT_EVENT_TYPES.authSignInFailed,
+        targetType: "auth",
+        targetId: "sign_in",
+        metadata: {
+          outcome: "failed",
+          reason_category: categorizeAuthError(error.message),
+          email_hash: hashAuditIdentifier(credentials.email),
+          ...requestFingerprint,
+        },
+      },
+    });
     return {
       status: "error",
       message: toSignInError(error.message),
@@ -167,12 +249,47 @@ export async function signInAction(
 
   const profileResult = await ensureProfileForCurrentUser(supabase);
   if (!profileResult.ok) {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    await recordSecurityAuditEvent({
+      supabase,
+      event: {
+        eventType: AUDIT_EVENT_TYPES.authProfileBootstrapFailed,
+        actorUserId: user?.id ?? null,
+        targetType: "auth",
+        targetId: "sign_in",
+        metadata: {
+          phase: "sign_in",
+          email_hash: hashAuditIdentifier(credentials.email),
+          ...requestFingerprint,
+        },
+      },
+    });
     await rollbackSessionAfterProfileBootstrapFailure(supabase);
     return {
       status: "error",
       message: "We could not finalize your account session. Please sign in again.",
     };
   }
+
+  const {
+    data: { user: signedInUser },
+  } = await supabase.auth.getUser();
+  await recordSecurityAuditEvent({
+    supabase,
+    event: {
+      eventType: AUDIT_EVENT_TYPES.authSignInSucceeded,
+      actorUserId: signedInUser?.id ?? null,
+      targetType: "auth",
+      targetId: "sign_in",
+      metadata: {
+        outcome: "success",
+        email_hash: hashAuditIdentifier(credentials.email),
+        ...requestFingerprint,
+      },
+    },
+  });
 
   revalidatePath("/", "layout");
 
@@ -186,6 +303,7 @@ export async function signUpAction(
   _: AuthActionState,
   formData: FormData
 ): Promise<AuthActionState> {
+  const requestFingerprint = await getAuditRequestFingerprint();
   const requestedNextPath = getRequestedNextPath(formData);
   const nextPath = resolveAuthenticatedRedirect(requestedNextPath, AUTH_DEFAULT_REDIRECT_PATH);
   const input = readSignUpFields(formData);
@@ -214,6 +332,20 @@ export async function signUpAction(
     unavailableMessage: "Sign-up is temporarily unavailable. Please try again shortly.",
   });
   if (!ipControl.ok) {
+    await recordSecurityAuditEvent({
+      supabase,
+      event: {
+        eventType: AUDIT_EVENT_TYPES.authSignUpFailed,
+        targetType: "auth",
+        targetId: "sign_up",
+        metadata: {
+          outcome: "rate_limited",
+          limit_scope: "ip",
+          email_hash: hashAuditIdentifier(input.email),
+          ...requestFingerprint,
+        },
+      },
+    });
     return toTrafficErrorState(ipControl);
   }
 
@@ -225,6 +357,20 @@ export async function signUpAction(
     unavailableMessage: "Sign-up is temporarily unavailable. Please try again shortly.",
   });
   if (!emailControl.ok) {
+    await recordSecurityAuditEvent({
+      supabase,
+      event: {
+        eventType: AUDIT_EVENT_TYPES.authSignUpFailed,
+        targetType: "auth",
+        targetId: "sign_up",
+        metadata: {
+          outcome: "rate_limited",
+          limit_scope: "email",
+          email_hash: hashAuditIdentifier(input.email),
+          ...requestFingerprint,
+        },
+      },
+    });
     return toTrafficErrorState(emailControl);
   }
 
@@ -240,6 +386,20 @@ export async function signUpAction(
   });
 
   if (error) {
+    await recordSecurityAuditEvent({
+      supabase,
+      event: {
+        eventType: AUDIT_EVENT_TYPES.authSignUpFailed,
+        targetType: "auth",
+        targetId: "sign_up",
+        metadata: {
+          outcome: "failed",
+          reason_category: categorizeAuthError(error.message),
+          email_hash: hashAuditIdentifier(input.email),
+          ...requestFingerprint,
+        },
+      },
+    });
     return {
       status: "error",
       message: toSignUpError(error.message),
@@ -249,12 +409,41 @@ export async function signUpAction(
   if (data.session) {
     const profileResult = await ensureProfileForCurrentUser(supabase, input.displayName);
     if (!profileResult.ok) {
+      await recordSecurityAuditEvent({
+        supabase,
+        event: {
+          eventType: AUDIT_EVENT_TYPES.authProfileBootstrapFailed,
+          actorUserId: data.user?.id ?? null,
+          targetType: "auth",
+          targetId: "sign_up",
+          metadata: {
+            phase: "sign_up",
+            email_hash: hashAuditIdentifier(input.email),
+            ...requestFingerprint,
+          },
+        },
+      });
       await rollbackSessionAfterProfileBootstrapFailure(supabase);
       return {
         status: "error",
         message: "Account created, but session setup was incomplete. Please sign in again.",
       };
     }
+
+    await recordSecurityAuditEvent({
+      supabase,
+      event: {
+        eventType: AUDIT_EVENT_TYPES.authSignUpCompleted,
+        actorUserId: data.user?.id ?? null,
+        targetType: "auth",
+        targetId: "sign_up",
+        metadata: {
+          outcome: "session_created",
+          email_hash: hashAuditIdentifier(input.email),
+          ...requestFingerprint,
+        },
+      },
+    });
 
     revalidatePath("/", "layout");
 
@@ -264,6 +453,21 @@ export async function signUpAction(
       redirectTo: nextPath,
     };
   }
+
+  await recordSecurityAuditEvent({
+    supabase,
+    event: {
+      eventType: AUDIT_EVENT_TYPES.authSignUpPendingVerification,
+      actorUserId: data.user?.id ?? null,
+      targetType: "auth",
+      targetId: "sign_up",
+      metadata: {
+        outcome: "pending_verification",
+        email_hash: hashAuditIdentifier(input.email),
+        ...requestFingerprint,
+      },
+    },
+  });
 
   return {
     status: "success",
@@ -276,6 +480,7 @@ export async function requestPasswordResetAction(
   _: AuthActionState,
   formData: FormData
 ): Promise<AuthActionState> {
+  const requestFingerprint = await getAuditRequestFingerprint();
   const input = readAuthCredentials(formData);
   const errors = validateForgotPasswordInput({ email: input.email });
 
@@ -302,6 +507,20 @@ export async function requestPasswordResetAction(
     unavailableMessage: "Password reset is temporarily unavailable. Please try again shortly.",
   });
   if (!ipControl.ok) {
+    await recordSecurityAuditEvent({
+      supabase,
+      event: {
+        eventType: AUDIT_EVENT_TYPES.authPasswordResetRequested,
+        targetType: "auth",
+        targetId: "password_reset_request",
+        metadata: {
+          outcome: "rate_limited",
+          limit_scope: "ip",
+          email_hash: hashAuditIdentifier(input.email),
+          ...requestFingerprint,
+        },
+      },
+    });
     return toTrafficErrorState(ipControl);
   }
 
@@ -313,6 +532,20 @@ export async function requestPasswordResetAction(
     unavailableMessage: "Password reset is temporarily unavailable. Please try again shortly.",
   });
   if (!emailControl.ok) {
+    await recordSecurityAuditEvent({
+      supabase,
+      event: {
+        eventType: AUDIT_EVENT_TYPES.authPasswordResetRequested,
+        targetType: "auth",
+        targetId: "password_reset_request",
+        metadata: {
+          outcome: "rate_limited",
+          limit_scope: "email",
+          email_hash: hashAuditIdentifier(input.email),
+          ...requestFingerprint,
+        },
+      },
+    });
     return toTrafficErrorState(emailControl);
   }
 
@@ -321,11 +554,39 @@ export async function requestPasswordResetAction(
   });
 
   if (error) {
+    await recordSecurityAuditEvent({
+      supabase,
+      event: {
+        eventType: AUDIT_EVENT_TYPES.authPasswordResetRequested,
+        targetType: "auth",
+        targetId: "password_reset_request",
+        metadata: {
+          outcome: "failed",
+          reason_category: categorizeAuthError(error.message),
+          email_hash: hashAuditIdentifier(input.email),
+          ...requestFingerprint,
+        },
+      },
+    });
     return {
       status: "error",
       message: toForgotPasswordError(error.message),
     };
   }
+
+  await recordSecurityAuditEvent({
+    supabase,
+    event: {
+      eventType: AUDIT_EVENT_TYPES.authPasswordResetRequested,
+      targetType: "auth",
+      targetId: "password_reset_request",
+      metadata: {
+        outcome: "accepted",
+        email_hash: hashAuditIdentifier(input.email),
+        ...requestFingerprint,
+      },
+    },
+  });
 
   return {
     status: "success",
@@ -338,6 +599,7 @@ export async function resetPasswordAction(
   _: AuthActionState,
   formData: FormData
 ): Promise<AuthActionState> {
+  const requestFingerprint = await getAuditRequestFingerprint();
   const input = readResetPasswordFields(formData);
   const errors = validateResetPasswordInput(input);
 
@@ -351,11 +613,45 @@ export async function resetPasswordAction(
   });
 
   if (error) {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    await recordSecurityAuditEvent({
+      supabase,
+      event: {
+        eventType: AUDIT_EVENT_TYPES.authPasswordResetCompleted,
+        actorUserId: user?.id ?? null,
+        targetType: "auth",
+        targetId: "password_reset_complete",
+        metadata: {
+          outcome: "failed",
+          reason_category: categorizeAuthError(error.message),
+          ...requestFingerprint,
+        },
+      },
+    });
     return {
       status: "error",
       message: toResetPasswordError(error.message),
     };
   }
+
+  const {
+    data: { user: resetUser },
+  } = await supabase.auth.getUser();
+  await recordSecurityAuditEvent({
+    supabase,
+    event: {
+      eventType: AUDIT_EVENT_TYPES.authPasswordResetCompleted,
+      actorUserId: resetUser?.id ?? null,
+      targetType: "auth",
+      targetId: "password_reset_complete",
+      metadata: {
+        outcome: "success",
+        ...requestFingerprint,
+      },
+    },
+  });
 
   revalidatePath("/", "layout");
 
@@ -368,7 +664,24 @@ export async function resetPasswordAction(
 
 export async function signOutAction() {
   const supabase = await createServerSupabaseClient();
+  const requestFingerprint = await getAuditRequestFingerprint();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   await supabase.auth.signOut({ scope: "local" });
+  await recordSecurityAuditEvent({
+    supabase,
+    event: {
+      eventType: AUDIT_EVENT_TYPES.authSignOut,
+      actorUserId: user?.id ?? null,
+      targetType: "auth",
+      targetId: "sign_out",
+      metadata: {
+        outcome: "success",
+        ...requestFingerprint,
+      },
+    },
+  });
   revalidatePath("/", "layout");
   redirect(toSignInPath(AUTH_DEFAULT_REDIRECT_PATH, "signed_out"));
 }

@@ -2,6 +2,7 @@
 
 import { getCurrentUserProfile } from "@/lib/auth/profile";
 import { isAdminRole } from "@/lib/auth/roles";
+import { AUDIT_EVENT_TYPES, recordSecurityAuditEvent } from "@/lib/security/audit";
 import { enforceTrafficControl, TRAFFIC_CONTROL_RULES } from "@/lib/security/traffic-control";
 import { createServerSupabaseClient } from "@/lib/supabase";
 
@@ -101,12 +102,23 @@ export async function updateListingModerationVisibilityAction(
   }
 
   const listingId = typeof input.listingId === "string" ? input.listingId : null;
+  const reportId =
+    typeof input.reportId === "string" && input.reportId.trim().length > 0
+      ? input.reportId.trim()
+      : null;
   const action = input.action;
 
   if (!listingId || !isUuid(listingId)) {
     return {
       ok: false,
       message: "Listing reference is invalid.",
+    };
+  }
+
+  if (reportId && !isUuid(reportId)) {
+    return {
+      ok: false,
+      message: "Moderation report reference is invalid.",
     };
   }
 
@@ -150,6 +162,22 @@ export async function updateListingModerationVisibilityAction(
     .maybeSingle();
 
   if (listingResult.error || !listingResult.data) {
+    await recordSecurityAuditEvent({
+      supabase,
+      event: {
+        eventType: AUDIT_EVENT_TYPES.moderationVisibilityFailed,
+        actorUserId: profile.id,
+        actorRole: profile.role,
+        targetType: "listing",
+        targetId: listingId,
+        listingId,
+        reportId,
+        metadata: {
+          action,
+          reason: "listing_not_found",
+        },
+      },
+    });
     return {
       ok: false,
       message: "Listing not found for moderation.",
@@ -161,6 +189,24 @@ export async function updateListingModerationVisibilityAction(
 
   if (action === "hide") {
     if (listing.listing_status === "hidden_by_admin") {
+      await recordSecurityAuditEvent({
+        supabase,
+        event: {
+          eventType: AUDIT_EVENT_TYPES.moderationVisibilityChanged,
+          actorUserId: profile.id,
+          actorRole: profile.role,
+          targetType: "listing",
+          targetId: listing.id,
+          listingId: listing.id,
+          reportId,
+          fromStatus: previousStatus,
+          toStatus: "hidden_by_admin",
+          metadata: {
+            action,
+            no_op: true,
+          },
+        },
+      });
       return {
         ok: true,
         message: "Listing is already hidden by moderation.",
@@ -180,6 +226,24 @@ export async function updateListingModerationVisibilityAction(
       .maybeSingle();
 
     if (updateError || !updated) {
+      await recordSecurityAuditEvent({
+        supabase,
+        event: {
+          eventType: AUDIT_EVENT_TYPES.moderationVisibilityFailed,
+          actorUserId: profile.id,
+          actorRole: profile.role,
+          targetType: "listing",
+          targetId: listing.id,
+          listingId: listing.id,
+          reportId,
+          fromStatus: previousStatus,
+          toStatus: "hidden_by_admin",
+          metadata: {
+            action,
+            reason: updateError ? "update_failed" : "empty_update_result",
+          },
+        },
+      });
       return {
         ok: false,
         message: updateError
@@ -188,6 +252,25 @@ export async function updateListingModerationVisibilityAction(
         previousStatus,
       };
     }
+
+    await recordSecurityAuditEvent({
+      supabase,
+      event: {
+        eventType: AUDIT_EVENT_TYPES.moderationVisibilityChanged,
+        actorUserId: profile.id,
+        actorRole: profile.role,
+        targetType: "listing",
+        targetId: listing.id,
+        listingId: listing.id,
+        reportId,
+        fromStatus: previousStatus,
+        toStatus: updated.listing_status,
+        metadata: {
+          action,
+          no_op: false,
+        },
+      },
+    });
 
     return {
       ok: true,
@@ -198,6 +281,24 @@ export async function updateListingModerationVisibilityAction(
   }
 
   if (listing.listing_status !== "hidden_by_admin") {
+    await recordSecurityAuditEvent({
+      supabase,
+      event: {
+        eventType: AUDIT_EVENT_TYPES.moderationVisibilityChanged,
+        actorUserId: profile.id,
+        actorRole: profile.role,
+        targetType: "listing",
+        targetId: listing.id,
+        listingId: listing.id,
+        reportId,
+        fromStatus: previousStatus,
+        toStatus: listing.listing_status,
+        metadata: {
+          action,
+          no_op: true,
+        },
+      },
+    });
     return {
       ok: true,
       message: "Listing is already visible to normal lifecycle controls.",
@@ -219,6 +320,24 @@ export async function updateListingModerationVisibilityAction(
     .maybeSingle();
 
   if (restoreError || !restored) {
+    await recordSecurityAuditEvent({
+      supabase,
+      event: {
+        eventType: AUDIT_EVENT_TYPES.moderationVisibilityFailed,
+        actorUserId: profile.id,
+        actorRole: profile.role,
+        targetType: "listing",
+        targetId: listing.id,
+        listingId: listing.id,
+        reportId,
+        fromStatus: previousStatus,
+        toStatus: restoreStatus,
+        metadata: {
+          action,
+          reason: restoreError ? "update_failed" : "empty_update_result",
+        },
+      },
+    });
     return {
       ok: false,
       message: restoreError
@@ -232,6 +351,25 @@ export async function updateListingModerationVisibilityAction(
     restored.listing_status === "published"
       ? "Listing restored to public visibility."
       : "Listing restored to draft workflow.";
+
+  await recordSecurityAuditEvent({
+    supabase,
+    event: {
+      eventType: AUDIT_EVENT_TYPES.moderationVisibilityChanged,
+      actorUserId: profile.id,
+      actorRole: profile.role,
+      targetType: "listing",
+      targetId: listing.id,
+      listingId: listing.id,
+      reportId,
+      fromStatus: previousStatus,
+      toStatus: restored.listing_status,
+      metadata: {
+        action,
+        no_op: false,
+      },
+    },
+  });
 
   return {
     ok: true,

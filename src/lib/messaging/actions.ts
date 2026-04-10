@@ -2,6 +2,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { AUDIT_EVENT_TYPES, recordSecurityAuditEvent } from "@/lib/security/audit";
 import { enforceTrafficControl, TRAFFIC_CONTROL_RULES } from "@/lib/security/traffic-control";
 import type { Database, Tables } from "@/types/database";
 
@@ -209,6 +210,23 @@ export async function createOrGetConversationForListingAction(
     .maybeSingle();
 
   if (!error && data) {
+    await recordSecurityAuditEvent({
+      supabase,
+      event: {
+        eventType: AUDIT_EVENT_TYPES.conversationCreated,
+        actorUserId: profile.id,
+        actorRole: profile.role,
+        targetType: "conversation",
+        targetId: data.id,
+        listingId: listing.id,
+        conversationId: data.id,
+        metadata: {
+          outcome: "created",
+          participant_role: "seeker",
+        },
+      },
+    });
+
     return {
       ok: true,
       data: {
@@ -228,6 +246,23 @@ export async function createOrGetConversationForListingAction(
       .maybeSingle();
 
     if (!existingError && existing) {
+      await recordSecurityAuditEvent({
+        supabase,
+        event: {
+          eventType: AUDIT_EVENT_TYPES.conversationCreated,
+          actorUserId: profile.id,
+          actorRole: profile.role,
+          targetType: "conversation",
+          targetId: existing.id,
+          listingId: listing.id,
+          conversationId: existing.id,
+          metadata: {
+            outcome: "existing",
+            participant_role: "seeker",
+          },
+        },
+      });
+
       return {
         ok: true,
         data: {
@@ -344,6 +379,25 @@ export async function sendConversationMessageAction(
 
     return toMessagingFailure("internal", "Message could not be sent right now.");
   }
+
+  // Message bodies are intentionally excluded from audit metadata.
+  // The canonical message content remains only in the product table.
+  await recordSecurityAuditEvent({
+    supabase,
+    event: {
+      eventType: AUDIT_EVENT_TYPES.messageSent,
+      actorUserId: profile.id,
+      actorRole: profile.role,
+      targetType: "message",
+      targetId: data.id,
+      listingId: conversation.listing_id,
+      conversationId: conversation.id,
+      metadata: {
+        body_length: normalizedBody.length,
+        sender_role: profile.role,
+      },
+    },
+  });
 
   return {
     ok: true,

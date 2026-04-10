@@ -3,6 +3,7 @@
 import { createServerSupabaseClient } from "@/lib/supabase";
 import { getCurrentUserProfile } from "@/lib/auth/profile";
 import { isProviderRole } from "@/lib/auth/roles";
+import { AUDIT_EVENT_TYPES, recordSecurityAuditEvent } from "@/lib/security/audit";
 import { enforceTrafficControl, TRAFFIC_CONTROL_RULES } from "@/lib/security/traffic-control";
 import {
   LISTING_IMAGE_MAX_COUNT,
@@ -531,6 +532,7 @@ export async function syncProviderListingPhotosAction(
     }
 
     let warningMessage: string | null = null;
+    let failedStorageDeletePathCount = 0;
     if (pathsToRemove.length > 0) {
       try {
         const deleteResult = await deleteListingImageObjects(supabase, pathsToRemove, {
@@ -539,9 +541,11 @@ export async function syncProviderListingPhotosAction(
         });
 
         if (deleteResult.failedPaths.length > 0) {
+          failedStorageDeletePathCount = deleteResult.failedPaths.length;
           warningMessage = LISTING_IMAGE_STORAGE_DELETE_WARNING;
         }
       } catch {
+        failedStorageDeletePathCount = pathsToRemove.length;
         warningMessage = LISTING_IMAGE_STORAGE_DELETE_WARNING;
       }
     }
@@ -555,6 +559,25 @@ export async function syncProviderListingPhotosAction(
         images: [],
       };
     }
+
+    await recordSecurityAuditEvent({
+      supabase,
+      event: {
+        eventType: AUDIT_EVENT_TYPES.listingPhotosSynced,
+        actorUserId: profile.id,
+        actorRole: profile.role,
+        targetType: "listing",
+        targetId: draftAccess.listing.id,
+        listingId: draftAccess.listing.id,
+        metadata: {
+          previous_image_count: existingSnapshotRows.length,
+          next_image_count: normalizedImages.length,
+          removed_path_count: pathsToRemove.length,
+          storage_delete_failed: Boolean(warningMessage),
+          storage_delete_failed_path_count: failedStorageDeletePathCount,
+        },
+      },
+    });
 
     return {
       ok: true,
@@ -651,6 +674,24 @@ export async function publishProviderListingDraftAction(
   });
 
   if (!publishReadiness.isReady) {
+    await recordSecurityAuditEvent({
+      supabase,
+      event: {
+        eventType: AUDIT_EVENT_TYPES.listingPublishFailed,
+        actorUserId: profile.id,
+        actorRole: profile.role,
+        targetType: "listing",
+        targetId: draftResult.draft.id,
+        listingId: draftResult.draft.id,
+        fromStatus: draftResult.draft.listing_status,
+        toStatus: "published",
+        metadata: {
+          reason: "publish_readiness_blocked",
+          blocker_count: publishReadiness.blockers.length,
+        },
+      },
+    });
+
     return {
       ok: false,
       message: "Listing is not publish-ready yet.",
@@ -661,6 +702,23 @@ export async function publishProviderListingDraftAction(
   if (
     !canTransitionProviderListingStatus(draftResult.draft.listing_status, "published")
   ) {
+    await recordSecurityAuditEvent({
+      supabase,
+      event: {
+        eventType: AUDIT_EVENT_TYPES.listingPublishFailed,
+        actorUserId: profile.id,
+        actorRole: profile.role,
+        targetType: "listing",
+        targetId: draftResult.draft.id,
+        listingId: draftResult.draft.id,
+        fromStatus: draftResult.draft.listing_status,
+        toStatus: "published",
+        metadata: {
+          reason: "invalid_status_transition",
+        },
+      },
+    });
+
     if (draftResult.draft.listing_status === "hidden_by_admin") {
       return {
         ok: false,
@@ -690,11 +748,45 @@ export async function publishProviderListingDraftAction(
   const { data, error } = await updateQuery.maybeSingle();
 
   if (error || !data) {
+    await recordSecurityAuditEvent({
+      supabase,
+      event: {
+        eventType: AUDIT_EVENT_TYPES.listingPublishFailed,
+        actorUserId: profile.id,
+        actorRole: profile.role,
+        targetType: "listing",
+        targetId: draftResult.draft.id,
+        listingId: draftResult.draft.id,
+        fromStatus: draftResult.draft.listing_status,
+        toStatus: "published",
+        metadata: {
+          reason: error ? "update_failed" : "empty_update_result",
+        },
+      },
+    });
+
     return {
       ok: false,
       message: error ? normalizeSupabaseError(error.message) : "Publish action could not be completed.",
     };
   }
+
+  await recordSecurityAuditEvent({
+    supabase,
+    event: {
+      eventType: AUDIT_EVENT_TYPES.listingPublished,
+      actorUserId: profile.id,
+      actorRole: profile.role,
+      targetType: "listing",
+      targetId: draftResult.draft.id,
+      listingId: draftResult.draft.id,
+      fromStatus: draftResult.draft.listing_status,
+      toStatus: data.listing_status,
+      metadata: {
+        listing_slug: data.slug,
+      },
+    },
+  });
 
   return {
     ok: true,

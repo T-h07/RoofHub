@@ -2,6 +2,7 @@
 
 import { getCurrentUserProfile } from "@/lib/auth/profile";
 import { isProviderRole } from "@/lib/auth/roles";
+import { AUDIT_EVENT_TYPES, recordSecurityAuditEvent } from "@/lib/security/audit";
 import { enforceTrafficControl, TRAFFIC_CONTROL_RULES } from "@/lib/security/traffic-control";
 import { createServerSupabaseClient } from "@/lib/supabase";
 import { canTransitionProviderListingStatus } from "@/lib/listings/provider-wizard/status-transitions";
@@ -233,6 +234,21 @@ export async function updateProviderListingLifecycleStatusAction(
   }
 
   if (nextStatus === "hidden_by_admin") {
+    await recordSecurityAuditEvent({
+      supabase,
+      event: {
+        eventType: AUDIT_EVENT_TYPES.listingStatusChangeDenied,
+        actorUserId: profile.id,
+        actorRole: profile.role,
+        targetType: "listing",
+        targetId: listingId,
+        listingId,
+        metadata: {
+          reason: "provider_cannot_set_hidden_by_admin",
+          requested_status: nextStatus,
+        },
+      },
+    });
     return {
       ok: false,
       message: "Hidden-by-admin status can only be set by moderation workflows.",
@@ -245,6 +261,21 @@ export async function updateProviderListingLifecycleStatusAction(
   });
 
   if (!listingResult.ok || !listingResult.listing) {
+    await recordSecurityAuditEvent({
+      supabase,
+      event: {
+        eventType: AUDIT_EVENT_TYPES.listingStatusChangeFailed,
+        actorUserId: profile.id,
+        actorRole: profile.role,
+        targetType: "listing",
+        targetId: listingId,
+        listingId,
+        metadata: {
+          reason: "listing_not_found_or_inaccessible",
+          requested_status: nextStatus,
+        },
+      },
+    });
     return {
       ok: false,
       message: listingResult.ok ? "Listing not found or inaccessible." : listingResult.message,
@@ -262,6 +293,22 @@ export async function updateProviderListingLifecycleStatusAction(
   }
 
   if (!canTransitionProviderListingStatus(currentListing.listing_status, nextStatus)) {
+    await recordSecurityAuditEvent({
+      supabase,
+      event: {
+        eventType: AUDIT_EVENT_TYPES.listingStatusChangeDenied,
+        actorUserId: profile.id,
+        actorRole: profile.role,
+        targetType: "listing",
+        targetId: currentListing.id,
+        listingId: currentListing.id,
+        fromStatus: currentListing.listing_status,
+        toStatus: nextStatus,
+        metadata: {
+          reason: "invalid_status_transition",
+        },
+      },
+    });
     return {
       ok: false,
       message: `Cannot move listing from ${currentListing.listing_status} to ${nextStatus}.`,
@@ -281,6 +328,22 @@ export async function updateProviderListingLifecycleStatusAction(
   const { data, error } = await updateQuery.maybeSingle();
 
   if (error || !data) {
+    await recordSecurityAuditEvent({
+      supabase,
+      event: {
+        eventType: AUDIT_EVENT_TYPES.listingStatusChangeFailed,
+        actorUserId: profile.id,
+        actorRole: profile.role,
+        targetType: "listing",
+        targetId: currentListing.id,
+        listingId: currentListing.id,
+        fromStatus: currentListing.listing_status,
+        toStatus: nextStatus,
+        metadata: {
+          reason: error ? "update_failed" : "empty_update_result",
+        },
+      },
+    });
     return {
       ok: false,
       message: error
@@ -289,6 +352,23 @@ export async function updateProviderListingLifecycleStatusAction(
       previousStatus: currentListing.listing_status,
     };
   }
+
+  await recordSecurityAuditEvent({
+    supabase,
+    event: {
+      eventType: AUDIT_EVENT_TYPES.listingStatusChanged,
+      actorUserId: profile.id,
+      actorRole: profile.role,
+      targetType: "listing",
+      targetId: currentListing.id,
+      listingId: currentListing.id,
+      fromStatus: currentListing.listing_status,
+      toStatus: data.listing_status,
+      metadata: {
+        action_source: "provider_dashboard",
+      },
+    },
+  });
 
   return {
     ok: true,

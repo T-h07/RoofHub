@@ -3,7 +3,9 @@
 import { createServerSupabaseClient } from "@/lib/supabase";
 import { getCurrentUserProfile } from "@/lib/auth/profile";
 import { isProviderRole } from "@/lib/auth/roles";
+import { AUDIT_EVENT_TYPES, recordSecurityAuditEvent } from "@/lib/security/audit";
 import { enforceTrafficControl, TRAFFIC_CONTROL_RULES } from "@/lib/security/traffic-control";
+import type { Enums } from "@/types/database";
 
 import {
   PROVIDER_WIZARD_DEFAULT_VALUES,
@@ -364,6 +366,31 @@ async function updateDraftListing(
   };
 }
 
+async function recordProviderDraftStepSavedAudit(input: {
+  supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>;
+  actorUserId: string;
+  actorRole: Enums<"app_role">;
+  draftId: string;
+  step: ProviderWizardStep;
+  outcome: "saved" | "resumed";
+}) {
+  await recordSecurityAuditEvent({
+    supabase: input.supabase,
+    event: {
+      eventType: AUDIT_EVENT_TYPES.listingDraftStepSaved,
+      actorUserId: input.actorUserId,
+      actorRole: input.actorRole,
+      targetType: "listing",
+      targetId: input.draftId,
+      listingId: input.draftId,
+      metadata: {
+        step: input.step,
+        outcome: input.outcome,
+      },
+    },
+  });
+}
+
 export async function saveProviderWizardStepAction(
   input: SaveProviderWizardStepInput
 ): Promise<SaveProviderWizardStepResult> {
@@ -435,6 +462,15 @@ export async function saveProviderWizardStepAction(
           };
         }
 
+        await recordProviderDraftStepSavedAudit({
+          supabase,
+          actorUserId: profile.id,
+          actorRole: profile.role,
+          draftId: candidateDraftId,
+          step: "basics",
+          outcome: "saved",
+        });
+
         return {
           ok: true,
           draftId: candidateDraftId,
@@ -458,6 +494,15 @@ export async function saveProviderWizardStepAction(
         if (error.code === "23505") {
           const existingAccess = await ensureDraftAccess(draftId, profile.id, supabase);
           if (existingAccess.ok) {
+            await recordProviderDraftStepSavedAudit({
+              supabase,
+              actorUserId: profile.id,
+              actorRole: profile.role,
+              draftId,
+              step: "basics",
+              outcome: "resumed",
+            });
+
             return {
               ok: true,
               draftId,
@@ -472,6 +517,21 @@ export async function saveProviderWizardStepAction(
           message: normalizeSupabaseError(error.message),
         };
       }
+
+      await recordSecurityAuditEvent({
+        supabase,
+        event: {
+          eventType: AUDIT_EVENT_TYPES.listingDraftCreated,
+          actorUserId: profile.id,
+          actorRole: profile.role,
+          targetType: "listing",
+          targetId: draftId,
+          listingId: draftId,
+          metadata: {
+            source_step: "basics",
+          },
+        },
+      });
 
       return {
         ok: true,
@@ -529,6 +589,17 @@ export async function saveProviderWizardStepAction(
         patch: pricingValidation.payload,
       });
 
+      if (updateResult.ok) {
+        await recordProviderDraftStepSavedAudit({
+          supabase,
+          actorUserId: profile.id,
+          actorRole: profile.role,
+          draftId: candidateDraftId,
+          step: "pricing",
+          outcome: "saved",
+        });
+      }
+
       return {
         ok: updateResult.ok,
         draftId: candidateDraftId,
@@ -553,6 +624,17 @@ export async function saveProviderWizardStepAction(
         userId: profile.id,
         patch: factsValidation.payload,
       });
+
+      if (updateResult.ok) {
+        await recordProviderDraftStepSavedAudit({
+          supabase,
+          actorUserId: profile.id,
+          actorRole: profile.role,
+          draftId: candidateDraftId,
+          step: "facts",
+          outcome: "saved",
+        });
+      }
 
       return {
         ok: updateResult.ok,
@@ -579,6 +661,17 @@ export async function saveProviderWizardStepAction(
         patch: locationValidation.payload,
       });
 
+      if (updateResult.ok) {
+        await recordProviderDraftStepSavedAudit({
+          supabase,
+          actorUserId: profile.id,
+          actorRole: profile.role,
+          draftId: candidateDraftId,
+          step: "location",
+          outcome: "saved",
+        });
+      }
+
       return {
         ok: updateResult.ok,
         draftId: candidateDraftId,
@@ -603,6 +696,17 @@ export async function saveProviderWizardStepAction(
         userId: profile.id,
         patch: amenitiesValidation.payload,
       });
+
+      if (updateResult.ok) {
+        await recordProviderDraftStepSavedAudit({
+          supabase,
+          actorUserId: profile.id,
+          actorRole: profile.role,
+          draftId: candidateDraftId,
+          step: "amenities",
+          outcome: "saved",
+        });
+      }
 
       return {
         ok: updateResult.ok,
@@ -656,6 +760,15 @@ export async function saveProviderWizardStepAction(
           message: "Contact settings could not be persisted for this profile. Refresh and retry.",
         };
       }
+
+      await recordProviderDraftStepSavedAudit({
+        supabase,
+        actorUserId: profile.id,
+        actorRole: profile.role,
+        draftId: candidateDraftId,
+        step: "contact",
+        outcome: "saved",
+      });
 
       return {
         ok: true,

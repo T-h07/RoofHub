@@ -45,6 +45,7 @@ export type ModerationOverviewMetrics = {
 
 export type UpdateListingModerationVisibilityInput = {
   listingId: string;
+  reportId?: string | null;
   action: "hide" | "unhide";
 };
 
