@@ -2,6 +2,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { enforceTrafficControl, TRAFFIC_CONTROL_RULES } from "@/lib/security/traffic-control";
 import type { Database, Tables } from "@/types/database";
 
 import { isListingContactableForNewConversation } from "./contact-rules";
@@ -81,6 +82,12 @@ function normalizeSupabaseError(
     code: "internal" as const,
     message: fallback,
   };
+}
+
+function toTrafficFailure(
+  result: Extract<Awaited<ReturnType<typeof enforceTrafficControl>>, { ok: false }>
+) {
+  return toMessagingFailure(result.reason === "throttled" ? "rate_limited" : "internal", result.message);
 }
 
 async function loadConversationEligibilityListing(
@@ -165,6 +172,28 @@ export async function createOrGetConversationForListingAction(
       "not_contactable",
       "This listing is not currently accepting new conversations."
     );
+  }
+
+  const conversationCreationUserLimit = await enforceTrafficControl({
+    supabase,
+    rule: TRAFFIC_CONTROL_RULES.messagingCreateConversationPerUser,
+    identity: { userId: profile.id, includeIp: true },
+    throttledMessage: "Too many new conversation attempts. Please wait before trying again.",
+    unavailableMessage: "Conversation start is temporarily unavailable. Please retry shortly.",
+  });
+  if (!conversationCreationUserLimit.ok) {
+    return toTrafficFailure(conversationCreationUserLimit);
+  }
+
+  const conversationCreationListingLimit = await enforceTrafficControl({
+    supabase,
+    rule: TRAFFIC_CONTROL_RULES.messagingCreateConversationPerListing,
+    identity: { userId: profile.id, scope: listing.id, includeIp: false },
+    throttledMessage: "Too many attempts to open this conversation. Please wait before retrying.",
+    unavailableMessage: "Conversation start is temporarily unavailable. Please retry shortly.",
+  });
+  if (!conversationCreationListingLimit.ok) {
+    return toTrafficFailure(conversationCreationListingLimit);
   }
 
   const conversationInsert = {
@@ -268,6 +297,28 @@ export async function sendConversationMessageAction(
 
   if (!isParticipant) {
     return toMessagingFailure("forbidden", "You are not a participant in this conversation.");
+  }
+
+  const messagePerConversationLimit = await enforceTrafficControl({
+    supabase,
+    rule: TRAFFIC_CONTROL_RULES.messagingSendPerConversation,
+    identity: { userId: profile.id, scope: conversation.id, includeIp: true },
+    throttledMessage: "Message rate limit reached for this conversation.",
+    unavailableMessage: "Message send is temporarily unavailable. Please retry shortly.",
+  });
+  if (!messagePerConversationLimit.ok) {
+    return toTrafficFailure(messagePerConversationLimit);
+  }
+
+  const messagePerUserLimit = await enforceTrafficControl({
+    supabase,
+    rule: TRAFFIC_CONTROL_RULES.messagingSendPerUser,
+    identity: { userId: profile.id, includeIp: false },
+    throttledMessage: "Message rate limit reached for your account.",
+    unavailableMessage: "Message send is temporarily unavailable. Please retry shortly.",
+  });
+  if (!messagePerUserLimit.ok) {
+    return toTrafficFailure(messagePerUserLimit);
   }
 
   const { data, error } = await supabase

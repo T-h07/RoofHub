@@ -1,6 +1,7 @@
 "use server";
 
 import { createServerSupabaseClient } from "@/lib/supabase";
+import { enforceTrafficControl, TRAFFIC_CONTROL_RULES } from "@/lib/security/traffic-control";
 import type { Enums } from "@/types/database";
 import { PUBLIC_DISCOVERY_STATUS } from "@/lib/listings/visibility";
 import { isListingReportReason } from "@/lib/moderation/reporting";
@@ -107,6 +108,38 @@ export async function submitListingReportAction(
       return {
         status: "error",
         message: "You cannot submit a report for your own listing.",
+        submitted: false,
+        requiresAuth: false,
+      };
+    }
+
+    const reportPerUserLimit = await enforceTrafficControl({
+      supabase,
+      rule: TRAFFIC_CONTROL_RULES.reportSubmitPerUser,
+      identity: { userId: user.id, includeIp: true },
+      throttledMessage: "You have reached the report limit for now.",
+      unavailableMessage: "Report submission is temporarily unavailable. Please retry shortly.",
+    });
+    if (!reportPerUserLimit.ok) {
+      return {
+        status: "error",
+        message: reportPerUserLimit.message,
+        submitted: false,
+        requiresAuth: false,
+      };
+    }
+
+    const reportPerListingLimit = await enforceTrafficControl({
+      supabase,
+      rule: TRAFFIC_CONTROL_RULES.reportSubmitPerListing,
+      identity: { userId: user.id, scope: listing.id, includeIp: false },
+      throttledMessage: "You have recently reported this listing. Please wait before trying again.",
+      unavailableMessage: "Report submission is temporarily unavailable. Please retry shortly.",
+    });
+    if (!reportPerListingLimit.ok) {
+      return {
+        status: "error",
+        message: reportPerListingLimit.message,
         submitted: false,
         requiresAuth: false,
       };

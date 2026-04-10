@@ -6,6 +6,7 @@ export type MessagingErrorCode =
   | "forbidden"
   | "not_found"
   | "not_contactable"
+  | "rate_limited"
   | "conflict"
   | "internal";
 

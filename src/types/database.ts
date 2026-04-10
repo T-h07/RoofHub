@@ -426,11 +426,51 @@ export type Database = {
         }
         Relationships: []
       }
+      rate_limit_counters: {
+        Row: {
+          actor_key: string
+          bucket: string
+          hit_count: number
+          updated_at: string
+          window_ends_at: string
+          window_started_at: string
+        }
+        Insert: {
+          actor_key: string
+          bucket: string
+          hit_count?: number
+          updated_at?: string
+          window_ends_at: string
+          window_started_at: string
+        }
+        Update: {
+          actor_key?: string
+          bucket?: string
+          hit_count?: number
+          updated_at?: string
+          window_ends_at?: string
+          window_started_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      consume_rate_limit_token: {
+        Args: {
+          actor_key_input: string
+          bucket_name: string
+          max_attempts: number
+          window_seconds: number
+        }
+        Returns: {
+          allowed: boolean
+          remaining: number
+          retry_after_seconds: number
+        }[]
+      }
       is_admin: { Args: never; Returns: boolean }
       is_valid_listing_image_path: {
         Args: { object_name: string }

@@ -7,6 +7,7 @@ import {
   resolveAuthenticatedRedirect,
   toSignInPath,
 } from "@/lib/auth/routing";
+import { enforceTrafficControl, TRAFFIC_CONTROL_RULES } from "@/lib/security/traffic-control";
 import { createServerSupabaseClient } from "@/lib/supabase";
 
 const SUPPORTED_OTP_TYPES = new Set<EmailOtpType>([
@@ -49,6 +50,23 @@ export async function GET(request: Request) {
   );
 
   const supabase = await createServerSupabaseClient();
+  const callbackTrafficControl = await enforceTrafficControl({
+    supabase,
+    rule: TRAFFIC_CONTROL_RULES.authCallbackPerIp,
+    identity: { includeIp: true },
+    throttledMessage: "Too many callback attempts. Please wait before retrying sign-in.",
+    unavailableMessage: "Authentication callback is temporarily unavailable. Please retry shortly.",
+  });
+  if (!callbackTrafficControl.ok) {
+    const throttledRedirect = NextResponse.redirect(
+      toRedirectUrl(request, toSignInPath(nextPath, "callback_invalid"))
+    );
+    throttledRedirect.headers.set(
+      "Retry-After",
+      String(Math.max(1, callbackTrafficControl.retryAfterSeconds))
+    );
+    return throttledRedirect;
+  }
 
   if (code) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);

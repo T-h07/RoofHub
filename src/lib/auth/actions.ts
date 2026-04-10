@@ -3,6 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+import {
+  enforceTrafficControl,
+  TRAFFIC_CONTROL_RULES,
+  type TrafficControlResult,
+} from "@/lib/security/traffic-control";
 import { createServerSupabaseClient } from "@/lib/supabase";
 
 import { ensureProfileForCurrentUser } from "./profile";
@@ -104,6 +109,15 @@ function toValidationErrorState(errors: AuthActionState["errors"]): AuthActionSt
   };
 }
 
+function toTrafficErrorState(
+  result: Extract<TrafficControlResult, { ok: false }>
+): AuthActionState {
+  return {
+    status: "error",
+    message: result.message,
+  };
+}
+
 export async function signInAction(
   _: AuthActionState,
   formData: FormData
@@ -120,6 +134,28 @@ export async function signInAction(
   }
 
   const supabase = await createServerSupabaseClient();
+  const ipControl = await enforceTrafficControl({
+    supabase,
+    rule: TRAFFIC_CONTROL_RULES.authSignInPerIp,
+    identity: { includeIp: true },
+    throttledMessage: "Too many sign-in attempts from this connection.",
+    unavailableMessage: "Sign-in is temporarily unavailable. Please try again shortly.",
+  });
+  if (!ipControl.ok) {
+    return toTrafficErrorState(ipControl);
+  }
+
+  const emailControl = await enforceTrafficControl({
+    supabase,
+    rule: TRAFFIC_CONTROL_RULES.authSignInPerEmail,
+    identity: { email: credentials.email, includeIp: false },
+    throttledMessage: "Too many sign-in attempts for this account.",
+    unavailableMessage: "Sign-in is temporarily unavailable. Please try again shortly.",
+  });
+  if (!emailControl.ok) {
+    return toTrafficErrorState(emailControl);
+  }
+
   const { error } = await supabase.auth.signInWithPassword(credentials);
 
   if (error) {
@@ -170,6 +206,28 @@ export async function signUpAction(
   }
 
   const supabase = await createServerSupabaseClient();
+  const ipControl = await enforceTrafficControl({
+    supabase,
+    rule: TRAFFIC_CONTROL_RULES.authSignUpPerIp,
+    identity: { includeIp: true },
+    throttledMessage: "Too many sign-up attempts from this connection.",
+    unavailableMessage: "Sign-up is temporarily unavailable. Please try again shortly.",
+  });
+  if (!ipControl.ok) {
+    return toTrafficErrorState(ipControl);
+  }
+
+  const emailControl = await enforceTrafficControl({
+    supabase,
+    rule: TRAFFIC_CONTROL_RULES.authSignUpPerEmail,
+    identity: { email: input.email, includeIp: false },
+    throttledMessage: "Too many sign-up attempts for this email.",
+    unavailableMessage: "Sign-up is temporarily unavailable. Please try again shortly.",
+  });
+  if (!emailControl.ok) {
+    return toTrafficErrorState(emailControl);
+  }
+
   const { data, error } = await supabase.auth.signUp({
     email: input.email,
     password: input.password,
@@ -236,6 +294,28 @@ export async function requestPasswordResetAction(
   }
 
   const supabase = await createServerSupabaseClient();
+  const ipControl = await enforceTrafficControl({
+    supabase,
+    rule: TRAFFIC_CONTROL_RULES.authPasswordResetPerIp,
+    identity: { includeIp: true },
+    throttledMessage: "Too many password reset requests from this connection.",
+    unavailableMessage: "Password reset is temporarily unavailable. Please try again shortly.",
+  });
+  if (!ipControl.ok) {
+    return toTrafficErrorState(ipControl);
+  }
+
+  const emailControl = await enforceTrafficControl({
+    supabase,
+    rule: TRAFFIC_CONTROL_RULES.authPasswordResetPerEmail,
+    identity: { email: input.email, includeIp: false },
+    throttledMessage: "Too many password reset requests for this email.",
+    unavailableMessage: "Password reset is temporarily unavailable. Please try again shortly.",
+  });
+  if (!emailControl.ok) {
+    return toTrafficErrorState(emailControl);
+  }
+
   const { error } = await supabase.auth.resetPasswordForEmail(input.email, {
     redirectTo: resetRedirectTo,
   });
