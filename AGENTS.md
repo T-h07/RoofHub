@@ -64,12 +64,21 @@
 - Do not surface raw backend/provider exception messages to users from actions/routes.
 - Preserve and follow `docs/request-output-validation-hardening.md` for request-boundary changes.
 
+## Traffic-control invariants
+- High-risk auth, messaging, reporting, provider mutation, and moderation mutation paths require server-side traffic controls.
+- Do not implement anti-abuse logic only in client code; enforce at server action/route handler boundaries.
+- Keep control scopes explicit (for example per-IP, per-user, per-listing, per-conversation) and avoid a single global cap.
+- Do not bypass or remove `src/lib/security/traffic-control.ts` checks for protected mutations without security review.
+- Keep throttled responses user-safe and bounded; do not expose raw limiter/backend internals.
+- When adding sensitive endpoints, update `docs/traffic-control-hardening.md` and checklist notes.
+
 ## Required workflow for security-sensitive changes
 - Update `docs/security-baseline.md` when behavior, trust boundaries, or assumptions change.
 - Run and complete `docs/security-checklist.md` before merge for security-sensitive work.
 - Follow `docs/supply-chain-guardrails.md` when changing dependencies, lockfiles, or security workflows.
 - For authz boundary changes, update `docs/authorization-boundary-audit.md`.
 - For input/output boundary changes, update `docs/request-output-validation-hardening.md`.
+- For abuse/rate-limit changes, update `docs/traffic-control-hardening.md`.
 - Add tests or explicit validation notes for sensitive behavior changes (authz, ownership, visibility, storage, redirects, moderation).
 - Document newly added route handlers/server actions and their authorization/input-validation approach.
 

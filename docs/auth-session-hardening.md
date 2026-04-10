@@ -124,7 +124,7 @@ This is an honest, configuration-gated control and must not be claimed as enforc
 ## Deferred items (not in SH-PT02)
 
 - MFA enrollment/challenge flow
-- auth rate limiting and abuse throttling
+- adaptive auth risk scoring/challenge escalation beyond SH-PT06 baseline throttling
 - auth event audit trail pipeline
 - provider-specific OAuth rollout
 

@@ -82,5 +82,5 @@ Treat these as untrusted input boundaries:
 ## Deferred from SH-PT04
 
 - Full storage subsystem redesign and deep object-lifecycle automation (handled in later security/storage PTs).
-- Rate-limiting and abuse throttling controls.
+- Adaptive abuse controls beyond baseline SH-PT06 server-side throttling.
 - Full audit event pipeline (planned in SH-PT08).

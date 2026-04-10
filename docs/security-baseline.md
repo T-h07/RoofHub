@@ -123,6 +123,14 @@ Google OAuth note:
 - Dependabot update hygiene should remain enabled and scoped to avoid alert fatigue.
 - Security workflow changes are security-sensitive changes and require checklist completion.
 
+### 11) Traffic controls and abuse resistance
+
+- High-risk auth, messaging, reporting, provider mutation, and moderation mutation paths must include server-side traffic controls.
+- Apply controls at execution boundaries (server actions/route handlers), not only in client UX.
+- Use layered controls where appropriate (for example per-IP and per-account scopes for auth-sensitive behavior).
+- Keep limits explicit and documented in `docs/traffic-control-hardening.md`.
+- Throttled responses must remain bounded and user-safe.
+
 ## Required review points for high-risk changes
 
 The following changes require explicit security review before merge:
@@ -137,6 +145,7 @@ The following changes require explicit security review before merge:
 - environment/secrets model changes
 - dependency additions in sensitive domains
 - CI/security workflow changes or scanner suppression changes
+- high-risk mutation/read paths added without traffic-control evaluation
 
 ## Definition of done for security-sensitive work
 
@@ -150,6 +159,7 @@ A security-sensitive change is done only when:
 - checklist in `docs/security-checklist.md` is completed
 - tests or validation notes are included for sensitive behavior
 - docs are updated when trust boundaries or assumptions changed
+- abuse-prone entry points include traffic-control handling or explicit documented deferral
 
 ## Merge blockers
 
@@ -164,10 +174,11 @@ Do not merge when any of the following is true:
 - errors leak internal backend/provider details
 - checklist is skipped for security-sensitive changes
 - security scanner findings are ignored without documented disposition
+- high-risk mutation paths bypass required traffic-control review
 
 ## Intentionally deferred from SH-PT01
 
-- full rate limiting rollout
+- adaptive risk-scoring abuse controls and challenge flows
 - full audit logging implementation
 - CSP/header hardening program
 - full historical security audit of all features

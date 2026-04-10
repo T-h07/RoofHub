@@ -89,6 +89,9 @@ Map-first real estate marketplace for rental and sale listings.
 - admin moderation workspace route is now available at `/admin/moderation` with admin-only access
 - moderation queue now surfaces report + listing context with hide/unhide controls
 - admin hide/unhide now persists through `hidden_by_admin` status transitions and restores safe visibility state
+- server-side traffic controls now constrain auth brute-force, messaging spam, report flooding, provider mutation bursts, and moderation mutation bursts
+- internal Supabase probe route now has per-IP throttling with `Retry-After` behavior
+- public discovery request fan-out is further bounded (`PUBLIC_MAP_MARKER_LIMIT` and city option cap tightened)
 - public provider summary on listing detail now includes trust-safe metadata (`member since`, published listing count)
 - provider trust metadata is now sourced from real backend fields with typed fallbacks (no fabricated trust metrics)
 - verified-email trust indicator is now supported as a conditional surface and remains hidden until a reliable public verification source is available
@@ -359,6 +362,12 @@ Security-sensitive changes must follow the baseline and complete the checklist b
 
 - Media/upload lifecycle and storage security contract: `docs/upload-storage-hardening.md`
 - Storage foundation details (bucket/policy/path baseline): `docs/storage-images-foundation.md`
+
+## API Abuse and Rate-Limit Controls (SH-PT06)
+
+- Traffic-control strategy, protected flows, and deferred anti-abuse scope: `docs/traffic-control-hardening.md`
+- Shared server-side limiter helper: `src/lib/security/traffic-control.ts`
+- Supabase limiter schema/function migration: `supabase/migrations/20260410121500_nm_sh_pt06_traffic_controls.sql`
 
 ## Supply Chain Guardrails (SH-PT07)
 

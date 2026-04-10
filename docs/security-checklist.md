@@ -30,6 +30,15 @@ For dependency/lockfile/scanner specifics, also follow `docs/supply-chain-guardr
 - [ ] Public/private data exposure was reviewed for all changed queries/responses.
 - [ ] Changes preserve `docs/request-output-validation-hardening.md` guardrails.
 
+## Traffic controls and abuse resistance
+
+- [ ] New high-risk auth/messaging/report/provider/admin mutation paths were evaluated for rate limiting.
+- [ ] Traffic controls are enforced server-side (not only in client/UI behavior).
+- [ ] Layered controls were considered where needed (for example per-IP and per-account for auth flows).
+- [ ] Throttled responses are bounded, user-safe, and provide retry guidance when appropriate.
+- [ ] Resource-heavy routes/actions remain bounded (page size/marker/query caps) and are not trivially floodable.
+- [ ] Changes preserve `docs/traffic-control-hardening.md` rules for guarded flows.
+
 ## Storage and visibility
 
 - [ ] Upload constraints are enforced (type, size, count).
