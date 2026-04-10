@@ -33,7 +33,7 @@ function getReasonMessage(reason: AuthRedirectReason | null | undefined) {
     case "signed_out":
       return "You have been signed out.";
     case "profile_unavailable":
-      return "Your account session could not be finalized. Sign in again.";
+      return "We couldn't finish setting up your account profile. Please sign in again.";
     case "callback_invalid":
       return "Your sign-in link is invalid or expired. Sign in again to continue.";
     default:

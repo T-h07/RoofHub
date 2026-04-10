@@ -1,5 +1,6 @@
-import { NextResponse } from "next/server";
+import { createServerClient } from "@supabase/ssr";
 import type { EmailOtpType } from "@supabase/supabase-js";
+import { NextRequest, NextResponse } from "next/server";
 
 import { ensureProfileForCurrentUser } from "@/lib/auth/profile";
 import {
@@ -19,7 +20,8 @@ import {
   recordSecurityAuditEvent,
 } from "@/lib/security/audit";
 import { enforceTrafficControl, TRAFFIC_CONTROL_RULES } from "@/lib/security/traffic-control";
-import { createServerSupabaseClient } from "@/lib/supabase";
+import { getSupabaseEnv } from "@/lib/supabase";
+import type { Database } from "@/types/database";
 
 const SUPPORTED_OTP_TYPES = new Set<EmailOtpType>([
   "signup",
@@ -30,8 +32,65 @@ const SUPPORTED_OTP_TYPES = new Set<EmailOtpType>([
   "email",
 ]);
 
-function toRedirectUrl(request: Request, path: string) {
+function toRedirectUrl(request: NextRequest, path: string) {
   return new URL(path, request.url);
+}
+
+function withSessionCookies(target: NextResponse, sessionResponse: NextResponse) {
+  for (const cookie of sessionResponse.cookies.getAll()) {
+    target.cookies.set(cookie);
+  }
+
+  return target;
+}
+
+function buildRedirectResponse(
+  request: NextRequest,
+  path: string,
+  sessionResponse: NextResponse
+) {
+  return withSessionCookies(NextResponse.redirect(toRedirectUrl(request, path)), sessionResponse);
+}
+
+function createCallbackSupabaseContext(request: NextRequest) {
+  const response = NextResponse.next({
+    request,
+  });
+  const { url, publishableKey } = getSupabaseEnv();
+
+  const supabase = createServerClient<Database>(url, publishableKey, {
+    cookies: {
+      getAll() {
+        return request.cookies.getAll();
+      },
+      setAll(cookiesToSet) {
+        cookiesToSet.forEach(({ name, value, options }) => {
+          request.cookies.set(name, value);
+          response.cookies.set(name, value, options);
+        });
+      },
+    },
+  });
+
+  return { supabase, response };
+}
+
+function logCallbackFailure(
+  stage:
+    | "rate_limited"
+    | "rate_limiter_unavailable"
+    | "session_missing_after_exchange"
+    | "exchange_failed"
+    | "provider_error"
+    | "otp_verify_failed"
+    | "profile_bootstrap_failed"
+    | "invalid_payload",
+  details: Record<string, unknown>
+) {
+  console.error("[Auth][Callback] callback finalization issue", {
+    stage,
+    ...details,
+  });
 }
 
 function getCallbackFailurePath(input: {
@@ -48,6 +107,22 @@ function getCallbackFailurePath(input: {
     intent: input.intent,
     nextPath: input.nextPath,
     status: input.oauthStatus ?? "callback_exchange_failed",
+  });
+}
+
+function getProfileBootstrapFailurePath(input: {
+  hasOAuthIntent: boolean;
+  intent: ReturnType<typeof normalizeOAuthIntent>;
+  nextPath: string;
+}) {
+  if (!input.hasOAuthIntent) {
+    return toSignInPath(input.nextPath, "profile_unavailable");
+  }
+
+  return buildOAuthEntryPath({
+    intent: input.intent,
+    nextPath: input.nextPath,
+    status: "profile_bootstrap_failed",
   });
 }
 
@@ -73,22 +148,69 @@ function categorizeCallbackError(message: string | null | undefined) {
   return "provider_error";
 }
 
-async function handleProfileBootstrapAfterCallback(
-  supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>,
-  request: Request,
-  nextPath: string,
-  requestFingerprint: Awaited<ReturnType<typeof getAuditRequestFingerprint>>
-) {
+async function handleProfileBootstrapAfterCallback(input: {
+  supabase: ReturnType<typeof createServerClient<Database>>;
+  request: NextRequest;
+  sessionResponse: NextResponse;
+  nextPath: string;
+  hasOAuthIntent: boolean;
+  intent: ReturnType<typeof normalizeOAuthIntent>;
+  requestFingerprint: Awaited<ReturnType<typeof getAuditRequestFingerprint>>;
+}) {
+  const {
+    supabase,
+    request,
+    sessionResponse,
+    nextPath,
+    hasOAuthIntent,
+    intent,
+    requestFingerprint,
+  } = input;
   const {
     data: { user },
+    error: userError,
   } = await supabase.auth.getUser();
+
+  if (userError || !user) {
+    await recordSecurityAuditEvent({
+      supabase,
+      event: {
+        eventType: AUDIT_EVENT_TYPES.authCallbackFailed,
+        targetType: "auth",
+        targetId: "callback",
+        metadata: {
+          outcome: "failed",
+          callback_mode: "post_exchange_user_read",
+          reason_category: "session_missing_after_exchange",
+          ...requestFingerprint,
+        },
+      },
+    });
+    logCallbackFailure("session_missing_after_exchange", {
+      has_user: Boolean(user),
+      has_user_error: Boolean(userError),
+      next_path: nextPath,
+    });
+
+    return buildRedirectResponse(
+      request,
+      getCallbackFailurePath({
+        hasOAuthIntent,
+        intent,
+        nextPath,
+        oauthStatus: "callback_exchange_failed",
+      }),
+      sessionResponse
+    );
+  }
+
   const profileResult = await ensureProfileForCurrentUser(supabase);
   if (!profileResult.ok) {
     await recordSecurityAuditEvent({
       supabase,
       event: {
         eventType: AUDIT_EVENT_TYPES.authProfileBootstrapFailed,
-        actorUserId: user?.id ?? null,
+        actorUserId: user.id,
         targetType: "auth",
         targetId: "callback",
         metadata: {
@@ -97,10 +219,20 @@ async function handleProfileBootstrapAfterCallback(
         },
       },
     });
+    logCallbackFailure("profile_bootstrap_failed", {
+      user_id: user.id,
+      next_path: nextPath,
+    });
 
     await supabase.auth.signOut({ scope: "local" });
-    return NextResponse.redirect(
-      toRedirectUrl(request, toSignInPath(nextPath, "profile_unavailable"))
+    return buildRedirectResponse(
+      request,
+      getProfileBootstrapFailurePath({
+        hasOAuthIntent,
+        intent,
+        nextPath,
+      }),
+      sessionResponse
     );
   }
 
@@ -108,7 +240,7 @@ async function handleProfileBootstrapAfterCallback(
     supabase,
     event: {
       eventType: AUDIT_EVENT_TYPES.authCallbackSucceeded,
-      actorUserId: user?.id ?? null,
+      actorUserId: user.id,
       targetType: "auth",
       targetId: "callback",
       metadata: {
@@ -118,10 +250,10 @@ async function handleProfileBootstrapAfterCallback(
     },
   });
 
-  return NextResponse.redirect(toRedirectUrl(request, nextPath));
+  return buildRedirectResponse(request, nextPath, sessionResponse);
 }
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   const url = new URL(request.url);
   const code = url.searchParams.get("code");
   const tokenHash = url.searchParams.get("token_hash");
@@ -136,7 +268,7 @@ export async function GET(request: Request) {
   );
   const requestFingerprint = await getAuditRequestFingerprint();
 
-  const supabase = await createServerSupabaseClient();
+  const { supabase, response: sessionResponse } = createCallbackSupabaseContext(request);
   let callbackFailureLogged = false;
   const callbackTrafficControl = await enforceTrafficControl({
     supabase,
@@ -145,6 +277,7 @@ export async function GET(request: Request) {
     throttledMessage: "Too many callback attempts. Please wait before retrying sign-in.",
     unavailableMessage: "Authentication callback is temporarily unavailable. Please retry shortly.",
   });
+
   if (!callbackTrafficControl.ok && callbackTrafficControl.reason === "throttled") {
     await recordSecurityAuditEvent({
       supabase,
@@ -159,16 +292,21 @@ export async function GET(request: Request) {
         },
       },
     });
-    const throttledRedirect = NextResponse.redirect(
-      toRedirectUrl(
-        request,
-        getCallbackFailurePath({
-          hasOAuthIntent,
-          intent,
-          nextPath,
-          oauthStatus: "callback_exchange_failed",
-        })
-      )
+    logCallbackFailure("rate_limited", {
+      retry_after_seconds: callbackTrafficControl.retryAfterSeconds,
+      has_code: Boolean(code),
+      has_token_hash: Boolean(tokenHash),
+    });
+
+    const throttledRedirect = buildRedirectResponse(
+      request,
+      getCallbackFailurePath({
+        hasOAuthIntent,
+        intent,
+        nextPath,
+        oauthStatus: "callback_exchange_failed",
+      }),
+      sessionResponse
     );
     throttledRedirect.headers.set(
       "Retry-After",
@@ -191,20 +329,31 @@ export async function GET(request: Request) {
         },
       },
     });
+    logCallbackFailure("rate_limiter_unavailable", {
+      has_code: Boolean(code),
+      has_token_hash: Boolean(tokenHash),
+    });
   }
 
   if (code) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
 
     if (!error) {
-      return handleProfileBootstrapAfterCallback(
+      return handleProfileBootstrapAfterCallback({
         supabase,
         request,
+        sessionResponse,
         nextPath,
-        requestFingerprint
-      );
+        hasOAuthIntent,
+        intent,
+        requestFingerprint,
+      });
     }
 
+    logCallbackFailure("exchange_failed", {
+      reason_category: categorizeCallbackError(error.message),
+      next_path: nextPath,
+    });
     await recordSecurityAuditEvent({
       supabase,
       event: {
@@ -223,6 +372,10 @@ export async function GET(request: Request) {
   }
 
   if (providerError) {
+    logCallbackFailure("provider_error", {
+      reason_category: "provider_error",
+      next_path: nextPath,
+    });
     await recordSecurityAuditEvent({
       supabase,
       event: {
@@ -248,14 +401,22 @@ export async function GET(request: Request) {
     });
 
     if (!error) {
-      return handleProfileBootstrapAfterCallback(
+      return handleProfileBootstrapAfterCallback({
         supabase,
         request,
+        sessionResponse,
         nextPath,
-        requestFingerprint
-      );
+        hasOAuthIntent,
+        intent,
+        requestFingerprint,
+      });
     }
 
+    logCallbackFailure("otp_verify_failed", {
+      reason_category: categorizeCallbackError(error.message),
+      otp_type: otpType,
+      next_path: nextPath,
+    });
     await recordSecurityAuditEvent({
       supabase,
       event: {
@@ -275,6 +436,14 @@ export async function GET(request: Request) {
   }
 
   if (!callbackFailureLogged) {
+    logCallbackFailure("invalid_payload", {
+      has_code: Boolean(code),
+      has_provider_error: Boolean(providerError),
+      has_token_hash: Boolean(tokenHash),
+      otp_type: otpType ?? null,
+      has_oauth_intent: hasOAuthIntent,
+      next_path: nextPath,
+    });
     await recordSecurityAuditEvent({
       supabase,
       event: {
@@ -291,10 +460,14 @@ export async function GET(request: Request) {
     });
   }
 
-  return NextResponse.redirect(toRedirectUrl(request, getCallbackFailurePath({
-    hasOAuthIntent,
-    intent,
-    nextPath,
-    oauthStatus: providerError ? "callback_provider_error" : "callback_exchange_failed",
-  })));
+  return buildRedirectResponse(
+    request,
+    getCallbackFailurePath({
+      hasOAuthIntent,
+      intent,
+      nextPath,
+      oauthStatus: providerError ? "callback_provider_error" : "callback_exchange_failed",
+    }),
+    sessionResponse
+  );
 }
