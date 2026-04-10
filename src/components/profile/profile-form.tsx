@@ -31,6 +31,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { ThemePreferenceSelector } from "@/components/theme/theme-preference-selector";
 import { signOutAction } from "@/lib/auth/actions";
 import { getRoleDescription, getRoleLabel, isAdminRole, type AppRole } from "@/lib/auth/roles";
 import {
@@ -785,27 +786,33 @@ export function ProfileForm({ profile, account, experience }: ProfileFormProps) 
           </header>
 
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
-            <div className="space-y-3 rounded-xl border border-border/70 bg-surface-soft px-4 py-3.5">
-              <p className="inline-flex items-center gap-2 text-sm font-semibold tracking-tight">
-                <Shield className="text-primary size-4" />
-                Active session controls
-              </p>
-              <p className="text-muted-foreground inline-flex items-center gap-2 text-xs leading-5">
-                <Mail className="size-3.5" />
-                {account.email ?? "Signed-in email unavailable"}
-              </p>
-              <p className="text-muted-foreground mt-1 text-sm leading-6">
-                Sign out from this browser session instantly.
-              </p>
-              <Button
-                type="submit"
-                formAction={signOutAction}
-                variant="outline"
-                className="mt-3 w-full justify-center sm:w-auto"
-              >
-                <LogOut className="size-4" />
-                Sign out
-              </Button>
+            <div className="space-y-4">
+              <div className="space-y-3 rounded-xl border border-border/70 bg-surface-soft px-4 py-3.5">
+                <ThemePreferenceSelector />
+              </div>
+
+              <div className="space-y-3 rounded-xl border border-border/70 bg-surface-soft px-4 py-3.5">
+                <p className="inline-flex items-center gap-2 text-sm font-semibold tracking-tight">
+                  <Shield className="text-primary size-4" />
+                  Active session controls
+                </p>
+                <p className="text-muted-foreground inline-flex items-center gap-2 text-xs leading-5">
+                  <Mail className="size-3.5" />
+                  {account.email ?? "Signed-in email unavailable"}
+                </p>
+                <p className="text-muted-foreground mt-1 text-sm leading-6">
+                  Sign out from this browser session instantly.
+                </p>
+                <Button
+                  type="submit"
+                  formAction={signOutAction}
+                  variant="outline"
+                  className="mt-3 w-full justify-center sm:w-auto"
+                >
+                  <LogOut className="size-4" />
+                  Sign out
+                </Button>
+              </div>
             </div>
 
             <div className="bg-destructive/7 space-y-3 rounded-xl border border-destructive/30 px-4 py-3.5">

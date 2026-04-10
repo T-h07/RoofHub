@@ -2,8 +2,10 @@ import type { Metadata } from "next";
 import { JetBrains_Mono, Manrope } from "next/font/google";
 
 import { AppShell } from "@/components/layout/app-shell";
+import { ThemeSync } from "@/components/theme/theme-sync";
 import { Toaster } from "@/components/ui/sonner";
 import { siteConfig } from "@/lib/config/site";
+import { THEME_STORAGE_KEY } from "@/lib/theme/preference";
 
 import "./globals.css";
 import "maplibre-gl/dist/maplibre-gl.css";
@@ -45,9 +47,26 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const themeInitScript = `(() => {
+    const storageKey = "${THEME_STORAGE_KEY}";
+    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    const storedPreference = localStorage.getItem(storageKey);
+    const preference =
+      storedPreference === "light" || storedPreference === "dark" || storedPreference === "system"
+        ? storedPreference
+        : "system";
+    const activeTheme = preference === "system" ? (prefersDark ? "dark" : "light") : preference;
+    const root = document.documentElement;
+    root.classList.toggle("dark", activeTheme === "dark");
+    root.dataset.theme = activeTheme;
+    root.dataset.themePreference = preference;
+  })();`;
+
   return (
     <html lang="en" className={`${manrope.variable} ${jetBrainsMono.variable} h-full antialiased`}>
       <body className="bg-background text-foreground min-h-full">
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+        <ThemeSync />
         <AppShell>{children}</AppShell>
         <Toaster
           richColors
