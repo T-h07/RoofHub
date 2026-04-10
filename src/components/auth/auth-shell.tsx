@@ -23,8 +23,8 @@ export function AuthShell({ badge, title, description, children, footer }: AuthS
   return (
     <MainContainer size="content" className="space-y-8">
       <div className="grid gap-6 lg:grid-cols-[1.08fr_1fr]">
-        <section className="border-border/80 bg-card/62 relative overflow-hidden rounded-2xl border p-6 shadow-[0_20px_46px_-34px_rgba(4,10,26,0.98)] sm:p-7">
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_4%,rgba(110,151,255,0.22),transparent_42%)]" />
+        <section className="border-border bg-card relative overflow-hidden rounded-2xl border p-6 shadow-[0_24px_42px_-34px_color-mix(in_oklch,var(--nav-background)_36%,transparent)] sm:p-7">
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_4%,color-mix(in_oklch,var(--primary)_18%,white),transparent_42%)]" />
           <div className="relative space-y-5">
             <Badge variant="primary">{badge}</Badge>
             <div className="space-y-2.5">

@@ -69,15 +69,15 @@ export function HeaderAccountMenu({
         type="button"
         onClick={() => setOpen((current) => !current)}
         className={cn(
-          "border-border/70 bg-background/70 hover:bg-accent/55 inline-flex h-9 max-w-[15.5rem] items-center gap-2 rounded-lg border px-2.5 text-sm transition-colors",
-          "focus-visible:ring-ring focus-visible:ring-offset-background focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+          "border-nav-muted/45 bg-nav-background/60 hover:bg-nav-active/24 inline-flex h-9 max-w-[15.5rem] items-center gap-2 rounded-lg border px-2.5 text-sm text-nav-foreground transition-colors",
+          "focus-visible:ring-ring focus-visible:ring-offset-nav-background focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
         )}
         aria-expanded={open}
         aria-haspopup="menu"
       >
         <span className="min-w-0 text-left leading-none">
           <span className="block truncate text-xs font-semibold">{accountLabel}</span>
-          <span className="text-muted-foreground block truncate text-[11px]">
+          <span className="text-nav-muted block truncate text-[11px]">
             {role ? `${getRoleLabel(role)} account` : "Signed-in account"}
           </span>
         </span>
@@ -87,13 +87,13 @@ export function HeaderAccountMenu({
           </span>
         ) : null}
         <ChevronDown
-          className={cn("text-muted-foreground size-4 shrink-0 transition-transform", open && "rotate-180")}
+          className={cn("text-nav-muted size-4 shrink-0 transition-transform", open && "rotate-180")}
           aria-hidden="true"
         />
       </button>
 
       {open ? (
-        <div className="border-border/75 bg-popover/98 absolute top-full right-0 z-50 mt-2 w-[min(88vw,18rem)] rounded-xl border p-2.5 shadow-[0_18px_42px_-22px_rgba(2,6,23,0.92)] backdrop-blur">
+        <div className="border-border bg-popover/98 absolute top-full right-0 z-50 mt-2 w-[min(88vw,18rem)] rounded-xl border p-2.5 shadow-[0_20px_36px_-24px_color-mix(in_oklch,var(--nav-background)_44%,transparent)] backdrop-blur">
           {profileError ? (
             <div className="border-destructive/35 bg-destructive/8 mb-2 rounded-lg border px-2.5 py-2 text-xs leading-5 text-destructive">
               {profileError}
@@ -116,7 +116,7 @@ export function HeaderAccountMenu({
                 href={link.href}
                 onClick={() => setOpen(false)}
                 className={cn(
-                  "text-muted-foreground hover:bg-accent/55 hover:text-foreground block rounded-md px-2.5 py-2 text-sm transition-colors"
+                  "text-muted-foreground hover:bg-secondary hover:text-foreground block rounded-md px-2.5 py-2 text-sm transition-colors"
                 )}
               >
                 {link.title}

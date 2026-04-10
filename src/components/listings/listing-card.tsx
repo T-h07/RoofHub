@@ -96,10 +96,10 @@ export function ListingCard({ listing, isAuthenticated, className }: ListingCard
             className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
           />
         ) : (
-          <div className="h-full w-full bg-[linear-gradient(135deg,rgba(84,128,210,0.22),transparent_48%),linear-gradient(320deg,rgba(115,150,224,0.18),transparent_64%)]" />
+          <div className="h-full w-full bg-[linear-gradient(135deg,color-mix(in_oklch,var(--primary)_34%,white),transparent_48%),linear-gradient(320deg,color-mix(in_oklch,var(--warm-accent)_34%,white),transparent_64%)]" />
         )}
 
-        <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-black/10" />
+        <div className="absolute inset-0 bg-gradient-to-t from-nav-background/45 via-transparent to-nav-background/8" />
 
         <div className="absolute top-3 left-3 flex flex-wrap items-center gap-2">
           <Badge variant={listing.listing_type === "rent" ? "primary" : "neutral"}>
@@ -118,7 +118,7 @@ export function ListingCard({ listing, isAuthenticated, className }: ListingCard
         </div>
 
         {!listing.coverImageUrl ? (
-          <div className="absolute right-3 bottom-3 inline-flex items-center gap-1.5 rounded-full border border-white/25 bg-black/40 px-2.5 py-1 text-[0.7rem] font-semibold tracking-wide text-white uppercase">
+          <div className="absolute right-3 bottom-3 inline-flex items-center gap-1.5 rounded-full border border-nav-foreground/35 bg-nav-background/70 px-2.5 py-1 text-[0.7rem] font-semibold tracking-wide text-nav-foreground uppercase">
             <Hourglass className="size-3.5" aria-hidden="true" />
             Image pending
           </div>

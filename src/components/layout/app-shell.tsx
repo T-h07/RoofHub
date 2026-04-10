@@ -71,7 +71,7 @@ export async function AppShell({ children }: AppShellProps) {
 
   return (
     <div className="relative flex min-h-screen flex-col overflow-x-clip">
-      <div className="pointer-events-none absolute inset-0 -z-20 bg-[linear-gradient(to_bottom,rgba(2,8,23,0.28),transparent_220px)]" />
+      <div className="pointer-events-none absolute inset-0 -z-20 bg-[linear-gradient(to_bottom,color-mix(in_oklch,var(--nav-background)_14%,transparent),transparent_260px)]" />
       <SiteHeader authState={authState} />
       <main className="flex-1 py-8 sm:py-10">{children}</main>
       <SiteFooter />

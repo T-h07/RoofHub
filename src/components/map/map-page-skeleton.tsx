@@ -28,7 +28,7 @@ export function MapPageSkeleton() {
           <div className="bg-muted/45 h-8 w-8 rounded-md" />
           <div className="bg-muted/45 h-8 w-8 rounded-md" />
         </div>
-        <div className="absolute bottom-4 left-4 rounded-md border border-white/10 bg-black/30 px-3 py-1.5 text-xs text-white/75">
+        <div className="bg-nav-background/72 text-nav-foreground/90 border-nav-foreground/24 absolute bottom-4 left-4 rounded-md border px-3 py-1.5 text-xs">
           Loading map and markers...
         </div>
       </section>

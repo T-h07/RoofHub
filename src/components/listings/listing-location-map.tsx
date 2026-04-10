@@ -149,13 +149,19 @@ export function ListingLocationMap({
         </Source>
       </MapLibre>
 
-      <div className="absolute top-3 left-3 z-10 inline-flex items-center gap-1.5 rounded-full border border-white/18 bg-black/36 px-2.5 py-1 text-[11px] font-medium text-white">
+      <div className="absolute top-3 left-3 z-10 inline-flex items-center gap-1.5 rounded-full border border-nav-foreground/30 bg-nav-background/72 px-2.5 py-1 text-[11px] font-medium text-nav-foreground">
         <MapPin className="size-3.5" aria-hidden="true" />
         {publicLocationMode === "approximate" ? "Approximate location" : "Location preview"}
       </div>
 
       <div className="absolute right-3 bottom-3 z-10">
-        <Link href={mapHref} className={cn(buttonVariants({ size: "sm", variant: "outline" }), "h-8 gap-1.5 border-white/18 bg-black/42 text-white hover:bg-black/58")}>
+        <Link
+          href={mapHref}
+          className={cn(
+            buttonVariants({ size: "sm", variant: "outline" }),
+            "h-8 gap-1.5 border-nav-foreground/30 bg-nav-background/72 text-nav-foreground hover:bg-nav-background/88"
+          )}
+        >
           Open full map
           <ExternalLink className="size-3.5" aria-hidden="true" />
         </Link>

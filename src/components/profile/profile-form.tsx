@@ -197,7 +197,7 @@ function pickMetricToneClass(tone: ProfileExperienceMetric["tone"]) {
   }
 
   if (tone === "warning") {
-    return "border-amber-500/45 bg-amber-500/10";
+    return "border-warning/35 bg-warning/12";
   }
 
   return "border-border/70 bg-background/50";
@@ -348,13 +348,13 @@ export function ProfileForm({ profile, account, experience }: ProfileFormProps) 
 
   return (
     <div className="space-y-6 pb-12">
-      <section className="border-border/80 bg-card/72 relative overflow-hidden rounded-3xl border p-5 shadow-[0_30px_54px_-36px_rgba(2,6,20,0.98)] sm:p-7">
+      <section className="border-border bg-card relative overflow-hidden rounded-3xl border p-5 shadow-[0_28px_48px_-36px_color-mix(in_oklch,var(--nav-background)_40%,transparent)] sm:p-7">
         <div
           className={cn(
             "pointer-events-none absolute inset-0 opacity-80",
             isProvider
-              ? "bg-[radial-gradient(circle_at_88%_8%,rgba(64,173,255,0.2),transparent_42%),radial-gradient(circle_at_0%_100%,rgba(52,211,153,0.16),transparent_36%)]"
-              : "bg-[radial-gradient(circle_at_88%_8%,rgba(64,173,255,0.17),transparent_42%),radial-gradient(circle_at_0%_100%,rgba(251,191,36,0.14),transparent_36%)]"
+              ? "bg-[radial-gradient(circle_at_88%_8%,color-mix(in_oklch,var(--primary)_18%,white),transparent_42%),radial-gradient(circle_at_0%_100%,color-mix(in_oklch,var(--accent)_24%,white),transparent_36%)]"
+              : "bg-[radial-gradient(circle_at_88%_8%,color-mix(in_oklch,var(--primary)_16%,white),transparent_42%),radial-gradient(circle_at_0%_100%,color-mix(in_oklch,var(--warm-accent)_34%,white),transparent_36%)]"
           )}
         />
         <div className="relative grid gap-6 xl:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
@@ -368,7 +368,7 @@ export function ProfileForm({ profile, account, experience }: ProfileFormProps) 
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
               <div
                 className={cn(
-                  "border-border/80 bg-background/55 relative size-26 shrink-0 overflow-hidden rounded-full border shadow-[0_14px_28px_-18px_rgba(3,8,26,0.95)]",
+                  "border-border/80 bg-card relative size-26 shrink-0 overflow-hidden rounded-full border shadow-[0_16px_28px_-20px_color-mix(in_oklch,var(--nav-background)_32%,transparent)]",
                   isProvider
                     ? "ring-2 ring-color-mix(in_oklch,var(--primary)_34%,transparent)"
                     : "ring-2 ring-color-mix(in_oklch,var(--accent)_36%,transparent)"
@@ -389,8 +389,8 @@ export function ProfileForm({ profile, account, experience }: ProfileFormProps) 
                     className={cn(
                       "flex size-full items-center justify-center text-xl font-semibold tracking-tight",
                       isProvider
-                        ? "bg-gradient-to-br from-sky-500/24 to-emerald-400/14 text-sky-100"
-                        : "bg-gradient-to-br from-amber-400/20 to-sky-400/14 text-amber-100"
+                        ? "bg-gradient-to-br from-primary/20 to-accent/18 text-foreground"
+                        : "bg-gradient-to-br from-warm-accent/40 to-primary/16 text-foreground"
                     )}
                   >
                     {profileImageInitials}
@@ -407,13 +407,13 @@ export function ProfileForm({ profile, account, experience }: ProfileFormProps) 
                 <h1 className="type-page-title">{profile.displayName}</h1>
                 <p className="type-body-muted max-w-2xl">{experience.heroDescription}</p>
                 <div className="text-muted-foreground flex flex-wrap items-center gap-2 text-xs">
-                  <span className="border-border/70 bg-background/55 rounded-full border px-2.5 py-1">
+                  <span className="border-border/70 bg-surface-soft rounded-full border px-2.5 py-1">
                     {experience.roleDescriptor}
                   </span>
-                  <span className="border-border/70 bg-background/55 rounded-full border px-2.5 py-1">
+                  <span className="border-border/70 bg-surface-soft rounded-full border px-2.5 py-1">
                     Member since {accountSince}
                   </span>
-                  <span className="border-border/70 bg-background/55 rounded-full border px-2.5 py-1">
+                  <span className="border-border/70 bg-surface-soft rounded-full border px-2.5 py-1">
                     Updated {lastUpdated}
                   </span>
                 </div>
@@ -500,7 +500,7 @@ export function ProfileForm({ profile, account, experience }: ProfileFormProps) 
                 <div
                   key={`${metric.label}-${metric.value}`}
                   className={cn(
-                    "rounded-xl border px-3.5 py-3 shadow-[0_14px_30px_-24px_rgba(4,8,24,0.95)]",
+                    "rounded-xl border px-3.5 py-3 shadow-[0_14px_26px_-22px_color-mix(in_oklch,var(--nav-background)_26%,transparent)]",
                     pickMetricToneClass(metric.tone)
                   )}
                 >
@@ -526,7 +526,7 @@ export function ProfileForm({ profile, account, experience }: ProfileFormProps) 
           <AuthStatusMessage tone="success" message={profileState.message} />
         ) : null}
 
-        <section className="border-border/75 bg-card/68 rounded-2xl border p-5 sm:p-6">
+        <section className="border-border bg-card rounded-2xl border p-5 sm:p-6">
           <header className="border-border/70 mb-5 space-y-2 border-b pb-4">
             <p className="type-label">{isProvider ? "Marketplace identity" : "Personal identity"}</p>
             <h2 className="type-section-title">{experience.heroTitle}</h2>
@@ -575,7 +575,7 @@ export function ProfileForm({ profile, account, experience }: ProfileFormProps) 
           </div>
         </section>
 
-        <section className="border-border/75 bg-card/68 rounded-2xl border p-5 sm:p-6">
+        <section className="border-border bg-card rounded-2xl border p-5 sm:p-6">
           <header className="border-border/70 mb-5 space-y-2 border-b pb-4">
             <p className="type-label">
               {isProvider ? "Response channels" : "Contact preferences"}
@@ -603,7 +603,7 @@ export function ProfileForm({ profile, account, experience }: ProfileFormProps) 
                       key={option.value}
                       className={cn(
                         "border-border/75 hover:border-border flex cursor-pointer items-start gap-3 rounded-xl border px-3 py-2.5 transition-colors",
-                        checked ? "border-primary/55 bg-primary/12" : "bg-background/45"
+                        checked ? "border-primary/55 bg-primary/10" : "bg-surface-soft"
                       )}
                     >
                       <input
@@ -721,7 +721,7 @@ export function ProfileForm({ profile, account, experience }: ProfileFormProps) 
           </div>
         </section>
 
-        <section className="border-border/75 bg-card/68 rounded-2xl border p-5 sm:p-6">
+        <section className="border-border bg-card rounded-2xl border p-5 sm:p-6">
           <header className="border-border/70 mb-5 space-y-2 border-b pb-4">
             <p className="type-label">Role and visibility</p>
             <h2 className="type-section-title">{experience.previewTitle}</h2>
@@ -760,7 +760,7 @@ export function ProfileForm({ profile, account, experience }: ProfileFormProps) 
               )}
             </Field>
 
-            <div className="border-border/70 bg-background/45 rounded-xl border px-4 py-3.5">
+            <div className="border-border/70 bg-surface-soft rounded-xl border px-4 py-3.5">
               <p className="inline-flex items-center gap-2 text-sm font-semibold tracking-tight">
                 <UserRound className="text-primary size-4" />
                 Public profile framing
@@ -774,7 +774,7 @@ export function ProfileForm({ profile, account, experience }: ProfileFormProps) 
           </div>
         </section>
 
-        <section className="border-border/75 bg-card/68 rounded-2xl border p-5 sm:p-6">
+        <section className="border-border bg-card rounded-2xl border p-5 sm:p-6">
           <header className="border-border/70 mb-5 space-y-2 border-b pb-4">
             <p className="type-label">Account controls</p>
             <h2 className="type-section-title">Security and lifecycle</h2>
@@ -785,7 +785,7 @@ export function ProfileForm({ profile, account, experience }: ProfileFormProps) 
           </header>
 
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
-            <div className="space-y-3 rounded-xl border border-border/70 bg-background/45 px-4 py-3.5">
+            <div className="space-y-3 rounded-xl border border-border/70 bg-surface-soft px-4 py-3.5">
               <p className="inline-flex items-center gap-2 text-sm font-semibold tracking-tight">
                 <Shield className="text-primary size-4" />
                 Active session controls
@@ -808,7 +808,7 @@ export function ProfileForm({ profile, account, experience }: ProfileFormProps) 
               </Button>
             </div>
 
-            <div className="space-y-3 rounded-xl border border-destructive/30 bg-destructive/8 px-4 py-3.5">
+            <div className="bg-destructive/7 space-y-3 rounded-xl border border-destructive/30 px-4 py-3.5">
               <p className="inline-flex items-center gap-2 text-sm font-semibold tracking-tight">
                 <AlertTriangle className="text-destructive size-4" />
                 Danger zone
@@ -829,7 +829,7 @@ export function ProfileForm({ profile, account, experience }: ProfileFormProps) 
           </div>
         </section>
 
-        <section className="border-border/75 bg-card/75 sticky bottom-4 rounded-2xl border px-4 py-3 shadow-[0_24px_44px_-30px_rgba(5,10,28,0.95)] backdrop-blur-sm">
+        <section className="border-border bg-card/96 sticky bottom-4 rounded-2xl border px-4 py-3 shadow-[0_24px_44px_-30px_color-mix(in_oklch,var(--nav-background)_36%,transparent)] backdrop-blur-sm">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-muted-foreground text-sm leading-6">
               {hasUnsavedChanges

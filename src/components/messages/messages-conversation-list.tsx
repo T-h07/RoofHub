@@ -82,10 +82,10 @@ export function MessagesConversationList({
             className={cn(
               "rounded-full px-2 py-0.5 text-[11px] font-medium",
               realtimeHealth === "live"
-                ? "bg-emerald-500/20 text-emerald-300"
+                ? "bg-success/14 text-success"
                 : realtimeHealth === "connecting"
-                  ? "bg-amber-500/20 text-amber-300"
-                  : "bg-destructive/20 text-destructive-foreground"
+                  ? "bg-warning/14 text-warning"
+                  : "bg-destructive/14 text-destructive"
             )}
           >
             {realtimeHealth === "live"

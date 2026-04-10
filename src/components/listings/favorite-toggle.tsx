@@ -72,7 +72,7 @@ export function FavoriteToggle({
             size: mode === "icon" ? "icon" : "default",
           }),
           mode === "icon"
-            ? "size-8 border-white/25 bg-black/34 text-white hover:bg-black/56"
+            ? "size-8 border-nav-foreground/35 bg-nav-background/66 text-nav-foreground hover:bg-nav-background/85"
             : "w-full gap-1.5",
           className
         )}
@@ -136,7 +136,7 @@ export function FavoriteToggle({
           }),
           mode === "icon"
             ? cn(
-                "size-8 border-white/25 bg-black/34 text-white hover:bg-black/56",
+                "size-8 border-nav-foreground/35 bg-nav-background/66 text-nav-foreground hover:bg-nav-background/85",
                 isFavorited ? "bg-primary text-primary-foreground border-transparent hover:bg-primary/90" : ""
               )
             : "w-full gap-1.5"

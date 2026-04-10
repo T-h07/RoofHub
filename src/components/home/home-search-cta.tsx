@@ -23,7 +23,7 @@ const quickSearchPaths = [
 
 export function HomeSearchCta() {
   return (
-    <section className="border-border/80 bg-background/65 rounded-xl border p-4 shadow-[0_14px_28px_-22px_rgba(2,8,24,0.95)] sm:p-5">
+    <section className="border-border bg-surface-soft rounded-xl border p-4 shadow-[0_18px_30px_-24px_color-mix(in_oklch,var(--nav-background)_30%,transparent)] sm:p-5">
       <form action="/explore" className="space-y-3">
         <div className="grid gap-3 md:grid-cols-[168px_minmax(0,1fr)_auto]">
           <div className="space-y-1.5">

@@ -21,10 +21,10 @@ function HeaderLink({ href, label, active }: { href: string; label: string; acti
       href={href}
       className={cn(
         "rounded-md px-3 py-2 text-sm font-medium whitespace-nowrap transition-colors",
-        "focus-visible:ring-ring focus-visible:ring-offset-background focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none",
+        "focus-visible:ring-ring focus-visible:ring-offset-nav-background focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none",
         active
-          ? "bg-accent text-accent-foreground"
-          : "text-muted-foreground hover:bg-accent/65 hover:text-foreground"
+          ? "bg-nav-active text-primary-foreground"
+          : "text-nav-muted hover:bg-nav-active/24 hover:text-nav-foreground"
       )}
     >
       {label}
@@ -68,18 +68,18 @@ export function SiteHeader({ authState }: SiteHeaderProps) {
   const accountLabel = authState.displayName || authState.email || "Signed in";
 
   return (
-    <header className="border-border/70 bg-background/90 sticky top-0 z-40 border-b backdrop-blur-md">
+    <header className="border-nav-active/20 bg-nav-background/96 text-nav-foreground sticky top-0 z-40 border-b backdrop-blur-md">
       <MainContainer>
         <div className="flex h-[4.5rem] items-center justify-between gap-3">
           <Link href="/" className="group inline-flex min-w-0 items-center gap-2.5">
-            <span className="border-primary/45 bg-primary/16 text-primary group-hover:bg-primary/24 inline-flex size-8.5 shrink-0 items-center justify-center rounded-lg border transition-colors">
+            <span className="border-nav-active/45 bg-nav-active/22 text-nav-foreground group-hover:bg-nav-active/32 inline-flex size-8.5 shrink-0 items-center justify-center rounded-lg border transition-colors">
               <MapPinned className="size-4.5" aria-hidden="true" />
             </span>
             <span className="min-w-0 leading-none">
               <span className="block truncate text-base font-semibold tracking-tight">
                 {siteConfig.name}
               </span>
-              <span className="text-muted-foreground hidden truncate text-[11px] xl:block">
+              <span className="text-nav-muted hidden truncate text-[11px] xl:block">
                 Map-first marketplace
               </span>
             </span>
@@ -101,7 +101,10 @@ export function SiteHeader({ authState }: SiteHeaderProps) {
               <>
                 <Link
                   href={cta.href}
-                  className={cn(buttonVariants({ size: "sm" }), "hidden gap-1.5 xl:inline-flex")}
+                  className={cn(
+                    buttonVariants({ size: "sm" }),
+                    "hidden gap-1.5 xl:inline-flex shadow-none"
+                  )}
                 >
                   {cta.label}
                   <Sparkles className="size-4" aria-hidden="true" />
@@ -118,13 +121,16 @@ export function SiteHeader({ authState }: SiteHeaderProps) {
               <>
                 <Link
                   href="/auth/sign-in"
-                  className={buttonVariants({ variant: "outline", size: "sm" })}
+                  className={cn(
+                    buttonVariants({ variant: "outline", size: "sm" }),
+                    "border-nav-muted/45 bg-transparent text-nav-foreground hover:bg-nav-active/24 hover:text-nav-foreground"
+                  )}
                 >
                   Sign in
                 </Link>
                 <Link
                   href="/auth/sign-up"
-                  className={cn(buttonVariants({ size: "sm" }), "gap-1.5")}
+                  className={cn(buttonVariants({ size: "sm" }), "gap-1.5 shadow-none")}
                 >
                   {cta.label}
                   <Sparkles className="size-4" aria-hidden="true" />

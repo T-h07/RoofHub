@@ -46,10 +46,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="en"
-      className={`${manrope.variable} ${jetBrainsMono.variable} dark h-full antialiased`}
-    >
+    <html lang="en" className={`${manrope.variable} ${jetBrainsMono.variable} h-full antialiased`}>
       <body className="bg-background text-foreground min-h-full">
         <AppShell>{children}</AppShell>
         <Toaster

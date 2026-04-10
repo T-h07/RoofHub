@@ -33,9 +33,9 @@ function MobileNavLink({
 }) {
   if (disabled) {
     return (
-      <div className="border-border/70 text-muted-foreground flex items-center justify-between rounded-lg border px-3 py-2.5 text-sm">
+      <div className="border-nav-muted/35 text-nav-muted flex items-center justify-between rounded-lg border px-3 py-2.5 text-sm">
         <span>{label}</span>
-        <span className="border-border rounded-full border px-2 py-0.5 text-[0.64rem] font-semibold tracking-wider uppercase">
+        <span className="border-nav-muted/35 rounded-full border px-2 py-0.5 text-[0.64rem] font-semibold tracking-wider uppercase">
           Soon
         </span>
       </div>
@@ -48,8 +48,8 @@ function MobileNavLink({
       className={cn(
         "flex items-center justify-between rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
         active
-          ? "bg-accent text-accent-foreground"
-          : "text-muted-foreground hover:bg-accent/70 hover:text-foreground"
+          ? "bg-nav-active text-primary-foreground"
+          : "text-nav-muted hover:bg-nav-active/24 hover:text-nav-foreground"
       )}
     >
       {label}
@@ -81,19 +81,27 @@ export function MobileNavSheet({ authState }: MobileNavSheetProps) {
 
   return (
     <Sheet>
-      <SheetTrigger className={buttonVariants({ variant: "outline", size: "icon" })}>
+      <SheetTrigger
+        className={cn(
+          buttonVariants({ variant: "outline", size: "icon" }),
+          "border-nav-muted/45 bg-nav-background/55 text-nav-foreground hover:bg-nav-active/24 hover:text-nav-foreground"
+        )}
+      >
         <Menu className="size-4" aria-hidden="true" />
         <span className="sr-only">Open navigation</span>
       </SheetTrigger>
-      <SheetContent side="right" className="bg-popover/98">
+      <SheetContent
+        side="right"
+        className="border-nav-active/30 bg-nav-background text-nav-foreground [&>button]:text-nav-muted [&>button:hover]:bg-nav-active/24 [&>button:hover]:text-nav-foreground"
+      >
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2 text-lg">
-            <span className="bg-primary/20 text-primary inline-flex size-7 items-center justify-center rounded-md">
+            <span className="bg-nav-active/30 text-nav-foreground inline-flex size-7 items-center justify-center rounded-md">
               <Compass className="size-4" />
             </span>
             {siteConfig.name}
           </SheetTitle>
-          <SheetDescription className="text-muted-foreground text-sm">
+          <SheetDescription className="text-nav-muted text-sm">
             {isAuthenticated && authState.role
               ? `${getRoleLabel(authState.role)} account navigation`
               : "Explore listings, map results, and account actions."}
@@ -115,9 +123,9 @@ export function MobileNavSheet({ authState }: MobileNavSheetProps) {
             </nav>
           </div>
 
-          <div className="border-border/70 bg-muted/25 rounded-lg border p-3">
-            <div className="text-foreground mb-3 flex items-center gap-2 text-sm font-medium">
-              <LayoutGrid className="text-primary size-4" />
+          <div className="border-nav-muted/35 bg-nav-active/14 rounded-lg border p-3">
+            <div className="text-nav-foreground mb-3 flex items-center gap-2 text-sm font-medium">
+              <LayoutGrid className="text-nav-foreground size-4" />
               {isAuthenticated
                 ? authState.profileError
                   ? "Profile action required"
@@ -131,7 +139,7 @@ export function MobileNavSheet({ authState }: MobileNavSheetProps) {
                 ) : null}
                 <Link
                   href={cta.href}
-                  className={cn(buttonVariants({ size: "sm" }), "w-full justify-center")}
+                  className={cn(buttonVariants({ size: "sm" }), "w-full justify-center shadow-none")}
                 >
                   {cta.label}
                   <Sparkles className="size-4" aria-hidden="true" />
@@ -146,14 +154,14 @@ export function MobileNavSheet({ authState }: MobileNavSheetProps) {
                   href="/auth/sign-in"
                   className={cn(
                     buttonVariants({ variant: "outline", size: "sm" }),
-                    "w-full justify-center"
+                    "w-full justify-center border-nav-muted/45 bg-transparent text-nav-foreground hover:bg-nav-active/24 hover:text-nav-foreground"
                   )}
                 >
                   Sign in
                 </Link>
                 <Link
                   href="/auth/sign-up"
-                  className={cn(buttonVariants({ size: "sm" }), "w-full justify-center")}
+                  className={cn(buttonVariants({ size: "sm" }), "w-full justify-center shadow-none")}
                 >
                   Create account
                   <Sparkles className="size-4" aria-hidden="true" />

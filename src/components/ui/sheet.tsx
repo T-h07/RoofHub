@@ -17,7 +17,7 @@ const SheetDescription = DrawerPrimitive.Description;
 function SheetOverlay({ className, ...props }: DrawerPrimitive.Backdrop.Props) {
   return (
     <DrawerPrimitive.Backdrop
-      className={cn("fixed inset-0 z-50 bg-black/70 backdrop-blur-[1px]", className)}
+      className={cn("fixed inset-0 z-50 bg-nav-background/50 backdrop-blur-[2px]", className)}
       {...props}
     />
   );

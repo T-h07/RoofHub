@@ -15,12 +15,12 @@ export function EmptyState({ icon: Icon, title, description, action, className }
   return (
     <section
       className={cn(
-        "border-border/90 bg-muted/18 rounded-xl border border-dashed px-6 py-9 text-center",
+        "border-border bg-surface-soft rounded-xl border border-dashed px-6 py-9 text-center",
         className
       )}
     >
       {Icon ? (
-        <div className="bg-accent/80 text-accent-foreground mx-auto mb-4 inline-flex size-10 items-center justify-center rounded-full">
+        <div className="bg-warm-accent text-warm-accent-foreground mx-auto mb-4 inline-flex size-10 items-center justify-center rounded-full">
           <Icon className="size-4.5" aria-hidden="true" />
         </div>
       ) : null}

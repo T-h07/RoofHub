@@ -653,10 +653,10 @@ export function MessagesWorkspace({
   return (
     <section className="space-y-3">
       {realtimeHealth === "degraded" ? (
-        <section className="border-border/75 bg-card/58 flex flex-col gap-2 rounded-xl border px-3.5 py-3 sm:flex-row sm:items-center sm:justify-between">
+        <section className="border-border bg-card flex flex-col gap-2 rounded-xl border px-3.5 py-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0 space-y-1">
             <p className="inline-flex items-center gap-1.5 text-xs font-semibold">
-              <TriangleAlert className="size-3.5 text-amber-400" aria-hidden="true" />
+              <TriangleAlert className="text-warning size-3.5" aria-hidden="true" />
               Live updates paused
             </p>
             <p className="text-muted-foreground text-xs">
@@ -666,20 +666,20 @@ export function MessagesWorkspace({
           <div className="flex shrink-0 items-center gap-2">
             <button
               type="button"
-              onClick={refreshNow}
-              className={cn(
-                "border-border bg-card/72 hover:bg-accent/70 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors"
-              )}
-            >
-              Refresh now
+            onClick={refreshNow}
+            className={cn(
+              "border-border bg-card/72 hover:bg-accent/70 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors"
+            )}
+          >
+            Refresh now
             </button>
             <button
               type="button"
-              onClick={retryLiveSync}
-              className={cn(
-                "border-border bg-card/72 hover:bg-accent/70 inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors"
-              )}
-            >
+            onClick={retryLiveSync}
+            className={cn(
+              "border-border bg-card/72 hover:bg-accent/70 inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors"
+            )}
+          >
               <RotateCcw className="size-3.5" aria-hidden="true" />
               Retry live sync
             </button>

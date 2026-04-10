@@ -16,7 +16,7 @@ const DialogDescription = DialogPrimitive.Description;
 function DialogOverlay({ className, ...props }: DialogPrimitive.Backdrop.Props) {
   return (
     <DialogPrimitive.Backdrop
-      className={cn("fixed inset-0 z-50 bg-black/65 backdrop-blur-[1px]", className)}
+      className={cn("fixed inset-0 z-50 bg-nav-background/48 backdrop-blur-[2px]", className)}
       {...props}
     />
   );
@@ -32,7 +32,7 @@ function DialogContent({ className, children, showClose = true, ...props }: Dial
       <DialogOverlay />
       <DialogPrimitive.Popup
         className={cn(
-          "border-border bg-popover text-popover-foreground fixed top-1/2 left-1/2 z-50 w-[min(92vw,34rem)] -translate-x-1/2 -translate-y-1/2 rounded-xl border p-6 shadow-2xl outline-none",
+          "border-border bg-popover text-popover-foreground fixed top-1/2 left-1/2 z-50 w-[min(92vw,34rem)] -translate-x-1/2 -translate-y-1/2 rounded-2xl border p-6 shadow-[0_26px_48px_-28px_color-mix(in_oklch,var(--nav-background)_48%,transparent)] outline-none",
           className
         )}
         {...props}

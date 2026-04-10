@@ -130,7 +130,7 @@ export function MapResultsPane({
                         className="h-full w-full object-cover"
                       />
                     ) : (
-                      <div className="h-full w-full bg-[linear-gradient(140deg,rgba(96,138,216,0.26),transparent_58%),linear-gradient(300deg,rgba(126,157,226,0.2),transparent_64%)]" />
+                      <div className="h-full w-full bg-[linear-gradient(140deg,color-mix(in_oklch,var(--primary)_34%,white),transparent_58%),linear-gradient(300deg,color-mix(in_oklch,var(--warm-accent)_36%,white),transparent_64%)]" />
                     )}
                   </div>
 
@@ -177,7 +177,7 @@ export function MapResultsPane({
       )}
 
       {isTruncated ? (
-        <div className="border-border/70 bg-muted/20 border-t px-4 py-2.5 text-xs text-amber-300/90">
+        <div className="border-border/70 bg-warning/10 text-warning border-t px-4 py-2.5 text-xs">
           Result fetch capped at {markerLimit} rows for stable map performance.
         </div>
       ) : null}

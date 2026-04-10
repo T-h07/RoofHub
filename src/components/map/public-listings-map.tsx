@@ -67,7 +67,7 @@ const clusterCircleLayer: LayerProps = {
   source: LISTINGS_SOURCE_ID,
   filter: ["has", "point_count"],
   paint: {
-    "circle-color": ["step", ["get", "point_count"], "#5fa6ff", 16, "#3f89f4", 52, "#2a66d9"],
+    "circle-color": ["step", ["get", "point_count"], "#4f7fd4", 16, "#3f68b8", 52, "#2c4f95"],
     "circle-radius": ["step", ["get", "point_count"], 18, 16, 23, 52, 29],
     "circle-stroke-color": "rgba(4, 12, 28, 0.92)",
     "circle-stroke-width": 1.8,
@@ -96,7 +96,7 @@ const unclusteredPointLayer: LayerProps = {
   source: LISTINGS_SOURCE_ID,
   filter: ["!", ["has", "point_count"]],
   paint: {
-    "circle-color": ["case", ["==", ["get", "approximate"], 1], "#5d88ce", "#71b0ff"],
+    "circle-color": ["case", ["==", ["get", "approximate"], 1], "#6f8f72", "#2253b1"],
     "circle-radius": 12.5,
     "circle-stroke-color": "rgba(3, 10, 24, 0.9)",
     "circle-stroke-width": 1.6,
@@ -641,7 +641,7 @@ export function PublicListingsMap({ mapStyleUrl, listings, appliedBounds }: Publ
                     className="h-full w-full object-cover"
                   />
                 ) : (
-                  <div className="h-full w-full bg-[linear-gradient(140deg,rgba(95,134,212,0.26),transparent_55%),linear-gradient(300deg,rgba(120,152,222,0.18),transparent_60%)]" />
+                  <div className="h-full w-full bg-[linear-gradient(140deg,color-mix(in_oklch,var(--primary)_34%,white),transparent_55%),linear-gradient(300deg,color-mix(in_oklch,var(--warm-accent)_36%,white),transparent_60%)]" />
                 )}
               </div>
 
@@ -720,7 +720,7 @@ export function PublicListingsMap({ mapStyleUrl, listings, appliedBounds }: Publ
               Search all visible areas
             </button>
           ) : (
-            <div className="border-border/70 bg-card/88 text-muted-foreground rounded-full border px-3 py-1.5 text-[11px] shadow-lg">
+            <div className="border-border/85 bg-card/95 text-muted-foreground rounded-full border px-3 py-1.5 text-[11px] shadow-lg">
               Move map and use Search this area
             </div>
           )}

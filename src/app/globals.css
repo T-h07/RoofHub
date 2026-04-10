@@ -17,10 +17,13 @@
 
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
+  --color-primary-hover: var(--primary-hover);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
+  --color-warm-accent: var(--warm-accent);
+  --color-warm-accent-foreground: var(--warm-accent-foreground);
 
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
@@ -34,6 +37,12 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-nav-background: var(--nav-background);
+  --color-nav-foreground: var(--nav-foreground);
+  --color-nav-muted: var(--nav-muted);
+  --color-nav-active: var(--nav-active);
+  --color-surface-alt: var(--surface-alt);
+  --color-surface-soft: var(--surface-soft);
 
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
@@ -103,14 +112,19 @@
     @apply bg-background text-foreground font-sans antialiased;
     background-image:
       radial-gradient(
-        circle at 8% -2%,
-        color-mix(in oklch, var(--primary) 26%, transparent),
-        transparent 42%
+        circle at 0% -4%,
+        color-mix(in oklch, var(--warm-accent) 46%, transparent),
+        transparent 40%
       ),
       radial-gradient(
-        circle at 95% 0%,
-        color-mix(in oklch, var(--accent) 18%, transparent),
-        transparent 36%
+        circle at 100% 0%,
+        color-mix(in oklch, var(--primary) 16%, transparent),
+        transparent 33%
+      ),
+      linear-gradient(
+        to bottom,
+        color-mix(in oklch, var(--surface-soft) 82%, transparent),
+        transparent 24rem
       );
   }
 
@@ -142,7 +156,13 @@
   }
 
   .maplibregl-ctrl-group button .maplibregl-ctrl-icon {
+    filter: none;
+    opacity: 0.86;
+  }
+
+  .dark .maplibregl-ctrl-group button .maplibregl-ctrl-icon {
     filter: invert(1) brightness(1.7);
+    opacity: 1;
   }
 
   .maplibregl-ctrl-scale {
