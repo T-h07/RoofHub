@@ -153,7 +153,7 @@ Where to get the Supabase values:
 - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`: Supabase Dashboard -> Project Settings -> Data API -> Project API keys -> `anon` / publishable key
 - `NEXT_PUBLIC_MAP_STYLE_URL`: optional override. If omitted or invalid, RoofHub falls back to a public dark MapLibre style.
 - `AUTH_ALLOWED_ORIGINS`: server-side allowlist used for auth redirect/callback URL generation. Include all trusted local/preview/production app origins.
-- `SUPABASE_SERVICE_ROLE_KEY`: required server-only secret for account hard-delete operations from `/profile` danger-zone.
+- `SUPABASE_SERVICE_ROLE_KEY`: required server-only secret for account hard-delete operations from `/profile` danger-zone. If missing, delete-account fails with a controlled configuration error.
 
 Rules:
 

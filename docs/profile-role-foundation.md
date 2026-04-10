@@ -93,9 +93,15 @@ If this migration is not applied on the target project, profile photo uploads fa
 - flow removes:
   - owned listing images in storage
   - profile avatar storage objects
-  - actor/target-linked security audit rows
+  - actor/target/listing/conversation/report-linked security audit rows
   - auth user (which cascades profile/listings/favorites/conversations/messages/reports via FK rules)
 - Supabase auth cookies are cleared after delete finalization to avoid stale local session state
+
+Operational requirements:
+
+- `SUPABASE_SERVICE_ROLE_KEY` must be configured on the server runtime (`.env.local` for local dev, Vercel env vars for deployed environments)
+- delete-account uses server-only admin operations and intentionally fails if this env is missing
+- when missing, the action returns a controlled operational error message (no secrets, no stack traces)
 
 ## Role-Aware Navigation
 

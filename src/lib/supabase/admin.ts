@@ -6,7 +6,19 @@ import type { Database } from "@/types/database";
 
 import { getSupabaseEnv } from "./env";
 
-const SUPABASE_SERVICE_ROLE_ENV = "SUPABASE_SERVICE_ROLE_KEY";
+export const SUPABASE_SERVICE_ROLE_ENV = "SUPABASE_SERVICE_ROLE_KEY";
+
+export function isMissingSupabaseServiceRoleError(error: unknown) {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  const normalized = error.message.toLowerCase();
+  return (
+    normalized.includes("missing required server-only environment variable") &&
+    normalized.includes(SUPABASE_SERVICE_ROLE_ENV.toLowerCase())
+  );
+}
 
 export function createAdminSupabaseClient() {
   const { url } = getSupabaseEnv();

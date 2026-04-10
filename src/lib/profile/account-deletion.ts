@@ -114,6 +114,83 @@ async function loadOwnedListingIds(supabase: SupabaseClient<Database>, userId: s
   return (data ?? []).map((row) => row.id);
 }
 
+async function loadConversationIds(supabase: SupabaseClient<Database>, userId: string) {
+  const [providerResult, seekerResult] = await Promise.all([
+    supabase.from("conversations").select("id").eq("provider_id", userId),
+    supabase.from("conversations").select("id").eq("seeker_id", userId),
+  ]);
+
+  if (providerResult.error) {
+    throw new Error(
+      `Failed to load provider conversations for account deletion: ${providerResult.error.message}`
+    );
+  }
+
+  if (seekerResult.error) {
+    throw new Error(
+      `Failed to load seeker conversations for account deletion: ${seekerResult.error.message}`
+    );
+  }
+
+  const conversationIds = new Set<string>();
+  for (const row of providerResult.data ?? []) {
+    conversationIds.add(row.id);
+  }
+  for (const row of seekerResult.data ?? []) {
+    conversationIds.add(row.id);
+  }
+
+  return Array.from(conversationIds);
+}
+
+async function loadReportIds(
+  supabase: SupabaseClient<Database>,
+  input: {
+    userId: string;
+    listingIds: readonly string[];
+  }
+) {
+  const reportIdSet = new Set<string>();
+
+  const reporterResult = await supabase
+    .from("listing_reports")
+    .select("id")
+    .eq("reporter_id", input.userId);
+
+  if (reporterResult.error) {
+    throw new Error(
+      `Failed to load reporter-linked reports for account deletion: ${reporterResult.error.message}`
+    );
+  }
+
+  for (const row of reporterResult.data ?? []) {
+    reportIdSet.add(row.id);
+  }
+
+  if (input.listingIds.length === 0) {
+    return Array.from(reportIdSet);
+  }
+
+  for (const listingIdChunk of chunkArray(input.listingIds, IN_FILTER_CHUNK_SIZE)) {
+    const listingResult = await supabase
+      .from("listing_reports")
+      .select("id")
+      .in("listing_id", listingIdChunk);
+
+    if (listingResult.error) {
+      throw new Error(
+        `Failed to load listing-linked reports for account deletion: ${listingResult.error.message}`
+      );
+    }
+
+    for (const row of listingResult.data ?? []) {
+      reportIdSet.add(row.id);
+    }
+  }
+
+  return Array.from(reportIdSet);
+}
+
 async function loadListingImagePaths(
   supabase: SupabaseClient<Database>,
   listingIds: readonly string[]
@@ -177,10 +254,38 @@ async function loadProfileAvatarPaths(
   });
 }
 
+async function deleteAuditRowsByColumn(
+  supabase: SupabaseClient<Database>,
+  input: {
+    column: "listing_id" | "conversation_id" | "report_id";
+    values: readonly string[];
+  }
+) {
+  if (input.values.length === 0) {
+    return;
+  }
+
+  for (const valueChunk of chunkArray(input.values, IN_FILTER_CHUNK_SIZE)) {
+    const deleteResult = await supabase
+      .from("security_audit_events")
+      .delete()
+      .in(input.column, valueChunk);
+
+    if (deleteResult.error) {
+      throw new Error(
+        `Failed to remove ${input.column}-linked audit history during account deletion: ${deleteResult.error.message}`
+      );
+    }
+  }
+}
+
 async function deleteLinkedAuditRows(
   supabase: SupabaseClient<Database>,
   input: {
     userId: string;
+    listingIds: readonly string[];
+    conversationIds: readonly string[];
+    reportIds: readonly string[];
   }
 ) {
   const actorDeleteResult = await supabase
@@ -205,11 +310,33 @@ async function deleteLinkedAuditRows(
       `Failed to remove target-linked audit history during account deletion: ${targetDeleteResult.error.message}`
     );
   }
+
+  await deleteAuditRowsByColumn(supabase, {
+    column: "listing_id",
+    values: input.listingIds,
+  });
+
+  await deleteAuditRowsByColumn(supabase, {
+    column: "conversation_id",
+    values: input.conversationIds,
+  });
+
+  await deleteAuditRowsByColumn(supabase, {
+    column: "report_id",
+    values: input.reportIds,
+  });
 }
 
 export async function hardDeleteAccount(input: { userId: string }) {
   const adminSupabase = createAdminSupabaseClient();
   const listingIds = await loadOwnedListingIds(adminSupabase, input.userId);
+  const [conversationIds, reportIds] = await Promise.all([
+    loadConversationIds(adminSupabase, input.userId),
+    loadReportIds(adminSupabase, {
+      userId: input.userId,
+      listingIds,
+    }),
+  ]);
 
   const [listingImagePathsFromRows, listingImagePathsFromStorage, profileAvatarPaths] =
     await Promise.all([
@@ -236,6 +363,9 @@ export async function hardDeleteAccount(input: { userId: string }) {
 
   await deleteLinkedAuditRows(adminSupabase, {
     userId: input.userId,
+    listingIds,
+    conversationIds,
+    reportIds,
   });
 
   const { error: deleteUserError } = await adminSupabase.auth.admin.deleteUser(input.userId);

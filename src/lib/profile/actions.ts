@@ -7,6 +7,10 @@ import { getCurrentUserProfile } from "@/lib/auth/profile";
 import { isAdminRole, type PreferredContactMethod } from "@/lib/auth/roles";
 import { AUDIT_EVENT_TYPES, recordSecurityAuditEvent } from "@/lib/security/audit";
 import { createServerSupabaseClient } from "@/lib/supabase";
+import {
+  isMissingSupabaseServiceRoleError,
+  SUPABASE_SERVICE_ROLE_ENV,
+} from "@/lib/supabase/admin";
 import { hardDeleteAccount } from "@/lib/profile/account-deletion";
 import {
   removeProfileAvatarByPath,
@@ -93,19 +97,51 @@ function toAvatarRemoveError(message: string) {
 function toDeleteAccountError(message: string) {
   const normalized = message.toLowerCase();
 
-  if (normalized.includes("missing required server-only environment variable")) {
-    return "Account deletion is not available yet in this environment. Contact support.";
+  if (
+    normalized.includes("missing required server-only environment variable") &&
+    normalized.includes(SUPABASE_SERVICE_ROLE_ENV.toLowerCase())
+  ) {
+    return `Account deletion is blocked because server configuration is incomplete (${SUPABASE_SERVICE_ROLE_ENV} is missing). Contact support and retry.`;
   }
 
   if (normalized.includes("failed to remove") || normalized.includes("storage")) {
-    return "Account deletion could not complete file cleanup. Please retry shortly.";
+    return "Account deletion failed while removing linked files. Please retry shortly.";
   }
 
-  if (normalized.includes("permanently delete account") || normalized.includes("delete account")) {
-    return "Account deletion failed before finalization. Please retry.";
+  if (normalized.includes("audit history")) {
+    return "Account deletion failed while removing audit history. Please retry shortly.";
+  }
+
+  if (normalized.includes("permanently delete account")) {
+    return "Account deletion failed at final account-removal step. Please retry.";
   }
 
   return "Account deletion failed. Please retry.";
+}
+
+function getDeleteAccountReasonCategory(error: unknown) {
+  if (isMissingSupabaseServiceRoleError(error)) {
+    return "missing_service_role_env";
+  }
+
+  const message = error instanceof Error ? error.message.toLowerCase() : "";
+  if (message.includes("failed to remove") || message.includes("storage")) {
+    return "storage_cleanup_failed";
+  }
+
+  if (message.includes("audit history")) {
+    return "audit_cleanup_failed";
+  }
+
+  if (message.includes("failed to permanently delete account")) {
+    return "auth_user_delete_failed";
+  }
+
+  if (message.includes("failed to load")) {
+    return "linked_data_lookup_failed";
+  }
+
+  return "unknown_delete_failure";
 }
 
 function readConfirmationValue(formData: FormData, name: string) {
@@ -411,6 +447,11 @@ export async function deleteAccountAction(
       redirectTo: "/",
     };
   } catch (error) {
+    console.error("[Profile][DeleteAccount] hard delete failed", {
+      user_id: profileResult.profile.id,
+      reason_category: getDeleteAccountReasonCategory(error),
+    });
+
     return {
       status: "error",
       message: toDeleteAccountError(error instanceof Error ? error.message : ""),
