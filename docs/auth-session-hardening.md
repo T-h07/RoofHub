@@ -119,7 +119,7 @@ This is an honest, configuration-gated control and must not be claimed as enforc
   - local
   - preview
   - production
-- No social OAuth provider is enabled yet in repo state; callback hardening applies to current OTP/code exchange flow.
+- Google OAuth app-side callback/start flow now exists in repo state; successful provider login still depends on Supabase + Google Cloud configuration.
 
 ## Deferred items (not in SH-PT02)
 

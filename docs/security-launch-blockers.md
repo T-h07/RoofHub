@@ -40,7 +40,7 @@ Only concrete, launch-blocking items are listed here.
 
 - Severity: **High (conditional)**
 - Why blocking:
-  - Google OAuth is not currently active in shipped app code paths and provider/platform config is not complete for launch.
+  - Google OAuth app-side flow is implemented, but provider/platform configuration is not complete for launch.
 - Required mitigation before launch (if Google sign-in is required):
   - complete OAuth provider configuration in Google Cloud + Supabase
   - add/validate app-side OAuth start flow and callbacks

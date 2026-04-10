@@ -103,7 +103,7 @@ Audit and observability execution details are defined in `docs/audit-observabili
 - `AUTH_ALLOWED_ORIGINS` must be configured server-side for trusted auth callback/reset URL generation across local/preview/production.
 
 Google OAuth note:
-- OAuth is not currently enabled.
+- App-side Google OAuth flow foundations may exist before provider setup is complete.
 - When enabled, keep client secret server-only, configure provider redirect URIs explicitly, and document callback allowlists for local/preview/production.
 
 ### 9) Dependency and package hygiene

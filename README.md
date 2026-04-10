@@ -215,6 +215,7 @@ Implemented routes:
 
 - `/auth/sign-in`
 - `/auth/sign-up`
+- `/auth/oauth/google`
 - `/auth/forgot-password`
 - `/auth/reset-password`
 - `/auth/callback`
@@ -349,6 +350,10 @@ Security-sensitive changes must follow the baseline and complete the checklist b
 
 - Auth/session hardening model and threat-focused controls: `docs/auth-session-hardening.md`
 - Foundational auth flow behavior and route map: `docs/auth-flows.md`
+
+## Google OAuth Logic Foundation
+
+- App-side Google OAuth start and callback plumbing: `docs/google-oauth-foundation.md`
 
 ## Authorization Boundary Audit (SH-PT03)
 

@@ -10,6 +10,7 @@ For the SH-PT02 hardening pass (session invalidation semantics, callback/redirec
 
 - Email/password sign up (`/auth/sign-up`)
 - Email/password sign in (`/auth/sign-in`)
+- Google OAuth start (`/auth/oauth/google`)
 - Sign out (header and mobile navigation)
 - Forgot password (`/auth/forgot-password`)
 - Reset password (`/auth/reset-password`)
@@ -44,6 +45,7 @@ Behavior:
   - immediate session (if email confirmation is disabled)
   - confirmation-required flow (if enabled)
 - Forgot password sends users through callback then to `/auth/reset-password`.
+- Google OAuth uses `/auth/oauth/google` and returns through `/auth/callback`.
 - Sign out redirects to sign-in with explicit reason state (`signed_out`).
 
 ## Profile Bootstrap Integration
@@ -74,9 +76,15 @@ Supabase dashboard setup:
    - your production callback URL (for example `https://roofhub.vercel.app/auth/callback`)
    - your preview callback pattern/domain as needed by your Vercel setup
 
+Google OAuth foundation note:
+
+- App-side Google OAuth logic is implemented (`/auth/oauth/google` start route + `/auth/callback` exchange).
+- Provider enablement and credentials are still dashboard/provider configuration work.
+- See `docs/google-oauth-foundation.md` for exact implementation and remaining manual setup.
+
 ## Known Limits / Next PT Notes
 
-- OAuth providers are not enabled in PT07.
+- Google OAuth app-side flow exists, but successful Google sign-in depends on Supabase + Google Cloud provider configuration.
 - Single-active-session enforcement is configuration-gated in Supabase settings and is not claimed unless explicitly enabled in dashboard.
 - Route protection is authenticated-only (full role-segmented route shells can be expanded later).
 - PT08 can build on this to introduce profile/account UX and deeper guarded route groups.

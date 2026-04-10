@@ -194,7 +194,14 @@ Validated redirect boundaries:
 
 ## Google OAuth production-safe checklist
 
-Current status: **not active in code paths** (no `signInWithOAuth` flow currently shipped).
+Current status: **app-side flow is active, provider setup is pending**.
+
+Implemented in code:
+
+- OAuth start route: `/auth/oauth/google`
+- callback route: `/auth/callback`
+- server-side session code exchange + profile bootstrap compatibility
+- bounded OAuth failure redirect states
 
 If Google auth is introduced for launch, all of the following are mandatory:
 
@@ -256,7 +263,7 @@ Status model:
 | Abuse resistance | Server-side traffic controls for risky flows | DONE | SH-PT06 preserved |
 | Observability | Durable structured audit trail + redaction | DONE | SH-PT08 preserved |
 | Redirect safety | Safe relative path + trusted callback origin handling | DONE | `src/lib/auth/routing.ts`, `src/lib/auth/url.ts` |
-| OAuth | Google OAuth production-ready configuration | BLOCKED | Not active; manual+code rollout required if launch scope requires Google sign-in |
+| OAuth | Google OAuth production-ready configuration | NEEDS_MANUAL_PLATFORM_CONFIG | App flow exists; Supabase + Google Cloud config still required |
 | Secrets/deploy | Vercel/Supabase production env and redirect allowlists verified | NEEDS_MANUAL_PLATFORM_CONFIG | pre-launch checklist |
 | Repo security | Secret scan / dependency guardrails / CodeQL workflows | DONE | `.github/workflows/security-*.yml` |
 
