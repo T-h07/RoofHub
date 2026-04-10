@@ -72,6 +72,13 @@
 - Keep throttled responses user-safe and bounded; do not expose raw limiter/backend internals.
 - When adding sensitive endpoints, update `docs/traffic-control-hardening.md` and checklist notes.
 
+## Audit and observability invariants
+- Security-relevant actions must be traceable through structured audit events, not only console logs.
+- Preserve the central audit helper (`src/lib/security/audit.ts`) for event shape, sanitization, and redaction behavior.
+- Never log secrets, tokens, raw authorization headers, session cookies, or raw message bodies in audit metadata.
+- Keep audit storage access admin-restricted and avoid exposing audit internals on public routes.
+- Keep event naming and actor/target/linkage fields consistent with `docs/audit-observability-hardening.md`.
+
 ## Required workflow for security-sensitive changes
 - Update `docs/security-baseline.md` when behavior, trust boundaries, or assumptions change.
 - Run and complete `docs/security-checklist.md` before merge for security-sensitive work.
@@ -79,6 +86,7 @@
 - For authz boundary changes, update `docs/authorization-boundary-audit.md`.
 - For input/output boundary changes, update `docs/request-output-validation-hardening.md`.
 - For abuse/rate-limit changes, update `docs/traffic-control-hardening.md`.
+- For audit/observability changes, update `docs/audit-observability-hardening.md`.
 - Add tests or explicit validation notes for sensitive behavior changes (authz, ownership, visibility, storage, redirects, moderation).
 - Document newly added route handlers/server actions and their authorization/input-validation approach.
 

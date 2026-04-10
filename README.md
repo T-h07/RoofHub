@@ -378,6 +378,13 @@ Security-sensitive changes must follow the baseline and complete the checklist b
   - `.github/workflows/security-codeql.yml`
 - Automated dependency update hygiene: `.github/dependabot.yml`
 
+## Audit Trails and Security Observability (SH-PT08)
+
+- Security audit event model, redaction rules, and access boundaries: `docs/audit-observability-hardening.md`
+- Shared server-side audit helper: `src/lib/security/audit.ts`
+- Supabase audit storage + writer migration:
+  - `supabase/migrations/20260410153000_nm_sh_pt08_audit_observability.sql`
+
 ## Local Development
 
 ```bash
@@ -410,4 +417,5 @@ See:
 - `docs/auth-session-hardening.md`
 - `docs/authorization-boundary-audit.md`
 - `docs/request-output-validation-hardening.md`
+- `docs/audit-observability-hardening.md`
 - `docs/supply-chain-guardrails.md`

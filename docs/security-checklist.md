@@ -57,6 +57,14 @@ For dependency/lockfile/scanner specifics, also follow `docs/supply-chain-guardr
 - [ ] No real secrets were added to code, docs, fixtures, or committed env files.
 - [ ] `NEXT_PUBLIC_*` variables were reviewed to ensure no secret values are required.
 
+## Audit trails and observability
+
+- [ ] Security-relevant auth, provider, moderation, report, and messaging-critical actions are auditable.
+- [ ] Structured audit events include explicit actor/target/context fields (no ad-hoc free-text-only logs).
+- [ ] Audit metadata is sanitized/redacted and excludes raw secrets/tokens/message bodies.
+- [ ] Durable audit storage access boundaries were reviewed (admin-only history, no public exposure).
+- [ ] Changes preserve `docs/audit-observability-hardening.md` event and redaction rules.
+
 ## Dependencies and change hygiene
 
 - [ ] New/updated sensitive dependencies were reviewed and justified.

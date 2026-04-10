@@ -8,6 +8,7 @@ It is the baseline future PTs must preserve and extend.
 This is a guardrail milestone, not a full hardening rollout.
 
 Supply-chain execution details are defined in `docs/supply-chain-guardrails.md`.
+Audit and observability execution details are defined in `docs/audit-observability-hardening.md`.
 
 ## Scope and assumptions
 
@@ -89,10 +90,7 @@ Supply-chain execution details are defined in `docs/supply-chain-guardrails.md`.
 - Internal logs: diagnostic, but never include secrets/tokens/passwords/auth codes/cookies.
 - Security-sensitive failures must not fail silently.
 - Redact sensitive fields by default (`Authorization`, cookies, API keys, OAuth codes, reset tokens, service keys).
-
-Planned for SH-PT08 (not implemented here):
-- structured security/audit event logging and retention policy
-- standardized event taxonomy for auth failures, admin actions, moderation transitions, and sensitive mutation denials
+- Security-relevant actions should be captured through durable structured audit events (see `docs/audit-observability-hardening.md`).
 
 ### 8) Environment and secrets
 
@@ -146,6 +144,7 @@ The following changes require explicit security review before merge:
 - dependency additions in sensitive domains
 - CI/security workflow changes or scanner suppression changes
 - high-risk mutation/read paths added without traffic-control evaluation
+- audit event taxonomy/storage/redaction changes without docs and access-boundary review
 
 ## Definition of done for security-sensitive work
 
@@ -179,7 +178,7 @@ Do not merge when any of the following is true:
 ## Intentionally deferred from SH-PT01
 
 - adaptive risk-scoring abuse controls and challenge flows
-- full audit logging implementation
+- advanced audit alerting/retention automation and SIEM integrations
 - CSP/header hardening program
 - full historical security audit of all features
 - schema/RLS redesign

@@ -83,4 +83,4 @@ Treat these as untrusted input boundaries:
 
 - Full storage subsystem redesign and deep object-lifecycle automation (handled in later security/storage PTs).
 - Adaptive abuse controls beyond baseline SH-PT06 server-side throttling.
-- Full audit event pipeline (planned in SH-PT08).
+- Advanced observability alerting/retention automation beyond SH-PT08 baseline audit capture.
