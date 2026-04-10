@@ -426,6 +426,83 @@ export type Database = {
         }
         Relationships: []
       }
+      security_audit_events: {
+        Row: {
+          actor_role: Database["public"]["Enums"]["app_role"] | null
+          actor_user_id: string | null
+          conversation_id: string | null
+          created_at: string
+          event_type: string
+          from_status: Database["public"]["Enums"]["listing_status"] | null
+          id: string
+          listing_id: string | null
+          metadata: Json
+          report_id: string | null
+          target_id: string | null
+          target_type: string | null
+          to_status: Database["public"]["Enums"]["listing_status"] | null
+        }
+        Insert: {
+          actor_role?: Database["public"]["Enums"]["app_role"] | null
+          actor_user_id?: string | null
+          conversation_id?: string | null
+          created_at?: string
+          event_type: string
+          from_status?: Database["public"]["Enums"]["listing_status"] | null
+          id?: string
+          listing_id?: string | null
+          metadata?: Json
+          report_id?: string | null
+          target_id?: string | null
+          target_type?: string | null
+          to_status?: Database["public"]["Enums"]["listing_status"] | null
+        }
+        Update: {
+          actor_role?: Database["public"]["Enums"]["app_role"] | null
+          actor_user_id?: string | null
+          conversation_id?: string | null
+          created_at?: string
+          event_type?: string
+          from_status?: Database["public"]["Enums"]["listing_status"] | null
+          id?: string
+          listing_id?: string | null
+          metadata?: Json
+          report_id?: string | null
+          target_id?: string | null
+          target_type?: string | null
+          to_status?: Database["public"]["Enums"]["listing_status"] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "security_audit_events_actor_user_id_fkey"
+            columns: ["actor_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "security_audit_events_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "security_audit_events_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "security_audit_events_report_id_fkey"
+            columns: ["report_id"]
+            isOneToOne: false
+            referencedRelation: "listing_reports"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       rate_limit_counters: {
         Row: {
           actor_key: string
@@ -472,6 +549,22 @@ export type Database = {
         }[]
       }
       is_admin: { Args: never; Returns: boolean }
+      log_security_audit_event: {
+        Args: {
+          p_actor_role?: Database["public"]["Enums"]["app_role"]
+          p_actor_user_id?: string
+          p_conversation_id?: string
+          p_event_type: string
+          p_from_status?: Database["public"]["Enums"]["listing_status"]
+          p_listing_id?: string
+          p_metadata?: Json
+          p_report_id?: string
+          p_target_id?: string
+          p_target_type?: string
+          p_to_status?: Database["public"]["Enums"]["listing_status"]
+        }
+        Returns: string
+      }
       is_valid_listing_image_path: {
         Args: { object_name: string }
         Returns: boolean
