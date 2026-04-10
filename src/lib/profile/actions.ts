@@ -8,8 +8,10 @@ import { isAdminRole, type PreferredContactMethod } from "@/lib/auth/roles";
 import { AUDIT_EVENT_TYPES, recordSecurityAuditEvent } from "@/lib/security/audit";
 import { createServerSupabaseClient } from "@/lib/supabase";
 import {
+  isMissingSupabaseAdminUrlError,
   isMissingSupabaseServiceRoleError,
   SUPABASE_SERVICE_ROLE_ENV,
+  SUPABASE_SERVER_URL_ENV,
 } from "@/lib/supabase/admin";
 import { hardDeleteAccount } from "@/lib/profile/account-deletion";
 import {
@@ -101,7 +103,18 @@ function toDeleteAccountError(message: string) {
     normalized.includes("missing required server-only environment variable") &&
     normalized.includes(SUPABASE_SERVICE_ROLE_ENV.toLowerCase())
   ) {
-    return `Account deletion is blocked because server configuration is incomplete (${SUPABASE_SERVICE_ROLE_ENV} is missing). Contact support and retry.`;
+    return process.env.NODE_ENV === "production"
+      ? "Account deletion is temporarily unavailable because server configuration is incomplete. Contact support and retry."
+      : `Account deletion requires ${SUPABASE_SERVICE_ROLE_ENV} in server runtime. Add it to .env.local and restart the dev server.`;
+  }
+
+  if (
+    normalized.includes("missing required server-only environment variable") &&
+    normalized.includes(SUPABASE_SERVER_URL_ENV.toLowerCase())
+  ) {
+    return process.env.NODE_ENV === "production"
+      ? "Account deletion is temporarily unavailable because server configuration is incomplete. Contact support and retry."
+      : `Account deletion requires ${SUPABASE_SERVER_URL_ENV} or NEXT_PUBLIC_SUPABASE_URL in server runtime. Configure it in .env.local and restart the dev server.`;
   }
 
   if (normalized.includes("failed to remove") || normalized.includes("storage")) {
@@ -122,6 +135,9 @@ function toDeleteAccountError(message: string) {
 function getDeleteAccountReasonCategory(error: unknown) {
   if (isMissingSupabaseServiceRoleError(error)) {
     return "missing_service_role_env";
+  }
+  if (isMissingSupabaseAdminUrlError(error)) {
+    return "missing_supabase_url_env";
   }
 
   const message = error instanceof Error ? error.message.toLowerCase() : "";

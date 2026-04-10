@@ -154,6 +154,7 @@ Where to get the Supabase values:
 - `NEXT_PUBLIC_MAP_STYLE_URL`: optional override. If omitted or invalid, RoofHub falls back to a public dark MapLibre style.
 - `AUTH_ALLOWED_ORIGINS`: server-side allowlist used for auth redirect/callback URL generation. Include all trusted local/preview/production app origins.
 - `SUPABASE_SERVICE_ROLE_KEY`: required server-only secret for account hard-delete operations from `/profile` danger-zone. If missing, delete-account fails with a controlled configuration error.
+- `SUPABASE_URL` (optional server alias): used by server-only admin flows such as hard-delete. If omitted, server flows fall back to `NEXT_PUBLIC_SUPABASE_URL`.
 
 Rules:
 
@@ -164,6 +165,7 @@ Rules:
 - configure the same variables in Vercel for Development, Preview, and Production environments
 - ensure `AUTH_ALLOWED_ORIGINS` in Vercel includes every trusted preview + production origin used by auth callbacks
 - `NEXT_PUBLIC_SITE_URL` should point to the canonical app origin for each environment (required for production-safe auth redirect fallback and metadata base)
+- after adding or changing `SUPABASE_SERVICE_ROLE_KEY` (or `SUPABASE_URL`) restart local dev server and redeploy Vercel environments so server runtime picks up updated values
 
 Connectivity check:
 

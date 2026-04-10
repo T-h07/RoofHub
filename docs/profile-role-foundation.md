@@ -100,8 +100,10 @@ If this migration is not applied on the target project, profile photo uploads fa
 Operational requirements:
 
 - `SUPABASE_SERVICE_ROLE_KEY` must be configured on the server runtime (`.env.local` for local dev, Vercel env vars for deployed environments)
+- `SUPABASE_URL` can be configured as a server-only alias for admin flows; if absent, server admin flows fall back to `NEXT_PUBLIC_SUPABASE_URL`
 - delete-account uses server-only admin operations and intentionally fails if this env is missing
 - when missing, the action returns a controlled operational error message (no secrets, no stack traces)
+- runtime changes to these env vars require a local dev-server restart and a Vercel redeploy for the affected environment
 
 ## Role-Aware Navigation
 
