@@ -49,15 +49,28 @@ This closes direct self-escalation to `admin` from browser-facing clients.
 - `display_name`
 - `bio`
 - `phone`
+- `contact_methods`
 - `preferred_contact_method`
-- `avatar_url`
+- `contact_email`
+- `whatsapp_phone`
+- `viber_phone`
 - role selection between `seeker` and `provider` for non-admin accounts
+- profile photo upload/change/remove via secure storage pathing (`profile-avatars` bucket)
 
 Not included in this PT:
 
-- avatar file upload/storage workflow
 - advanced account security settings
 - full provider onboarding
+
+## Role-aware Account Hub
+
+`/profile` now behaves as an identity-first account hub instead of a flat settings form:
+
+- upgraded profile hero with role-aware copy and completion summary
+- circular profile photo UX (upload/change/remove) replacing raw avatar URL input
+- role-adaptive seeker/provider emphasis and helper text
+- stronger sectioning for profile identity, contact channels, role visibility, and account controls
+- polished placeholder structure for upcoming account hard-delete danger-zone flow
 
 ## Role-Aware Navigation
 

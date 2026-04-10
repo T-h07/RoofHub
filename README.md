@@ -17,7 +17,7 @@ Map-first real estate marketplace for rental and sale listings.
 - callback-based auth redirect handling for SSR-safe session creation
 - profile bootstrap on authenticated access with trusted `profiles` linkage
 - role model foundation: `seeker`, `provider`, `admin`
-- editable profile page for public-facing fields (`/profile`)
+- role-aware profile/account hub with identity hero, secure profile photo upload, and contact channel controls (`/profile`)
 - role-aware desktop/mobile navigation visibility
 - route protection for `/dashboard`, `/favorites`, `/messages`, and `/profile`
 - public homepage foundation with hero, search CTA, intent entry points, featured listing placeholders, and provider CTA
