@@ -10,7 +10,7 @@ import { HomeSearchCta } from "./home-search-cta";
 export function HomeHero() {
   return (
     <section className="border-border bg-card relative overflow-hidden rounded-2xl border p-6 shadow-[0_24px_42px_-34px_color-mix(in_oklch,var(--nav-background)_34%,transparent)] sm:p-8 lg:p-9">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_9%_4%,color-mix(in_oklch,var(--primary)_16%,white),transparent_36%),radial-gradient(circle_at_96%_0%,color-mix(in_oklch,var(--warm-accent)_34%,white),transparent_34%)]" />
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(116deg,color-mix(in_oklch,var(--primary)_9%,transparent)_0%,transparent_62%),linear-gradient(338deg,color-mix(in_oklch,var(--warm-accent)_11%,transparent)_4%,transparent_58%)]" />
 
       <div className="relative grid items-start gap-8 xl:grid-cols-[minmax(0,1.18fr)_minmax(0,0.82fr)]">
         <div className="space-y-6">

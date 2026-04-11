@@ -112,23 +112,23 @@
     @apply bg-background text-foreground font-sans antialiased;
     background-image:
       radial-gradient(
-        circle at 0% -6%,
-        color-mix(in oklch, var(--warm-accent) 34%, transparent),
-        transparent 52%
+        circle at 0% -12%,
+        color-mix(in oklch, var(--warm-accent) 20%, transparent),
+        transparent 66%
       ),
       radial-gradient(
-        circle at 100% -2%,
-        color-mix(in oklch, var(--primary) 14%, transparent),
-        transparent 46%
+        circle at 100% -10%,
+        color-mix(in oklch, var(--primary) 10%, transparent),
+        transparent 62%
       ),
       linear-gradient(
         to bottom,
-        color-mix(in oklch, var(--surface-soft) 78%, transparent) 0%,
-        color-mix(in oklch, var(--background) 96%, transparent) 42%,
+        color-mix(in oklch, var(--surface-soft) 42%, transparent) 0%,
+        color-mix(in oklch, var(--background) 98%, transparent) 38%,
         var(--background) 100%
       );
     background-repeat: no-repeat, no-repeat, no-repeat;
-    background-size: 140% 38rem, 132% 34rem, 100% 100%;
+    background-size: 150% 52rem, 146% 48rem, 100% 100%;
   }
 
   h1,

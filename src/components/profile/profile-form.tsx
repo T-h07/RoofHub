@@ -352,10 +352,10 @@ export function ProfileForm({ profile, account, experience }: ProfileFormProps) 
       <section className="border-border bg-card relative overflow-hidden rounded-3xl border p-5 shadow-[0_28px_48px_-36px_color-mix(in_oklch,var(--nav-background)_40%,transparent)] sm:p-7">
         <div
           className={cn(
-            "pointer-events-none absolute inset-0 opacity-55",
+            "pointer-events-none absolute inset-0 opacity-42",
             isProvider
-              ? "bg-[linear-gradient(112deg,color-mix(in_oklch,var(--primary)_13%,white)_4%,transparent_54%),linear-gradient(340deg,color-mix(in_oklch,var(--accent)_11%,white)_0%,transparent_48%)]"
-              : "bg-[linear-gradient(112deg,color-mix(in_oklch,var(--primary)_12%,white)_4%,transparent_56%),linear-gradient(338deg,color-mix(in_oklch,var(--warm-accent)_15%,white)_0%,transparent_54%)]"
+              ? "bg-[linear-gradient(116deg,color-mix(in_oklch,var(--primary)_8%,transparent)_4%,transparent_64%),linear-gradient(340deg,color-mix(in_oklch,var(--accent)_7%,transparent)_0%,transparent_62%)]"
+              : "bg-[linear-gradient(116deg,color-mix(in_oklch,var(--primary)_8%,transparent)_4%,transparent_64%),linear-gradient(338deg,color-mix(in_oklch,var(--warm-accent)_9%,transparent)_0%,transparent_62%)]"
           )}
         />
         <div className="relative grid gap-6 xl:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">

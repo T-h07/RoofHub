@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 export function ProviderCtaSection() {
   return (
     <section className="border-border bg-card relative overflow-hidden rounded-2xl border p-6 sm:p-7">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_100%_0%,color-mix(in_oklch,var(--primary)_18%,white),transparent_38%)]" />
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(106deg,color-mix(in_oklch,var(--primary)_9%,transparent)_8%,transparent_64%),linear-gradient(334deg,color-mix(in_oklch,var(--warm-accent)_8%,transparent)_0%,transparent_66%)]" />
       <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
         <div className="max-w-3xl space-y-3">
           <Badge variant="neutral">For providers</Badge>

@@ -96,7 +96,7 @@ export function ListingCard({ listing, isAuthenticated, className }: ListingCard
             className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
           />
         ) : (
-          <div className="h-full w-full bg-[linear-gradient(135deg,color-mix(in_oklch,var(--primary)_34%,white),transparent_48%),linear-gradient(320deg,color-mix(in_oklch,var(--warm-accent)_34%,white),transparent_64%)]" />
+          <div className="h-full w-full bg-[linear-gradient(132deg,color-mix(in_oklch,var(--primary)_14%,var(--surface-soft))_0%,transparent_62%),linear-gradient(316deg,color-mix(in_oklch,var(--warm-accent)_16%,var(--surface-soft))_0%,transparent_70%)]" />
         )}
 
         <div className="absolute inset-0 bg-gradient-to-t from-nav-background/45 via-transparent to-nav-background/8" />

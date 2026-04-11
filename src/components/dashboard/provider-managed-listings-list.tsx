@@ -79,7 +79,7 @@ function renderPreviewImage(listing: ProviderManagedListing) {
   }
 
   return (
-    <div className="h-full w-full bg-[linear-gradient(140deg,rgba(74,110,184,0.3),transparent_50%),linear-gradient(320deg,rgba(122,146,214,0.22),transparent_66%)]" />
+    <div className="h-full w-full bg-[linear-gradient(136deg,color-mix(in_oklch,var(--primary)_14%,var(--surface-soft))_0%,transparent_62%),linear-gradient(312deg,color-mix(in_oklch,var(--warm-accent)_14%,var(--surface-soft))_2%,transparent_70%)]" />
   );
 }
 

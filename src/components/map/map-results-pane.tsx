@@ -130,7 +130,7 @@ export function MapResultsPane({
                         className="h-full w-full object-cover"
                       />
                     ) : (
-                      <div className="h-full w-full bg-[linear-gradient(140deg,color-mix(in_oklch,var(--primary)_34%,white),transparent_58%),linear-gradient(300deg,color-mix(in_oklch,var(--warm-accent)_36%,white),transparent_64%)]" />
+                      <div className="h-full w-full bg-[linear-gradient(136deg,color-mix(in_oklch,var(--primary)_14%,var(--surface-soft))_0%,transparent_64%),linear-gradient(306deg,color-mix(in_oklch,var(--warm-accent)_16%,var(--surface-soft))_0%,transparent_72%)]" />
                     )}
                   </div>
 

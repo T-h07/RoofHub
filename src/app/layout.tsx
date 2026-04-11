@@ -58,12 +58,14 @@ export default function RootLayout({
     const activeTheme = preference === "system" ? (prefersDark ? "dark" : "light") : preference;
     const root = document.documentElement;
     root.classList.toggle("dark", activeTheme === "dark");
-    root.dataset.theme = activeTheme;
-    root.dataset.themePreference = preference;
   })();`;
 
   return (
-    <html lang="en" className={`${manrope.variable} ${jetBrainsMono.variable} h-full antialiased`}>
+    <html
+      lang="en"
+      className={`${manrope.variable} ${jetBrainsMono.variable} h-full antialiased`}
+      suppressHydrationWarning
+    >
       <body className="bg-background text-foreground min-h-full">
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
         <ThemeSync />

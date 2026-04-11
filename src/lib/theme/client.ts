@@ -26,9 +26,6 @@ export function applyThemePreference(preference: ThemePreference) {
   const rootElement = document.documentElement;
 
   rootElement.classList.toggle("dark", activeTheme === "dark");
-  rootElement.dataset.theme = activeTheme;
-  rootElement.dataset.themePreference = preference;
 
   window.localStorage.setItem(THEME_STORAGE_KEY, preference);
 }
-
