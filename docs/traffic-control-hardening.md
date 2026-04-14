@@ -57,6 +57,9 @@ Key model:
   - per-listing status-transition control
 - `updateListingModerationVisibilityAction`
   - per-admin moderation mutation control
+- `createCompanyWorkspaceAction`
+  - per-IP company workspace bootstrap control
+  - per-user company workspace bootstrap control
 
 ### Resource-consumption-sensitive
 

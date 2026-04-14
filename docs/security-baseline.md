@@ -43,10 +43,12 @@ Audit and observability execution details are defined in `docs/audit-observabili
 ### 2) Authorization, ownership, and RLS alignment
 
 - Enforce ownership server-side for listing/profile/storage/messaging mutations.
+- Enforce company workspace ownership from persisted `organization_members` records, not client mode toggles.
 - Never use client-supplied owner/provider/admin ids as authority.
 - Preserve RLS assumptions; app code must not "re-authorize" by weak client filters.
 - Admin-only behavior must have explicit role checks in server code.
 - Provider-only behavior must derive provider identity from authenticated profile context.
+- Company workspace creation must be transactional: organization record + owner membership bootstrap succeed/fail together.
 - Keep the role/ownership/participant contract aligned with `docs/authorization-boundary-audit.md`.
 
 ### 3) Route handlers and server actions
@@ -156,6 +158,7 @@ The following changes require explicit security review before merge:
 - CI/security workflow changes or scanner suppression changes
 - high-risk mutation/read paths added without traffic-control evaluation
 - audit event taxonomy/storage/redaction changes without docs and access-boundary review
+- organization/company workspace schema, ownership, or membership bootstrap flow changes without boundary review
 
 ## Definition of done for security-sensitive work
 

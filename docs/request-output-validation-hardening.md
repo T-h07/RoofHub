@@ -12,6 +12,7 @@ Treat these as untrusted input boundaries:
 
 - Auth forms and callback params (`src/lib/auth/*`, `src/app/auth/callback/route.ts`)
 - Profile update form payloads (`src/lib/profile/actions.ts`)
+- Company workspace create payloads (`src/lib/company/actions.ts`)
 - Provider listing wizard create/edit/publish payloads (`src/lib/listings/provider-wizard/*`)
 - Provider status transition actions (`src/lib/listings/provider-dashboard/actions.ts`)
 - Listing favorites/report actions (`src/lib/listings/favorite-actions.ts`, `src/lib/listings/detail-actions.ts`)
@@ -28,6 +29,7 @@ Treat these as untrusted input boundaries:
 - External values must be normalized into explicit typed models before persistence or query execution.
 - Unknown enum/state values must fail closed.
 - Route and search params must use strict parsers (no permissive partial numeric parsing).
+- Company workspace setup must validate name/description bounds server-side and derive ownership from authenticated server context.
 
 ## Query and route param rules
 
@@ -78,6 +80,7 @@ Treat these as untrusted input boundaries:
 - Slug/UUID route validation short-circuit behavior.
 - Safe text rendering defaults across public and authenticated surfaces.
 - Generic user-safe error messaging for backend failures.
+- Company ownership/membership resolution must continue to come from persisted organization membership data, not client role toggles.
 
 ## Deferred from SH-PT04
 

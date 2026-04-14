@@ -11,6 +11,14 @@ It defines who can access or mutate which objects, and which checks must remain 
 - `provider`: can manage only their own listings and listing photos, publish/pause/archive/sell/rent only their own listings, participate in listing-bound conversations where they are the provider participant.
 - `admin`: can access moderation surfaces and moderation actions; is not implicitly treated as a provider owner in provider listing management flows.
 
+Provider account classification (foundation for NM-PT31):
+
+- `profiles.role` remains the coarse role boundary (`seeker` / `provider` / `admin`).
+- `profiles.provider_account_type` distinguishes provider shape:
+  - `individual`: provider acts as an individual account.
+  - `company`: provider acts through an owned company workspace.
+- Company ownership authority is derived from `organization_members` with `role = 'owner'` and `member_status = 'active'`.
+
 ## Route-level access boundaries
 
 - Public routes:
@@ -35,6 +43,17 @@ Route protection improves UX but is not an authorization substitute.
 - Listing status transitions from provider flows are owner-scoped.
 - Provider code paths do not grant admin cross-owner lifecycle mutation by default.
 - Admin-controlled states (for example `hidden_by_admin`) cannot be set/cleared from provider flows.
+
+### Organizations and organization members (NM-PT31 foundation)
+
+- Organization records are not directly user-insertable from client context; bootstrap runs through a trusted server path.
+- Company workspace bootstrap is atomic:
+  - create `organizations` row
+  - create `organization_members` owner row
+  - upgrade profile provider mode to company path
+- Organization reads are membership-scoped (active member) or admin-scoped.
+- Organization/member mutation is owner-scoped (active owner) or admin-scoped.
+- App-layer ownership checks must continue to use persisted membership state, never client-supplied company flags.
 
 ### Favorites
 
@@ -106,3 +125,4 @@ Targeted hardening outcomes:
 - Messaging access remains participant-only.
 - Public listing surfaces remain published-only by default.
 - Any authorization model changes require updates to this document, `docs/security-baseline.md`, and `docs/security-checklist.md`.
+- Future company member invites/roles must extend this document before merge.
