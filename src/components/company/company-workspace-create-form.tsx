@@ -40,9 +40,9 @@ export function CompanyWorkspaceCreateForm() {
           <div className="space-y-2">
             <h1 className="type-page-title">Create your company workspace</h1>
             <p className="type-body-muted max-w-3xl">
-              Set up a branded company workspace for RoofHub. Your account is automatically
-              assigned as owner so future member management and company listing workflows can be
-              added on top of a trusted foundation.
+              Set up a branded company workspace for RoofHub. Your account is automatically assigned
+              as owner so future member management and company listing workflows can be added on top
+              of a trusted foundation.
             </p>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
@@ -82,8 +82,8 @@ export function CompanyWorkspaceCreateForm() {
           <p className="type-label">Workspace details</p>
           <h2 className="type-section-title">Company profile baseline</h2>
           <p className="type-body-muted">
-            Keep this focused for PT31. You can refine branding and member-level settings in
-            follow-up roadmap work.
+            Start with your core company identity now. You can refine public profile branding and
+            contact coverage immediately after setup.
           </p>
         </header>
 
@@ -99,9 +99,7 @@ export function CompanyWorkspaceCreateForm() {
               aria-invalid={Boolean(state.errors?.name)}
             />
             {state.errors?.name ? <FieldError>{state.errors.name}</FieldError> : null}
-            <FieldHelp>
-              This name appears as your RoofHub company workspace identity.
-            </FieldHelp>
+            <FieldHelp>This name appears as your RoofHub company workspace identity.</FieldHelp>
           </Field>
 
           <Field>
@@ -114,9 +112,7 @@ export function CompanyWorkspaceCreateForm() {
               className="min-h-28"
               aria-invalid={Boolean(state.errors?.description)}
             />
-            {state.errors?.description ? (
-              <FieldError>{state.errors.description}</FieldError>
-            ) : null}
+            {state.errors?.description ? <FieldError>{state.errors.description}</FieldError> : null}
             <FieldHelp>Up to 600 characters.</FieldHelp>
           </Field>
         </div>
@@ -128,7 +124,11 @@ export function CompanyWorkspaceCreateForm() {
             Company creation upgrades your provider account mode to company workspace.
           </p>
           <Button type="submit" disabled={isPending} className="sm:min-w-52">
-            {isPending ? <LoaderCircle className="size-4 animate-spin" /> : <ArrowRight className="size-4" />}
+            {isPending ? (
+              <LoaderCircle className="size-4 animate-spin" />
+            ) : (
+              <ArrowRight className="size-4" />
+            )}
             {isPending ? "Creating workspace..." : "Create company workspace"}
           </Button>
         </div>

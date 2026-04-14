@@ -1,14 +1,17 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Building2, CircleCheck, UsersRound } from "lucide-react";
+import { Building2, CircleCheck, LayoutTemplate, Megaphone } from "lucide-react";
 
 import { AuthStatusMessage } from "@/components/auth/auth-status-message";
+import { CompanyIdentityHeader } from "@/components/company/company-identity-header";
 import { MainContainer } from "@/components/layout/main-container";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { toSignInPath } from "@/lib/auth/routing";
+import { toCompanyLogoPublicUrl } from "@/lib/company/logo";
 import { getCurrentUserCompanyContext } from "@/lib/company/context";
+import { PUBLIC_DISCOVERY_STATUS } from "@/lib/listings/visibility";
 import { createServerSupabaseClient } from "@/lib/supabase";
 
 type CompanyWorkspacePageProps = {
@@ -17,22 +20,56 @@ type CompanyWorkspacePageProps = {
 
 function readStatus(
   searchParams: Record<string, string | string[] | undefined>
-): "created" | null {
+): "created" | "saved" | null {
   const rawStatus = searchParams.status;
   const status = Array.isArray(rawStatus) ? rawStatus[0] : rawStatus;
 
-  return status === "created" ? "created" : null;
-}
-
-function formatDate(value: string) {
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) {
-    return "Unavailable";
+  if (status === "created" || status === "saved") {
+    return status;
   }
 
-  return new Intl.DateTimeFormat("en", {
-    dateStyle: "medium",
-  }).format(parsed);
+  return null;
+}
+
+function buildProfileCompletionChecklist(organization: {
+  description: string | null;
+  logo_path: string | null;
+  contact_email: string | null;
+  contact_phone: string | null;
+  website_url: string | null;
+  coverage_area: string | null;
+}) {
+  const checks = [
+    {
+      label: "Company logo",
+      complete: Boolean(organization.logo_path),
+    },
+    {
+      label: "Company description",
+      complete: Boolean(organization.description?.trim()),
+    },
+    {
+      label: "Contact channel",
+      complete: Boolean(organization.contact_email?.trim() || organization.contact_phone?.trim()),
+    },
+    {
+      label: "Coverage summary",
+      complete: Boolean(organization.coverage_area?.trim()),
+    },
+    {
+      label: "Website link",
+      complete: Boolean(organization.website_url?.trim()),
+    },
+  ];
+
+  const completed = checks.filter((check) => check.complete).length;
+
+  return {
+    completed,
+    total: checks.length,
+    percent: Math.round((completed / checks.length) * 100),
+    missing: checks.filter((check) => !check.complete),
+  };
 }
 
 export default async function CompanyWorkspacePage({ searchParams }: CompanyWorkspacePageProps) {
@@ -87,74 +124,134 @@ export default async function CompanyWorkspacePage({ searchParams }: CompanyWork
         </section>
 
         <EmptyState
-          icon={UsersRound}
+          icon={LayoutTemplate}
           title="No company workspace yet"
-          description="Your account currently operates as an individual profile. Create a company workspace to unlock company provider foundations."
+          description="Your account currently operates as an individual profile. Create a company workspace to unlock company branding, public profile, and team-ready foundations."
         />
       </MainContainer>
     );
   }
 
+  const logoUrl = toCompanyLogoPublicUrl(supabase, ownerOrganization.logo_path);
+  const completion = buildProfileCompletionChecklist(ownerOrganization);
+  const { count: publishedListingCount } = await supabase
+    .from("listings")
+    .select("id", { count: "exact", head: true })
+    .eq("owner_id", user.id)
+    .eq("listing_status", PUBLIC_DISCOVERY_STATUS);
+
   return (
-    <MainContainer size="content" className="space-y-5">
+    <MainContainer size="wide" className="space-y-5">
       {status === "created" ? (
         <AuthStatusMessage
           tone="success"
-          message="Company workspace created. Your account is now the active owner."
+          message="Company workspace created. Next step: complete your company profile and branding."
         />
       ) : null}
+      {status === "saved" ? (
+        <AuthStatusMessage tone="success" message="Company profile changes are now live." />
+      ) : null}
 
-      <section className="border-border bg-card relative overflow-hidden rounded-3xl border p-5 sm:p-7">
-        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(118deg,color-mix(in_oklch,var(--primary)_10%,transparent)_0%,transparent_54%),linear-gradient(332deg,color-mix(in_oklch,var(--accent)_12%,transparent)_0%,transparent_70%)] opacity-52" />
-        <div className="relative space-y-4">
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="primary">Company owner</Badge>
-            <Badge variant="outline">Workspace active</Badge>
-          </div>
-          <div className="space-y-2">
-            <h1 className="type-page-title">{ownerOrganization.name}</h1>
-            <p className="type-body-muted max-w-3xl">
-              This workspace is now tied to your RoofHub account as the owner. Future member and
-              routing capabilities can build on this ownership context without changing your current
-              authentication flow.
-            </p>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="border-border/70 bg-surface-soft rounded-xl border px-4 py-3">
-              <p className="type-label">Workspace slug</p>
-              <p className="mt-1 text-sm font-semibold tracking-tight">{ownerOrganization.slug}</p>
-              <p className="text-muted-foreground mt-1 text-xs leading-5">
-                Stable identifier for future company routes.
-              </p>
-            </div>
-            <div className="border-border/70 bg-surface-soft rounded-xl border px-4 py-3">
-              <p className="type-label">Owner status</p>
-              <p className="mt-1 inline-flex items-center gap-1.5 text-sm font-semibold tracking-tight">
-                <CircleCheck className="text-success size-4" />
-                Active owner membership
-              </p>
-              <p className="text-muted-foreground mt-1 text-xs leading-5">
-                Created {formatDate(ownerOrganization.created_at)}
-              </p>
-            </div>
-          </div>
-
-          {ownerOrganization.description ? (
-            <div className="border-border/70 bg-surface-soft rounded-xl border px-4 py-3">
-              <p className="type-label">Company summary</p>
-              <p className="text-muted-foreground mt-1 whitespace-pre-wrap text-sm leading-6">
-                {ownerOrganization.description}
-              </p>
-            </div>
-          ) : null}
-
-          <div className="flex flex-wrap gap-2">
-            <Link href="/dashboard" className={buttonVariants({ size: "sm" })}>
-              Go to dashboard
+      <CompanyIdentityHeader
+        company={{
+          name: ownerOrganization.name,
+          slug: ownerOrganization.slug,
+          description: ownerOrganization.description,
+          logoUrl,
+          contactEmail: ownerOrganization.contact_email,
+          contactPhone: ownerOrganization.contact_phone,
+          websiteUrl: ownerOrganization.website_url,
+          coverageArea: ownerOrganization.coverage_area,
+        }}
+        contextLabel="Company workspace"
+        supportingLabel="Manage branding, contact context, and your public company presence from this workspace."
+        listingCount={publishedListingCount ?? 0}
+        actions={
+          <>
+            <Link href="/profile/company/edit" className={buttonVariants({ size: "sm" })}>
+              Complete company profile
             </Link>
-            <Link href="/profile" className={buttonVariants({ variant: "outline", size: "sm" })}>
-              Back to profile
+            <Link
+              href={`/companies/${ownerOrganization.slug}`}
+              className={buttonVariants({ variant: "outline", size: "sm" })}
+            >
+              View public company page
+            </Link>
+          </>
+        }
+      />
+
+      <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+        <div className="border-border bg-card rounded-2xl border p-5 sm:p-6">
+          <header className="border-border/70 mb-4 space-y-2 border-b pb-4">
+            <p className="type-label">Profile readiness</p>
+            <h2 className="type-section-title">Brand and contact completeness</h2>
+            <p className="type-body-muted">
+              A complete profile improves trust and gives seekers enough context before first
+              contact.
+            </p>
+          </header>
+
+          <div className="space-y-4">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-sm font-semibold">Completion</p>
+              <Badge variant={completion.percent >= 80 ? "success" : "warning"}>
+                {completion.percent}%
+              </Badge>
+            </div>
+
+            <div className="bg-border/55 h-2 rounded-full">
+              <div
+                className="bg-primary h-full rounded-full transition-all"
+                style={{ width: `${Math.max(8, completion.percent)}%` }}
+              />
+            </div>
+
+            {completion.missing.length > 0 ? (
+              <ul className="space-y-2">
+                {completion.missing.map((item) => (
+                  <li
+                    key={`company-profile-missing-${item.label}`}
+                    className="border-border/70 bg-surface-soft text-muted-foreground inline-flex w-full items-center gap-2 rounded-xl border px-3 py-2 text-sm"
+                  >
+                    <Megaphone className="text-primary size-4" />
+                    Add {item.label.toLowerCase()}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-muted-foreground inline-flex items-center gap-2 text-sm">
+                <CircleCheck className="text-success size-4" />
+                Company profile is fully complete for this foundation phase.
+              </p>
+            )}
+          </div>
+        </div>
+
+        <div className="border-border bg-card rounded-2xl border p-5 sm:p-6">
+          <header className="border-border/70 mb-4 space-y-2 border-b pb-4">
+            <p className="type-label">Next actions</p>
+            <h2 className="type-section-title">Keep company presence up to date</h2>
+            <p className="type-body-muted">
+              Use these shortcuts to manage how your company appears publicly.
+            </p>
+          </header>
+
+          <div className="space-y-3">
+            <Link href="/profile/company/edit" className={buttonVariants({ size: "sm" })}>
+              Edit company profile
+            </Link>
+            <Link
+              href={`/companies/${ownerOrganization.slug}`}
+              className={buttonVariants({ variant: "outline", size: "sm" })}
+            >
+              Open public company page
+            </Link>
+            <Link
+              href="/dashboard/listings"
+              className={buttonVariants({ variant: "ghost", size: "sm" })}
+            >
+              Review managed listings
             </Link>
           </div>
         </div>

@@ -79,9 +79,9 @@ function buildProfileCompletion(profile: Tables<"profiles">) {
         label: "direct response detail",
         ready: Boolean(
           profile.phone?.trim() ||
-            profile.contact_email?.trim() ||
-            profile.whatsapp_phone?.trim() ||
-            profile.viber_phone?.trim()
+          profile.contact_email?.trim() ||
+          profile.whatsapp_phone?.trim() ||
+          profile.viber_phone?.trim()
         ),
       }
     );
@@ -107,7 +107,10 @@ async function loadSeekerProfileExperience(
   profile: Tables<"profiles">
 ) {
   const [favoritesCountResult, conversationCountResult] = await Promise.all([
-    supabase.from("favorites").select("listing_id", { count: "exact", head: true }).eq("user_id", profile.id),
+    supabase
+      .from("favorites")
+      .select("listing_id", { count: "exact", head: true })
+      .eq("user_id", profile.id),
     supabase
       .from("conversations")
       .select("id", { count: "exact", head: true })
@@ -115,7 +118,9 @@ async function loadSeekerProfileExperience(
   ]);
 
   const favoritesCount = favoritesCountResult.error ? null : (favoritesCountResult.count ?? 0);
-  const conversationCount = conversationCountResult.error ? null : (conversationCountResult.count ?? 0);
+  const conversationCount = conversationCountResult.error
+    ? null
+    : (conversationCountResult.count ?? 0);
   const completion = buildProfileCompletion(profile);
 
   return {
@@ -229,9 +234,7 @@ export default async function ProfilePage() {
 
   const profile = profileResult.profile;
   const companyContextResult = await getCompanyMembershipContextForUser(supabase, profile.id);
-  const ownerOrganization = companyContextResult.ok
-    ? companyContextResult.ownerOrganization
-    : null;
+  const ownerOrganization = companyContextResult.ok ? companyContextResult.ownerOrganization : null;
   const roleExperience = isProviderRole(profile.role)
     ? await loadProviderProfileExperience(supabase, profile)
     : await loadSeekerProfileExperience(supabase, profile);
@@ -269,51 +272,59 @@ export default async function ProfilePage() {
         experience={roleExperience}
       />
 
-      {companyContextResult.ok ? ownerOrganization ? (
-        <section className="border-border bg-card relative overflow-hidden rounded-2xl border p-5 sm:p-6">
-          <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(118deg,color-mix(in_oklch,var(--primary)_10%,transparent)_0%,transparent_56%),linear-gradient(334deg,color-mix(in_oklch,var(--accent)_10%,transparent)_0%,transparent_72%)] opacity-52" />
-          <div className="relative space-y-3">
-            <div className="inline-flex items-center gap-2 text-sm font-semibold tracking-tight">
-              <Building2 className="text-primary size-4" />
-              Company workspace active
+      {companyContextResult.ok ? (
+        ownerOrganization ? (
+          <section className="border-border bg-card relative overflow-hidden rounded-2xl border p-5 sm:p-6">
+            <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(118deg,color-mix(in_oklch,var(--primary)_10%,transparent)_0%,transparent_56%),linear-gradient(334deg,color-mix(in_oklch,var(--accent)_10%,transparent)_0%,transparent_72%)] opacity-52" />
+            <div className="relative space-y-3">
+              <div className="inline-flex items-center gap-2 text-sm font-semibold tracking-tight">
+                <Building2 className="text-primary size-4" />
+                Company workspace active
+              </div>
+              <h2 className="type-section-title">{ownerOrganization.name}</h2>
+              <p className="type-body-muted max-w-3xl">
+                This account owns your RoofHub company workspace. Continue in the workspace to
+                manage branding, contact details, and public company profile presence.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <Link href="/profile/company" className={buttonVariants({ size: "sm" })}>
+                  Open company workspace
+                </Link>
+                <Link
+                  href={`/companies/${ownerOrganization.slug}`}
+                  className={buttonVariants({ variant: "outline", size: "sm" })}
+                >
+                  View public company page
+                </Link>
+              </div>
             </div>
-            <h2 className="type-section-title">{ownerOrganization.name}</h2>
-            <p className="type-body-muted max-w-3xl">
-              This account is the owner of your RoofHub company workspace. Continue in the
-              workspace view to review company ownership context.
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <Link href="/profile/company" className={buttonVariants({ size: "sm" })}>
-                Open company workspace
-              </Link>
+          </section>
+        ) : (
+          <section className="border-border bg-card rounded-2xl border p-5 sm:p-6">
+            <div className="space-y-3">
+              <div className="inline-flex items-center gap-2 text-sm font-semibold tracking-tight">
+                <Building2 className="text-primary size-4" />
+                Company workspace
+              </div>
+              <h2 className="type-section-title">Create a company account foundation</h2>
+              <p className="type-body-muted max-w-3xl">
+                Set up a company workspace to operate as a company provider while keeping account
+                ownership and session handling anchored to trusted server-side membership records.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <Link href="/profile/company/new" className={buttonVariants({ size: "sm" })}>
+                  Create company workspace
+                </Link>
+                <Link
+                  href="/profile/company"
+                  className={buttonVariants({ variant: "outline", size: "sm" })}
+                >
+                  Learn more
+                </Link>
+              </div>
             </div>
-          </div>
-        </section>
-      ) : (
-        <section className="border-border bg-card rounded-2xl border p-5 sm:p-6">
-          <div className="space-y-3">
-            <div className="inline-flex items-center gap-2 text-sm font-semibold tracking-tight">
-              <Building2 className="text-primary size-4" />
-              Company workspace
-            </div>
-            <h2 className="type-section-title">Create a company account foundation</h2>
-            <p className="type-body-muted max-w-3xl">
-              Set up a company workspace to operate as a company provider while keeping account
-              ownership and session handling anchored to trusted server-side membership records.
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <Link href="/profile/company/new" className={buttonVariants({ size: "sm" })}>
-                Create company workspace
-              </Link>
-              <Link
-                href="/profile/company"
-                className={buttonVariants({ variant: "outline", size: "sm" })}
-              >
-                Learn more
-              </Link>
-            </div>
-          </div>
-        </section>
+          </section>
+        )
       ) : (
         <EmptyState
           icon={Building2}
