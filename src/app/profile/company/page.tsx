@@ -9,8 +9,10 @@ import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { toSignInPath } from "@/lib/auth/routing";
-import { toCompanyLogoPublicUrl } from "@/lib/company/logo";
 import { getCurrentUserCompanyContext } from "@/lib/company/context";
+import { toCompanyLogoPublicUrl } from "@/lib/company/logo";
+import { loadPendingCompanyInvitesForCurrentUser } from "@/lib/company/team-queries";
+import { ORGANIZATION_MEMBER_ROLE_LABELS } from "@/lib/company/team-types";
 import { PUBLIC_DISCOVERY_STATUS } from "@/lib/listings/visibility";
 import { createServerSupabaseClient } from "@/lib/supabase";
 
@@ -20,11 +22,11 @@ type CompanyWorkspacePageProps = {
 
 function readStatus(
   searchParams: Record<string, string | string[] | undefined>
-): "created" | "saved" | null {
+): "created" | "saved" | "invite-accepted" | null {
   const rawStatus = searchParams.status;
   const status = Array.isArray(rawStatus) ? rawStatus[0] : rawStatus;
 
-  if (status === "created" || status === "saved") {
+  if (status === "created" || status === "saved" || status === "invite-accepted") {
     return status;
   }
 
@@ -98,36 +100,122 @@ export default async function CompanyWorkspacePage({ searchParams }: CompanyWork
 
   const status = readStatus(resolvedSearchParams);
   const ownerOrganization = companyContextResult.company.ownerOrganization;
+  const primaryOrganization = companyContextResult.company.primaryOrganization;
+  const managementMembership = companyContextResult.company.managementMembership;
+
+  const pendingInvitesResult = await loadPendingCompanyInvitesForCurrentUser();
+  const pendingInvites = pendingInvitesResult.ok ? pendingInvitesResult.pendingInvites : [];
 
   if (!ownerOrganization) {
     return (
       <MainContainer size="content" className="space-y-5">
-        <section className="border-border bg-card relative overflow-hidden rounded-3xl border p-5 sm:p-7">
-          <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(120deg,color-mix(in_oklch,var(--primary)_8%,transparent)_0%,transparent_58%),linear-gradient(325deg,color-mix(in_oklch,var(--accent)_12%,transparent)_0%,transparent_68%)] opacity-55" />
-          <div className="relative space-y-3">
-            <Badge variant="outline">Company workspace</Badge>
-            <h1 className="type-page-title">Set up your RoofHub company account foundation</h1>
-            <p className="type-body-muted max-w-3xl">
-              Create a company workspace to represent your team under a shared identity while your
-              current account remains the owner of that workspace.
-            </p>
-            <div className="flex flex-wrap gap-2">
-              <Link href="/profile/company/new" className={buttonVariants({ size: "sm" })}>
-                <Building2 className="size-4" />
-                Create company workspace
-              </Link>
-              <Link href="/profile" className={buttonVariants({ variant: "outline", size: "sm" })}>
-                Back to profile
-              </Link>
-            </div>
-          </div>
-        </section>
+        {status === "invite-accepted" ? (
+          <AuthStatusMessage
+            tone="success"
+            message="Company invite accepted. Your membership is now active."
+          />
+        ) : null}
 
-        <EmptyState
-          icon={LayoutTemplate}
-          title="No company workspace yet"
-          description="Your account currently operates as an individual profile. Create a company workspace to unlock company branding, public profile, and team-ready foundations."
-        />
+        {primaryOrganization ? (
+          <section className="border-border bg-card relative overflow-hidden rounded-3xl border p-5 sm:p-7">
+            <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(120deg,color-mix(in_oklch,var(--primary)_8%,transparent)_0%,transparent_58%),linear-gradient(325deg,color-mix(in_oklch,var(--accent)_12%,transparent)_0%,transparent_68%)] opacity-55" />
+            <div className="relative space-y-3">
+              <Badge variant="outline">Company membership active</Badge>
+              <h1 className="type-page-title">You are already part of a RoofHub company workspace</h1>
+              <p className="type-body-muted max-w-3xl">
+                Membership role:{" "}
+                {companyContextResult.company.primaryMembership
+                  ? ORGANIZATION_MEMBER_ROLE_LABELS[companyContextResult.company.primaryMembership.role]
+                  : "Member"}
+                . Continue in the workspace and public profile.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {managementMembership ? (
+                  <Link href="/profile/company/team" className={buttonVariants({ size: "sm" })}>
+                    Open team management
+                  </Link>
+                ) : null}
+                <Link
+                  href={`/companies/${primaryOrganization.slug}`}
+                  className={buttonVariants({ variant: "outline", size: "sm" })}
+                >
+                  View public company page
+                </Link>
+                <Link href="/profile" className={buttonVariants({ variant: "ghost", size: "sm" })}>
+                  Back to profile
+                </Link>
+              </div>
+            </div>
+          </section>
+        ) : (
+          <>
+            <section className="border-border bg-card relative overflow-hidden rounded-3xl border p-5 sm:p-7">
+              <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(120deg,color-mix(in_oklch,var(--primary)_8%,transparent)_0%,transparent_58%),linear-gradient(325deg,color-mix(in_oklch,var(--accent)_12%,transparent)_0%,transparent_68%)] opacity-55" />
+              <div className="relative space-y-3">
+                <Badge variant="outline">Company workspace</Badge>
+                <h1 className="type-page-title">Set up your RoofHub company account foundation</h1>
+                <p className="type-body-muted max-w-3xl">
+                  Create a company workspace to represent your team under a shared identity while your
+                  current account remains the owner of that workspace.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <Link href="/profile/company/new" className={buttonVariants({ size: "sm" })}>
+                    <Building2 className="size-4" />
+                    Create company workspace
+                  </Link>
+                  <Link href="/profile" className={buttonVariants({ variant: "outline", size: "sm" })}>
+                    Back to profile
+                  </Link>
+                </div>
+              </div>
+            </section>
+
+            <EmptyState
+              icon={LayoutTemplate}
+              title="No company workspace yet"
+              description="Your account currently operates as an individual profile. Create a company workspace to unlock company branding, public profile, and team-ready foundations."
+            />
+          </>
+        )}
+
+        {pendingInvites.length > 0 ? (
+          <section className="border-border bg-card rounded-2xl border p-5 sm:p-6">
+            <header className="border-border/70 mb-4 space-y-2 border-b pb-4">
+              <p className="type-label">Pending invites</p>
+              <h2 className="type-section-title">Accept your company invites</h2>
+              <p className="type-body-muted">
+                Accept a pending invite to activate company membership for this account.
+              </p>
+            </header>
+
+            <ul className="space-y-3">
+              {pendingInvites.map((invite) => (
+                <li
+                  key={invite.id}
+                  className="border-border/70 bg-surface-soft rounded-xl border px-3.5 py-3"
+                >
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="space-y-1">
+                      <p className="text-sm font-semibold">
+                        {invite.organization?.name ?? "Company workspace"}
+                      </p>
+                      <p className="text-muted-foreground text-xs">
+                        Role: {ORGANIZATION_MEMBER_ROLE_LABELS[invite.role]} • Expires{" "}
+                        {new Date(invite.expires_at).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <Link
+                      href={`/profile/company/invites/${invite.invite_token}`}
+                      className={buttonVariants({ size: "sm" })}
+                    >
+                      Review invite
+                    </Link>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
       </MainContainer>
     );
   }
@@ -151,6 +239,9 @@ export default async function CompanyWorkspacePage({ searchParams }: CompanyWork
       {status === "saved" ? (
         <AuthStatusMessage tone="success" message="Company profile changes are now live." />
       ) : null}
+      {status === "invite-accepted" ? (
+        <AuthStatusMessage tone="success" message="Company invite accepted successfully." />
+      ) : null}
 
       <CompanyIdentityHeader
         company={{
@@ -172,8 +263,14 @@ export default async function CompanyWorkspacePage({ searchParams }: CompanyWork
               Complete company profile
             </Link>
             <Link
-              href={`/companies/${ownerOrganization.slug}`}
+              href="/profile/company/team"
               className={buttonVariants({ variant: "outline", size: "sm" })}
+            >
+              Team management
+            </Link>
+            <Link
+              href={`/companies/${ownerOrganization.slug}`}
+              className={buttonVariants({ variant: "ghost", size: "sm" })}
             >
               View public company page
             </Link>
@@ -252,6 +349,12 @@ export default async function CompanyWorkspacePage({ searchParams }: CompanyWork
               className={buttonVariants({ variant: "ghost", size: "sm" })}
             >
               Review managed listings
+            </Link>
+            <Link
+              href="/profile/company/team"
+              className={buttonVariants({ variant: "outline", size: "sm" })}
+            >
+              Manage team members
             </Link>
           </div>
         </div>

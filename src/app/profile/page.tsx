@@ -291,8 +291,14 @@ export default async function ProfilePage() {
                   Open company workspace
                 </Link>
                 <Link
-                  href={`/companies/${ownerOrganization.slug}`}
+                  href="/profile/company/team"
                   className={buttonVariants({ variant: "outline", size: "sm" })}
+                >
+                  Manage team members
+                </Link>
+                <Link
+                  href={`/companies/${ownerOrganization.slug}`}
+                  className={buttonVariants({ variant: "ghost", size: "sm" })}
                 >
                   View public company page
                 </Link>
