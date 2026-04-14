@@ -35,6 +35,11 @@ export const AUDIT_EVENT_TYPES = {
   profileRoleChanged: "profile.role.changed",
   organizationWorkspaceCreated: "organization.workspace.created",
   organizationWorkspaceCreateFailed: "organization.workspace.create_failed",
+  organizationProfileUpdated: "organization.profile.updated",
+  organizationProfileUpdateFailed: "organization.profile.update_failed",
+  organizationLogoUpdated: "organization.logo.updated",
+  organizationLogoRemoved: "organization.logo.removed",
+  organizationLogoUpdateFailed: "organization.logo.update_failed",
   listingDraftCreated: "provider.listing_draft.created",
   listingDraftStepSaved: "provider.listing_draft.step_saved",
   listingPhotosSynced: "provider.listing_photos.synced",
@@ -101,11 +106,7 @@ export async function getAuditRequestFingerprint() {
   };
 }
 
-function sanitizeMetadataValue(
-  value: unknown,
-  depth: number,
-  keyName: string | null
-): Json {
+function sanitizeMetadataValue(value: unknown, depth: number, keyName: string | null): Json {
   if (depth > MAX_METADATA_DEPTH) {
     return "[TRUNCATED]";
   }
@@ -165,7 +166,9 @@ function sanitizeMetadataValue(
   return String(value);
 }
 
-export function sanitizeSecurityMetadata(metadata: Record<string, unknown> | null | undefined): Json {
+export function sanitizeSecurityMetadata(
+  metadata: Record<string, unknown> | null | undefined
+): Json {
   if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
     return {};
   }

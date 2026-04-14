@@ -7,7 +7,18 @@ import type { Database, Tables } from "@/types/database";
 
 export type CompanyWorkspaceSummary = Pick<
   Tables<"organizations">,
-  "id" | "name" | "slug" | "description" | "logo_path" | "status" | "created_at" | "updated_at"
+  | "id"
+  | "name"
+  | "slug"
+  | "description"
+  | "logo_path"
+  | "contact_email"
+  | "contact_phone"
+  | "website_url"
+  | "coverage_area"
+  | "status"
+  | "created_at"
+  | "updated_at"
 >;
 
 export type CompanyMembershipSummary = Pick<
@@ -70,7 +81,7 @@ export async function getCompanyMembershipContextForUser(
   const { data, error } = await supabase
     .from("organization_members")
     .select(
-      "id, organization_id, user_id, role, member_status, invited_by_user_id, joined_at, created_at, updated_at, organization:organizations(id, name, slug, description, logo_path, status, created_at, updated_at)"
+      "id, organization_id, user_id, role, member_status, invited_by_user_id, joined_at, created_at, updated_at, organization:organizations(id, name, slug, description, logo_path, contact_email, contact_phone, website_url, coverage_area, status, created_at, updated_at)"
     )
     .eq("user_id", userId)
     .order("created_at", { ascending: true });
@@ -82,7 +93,9 @@ export async function getCompanyMembershipContextForUser(
     };
   }
 
-  const memberships = normalizeCompanyMembershipRows((data ?? []) as OrganizationMembershipQueryRow[]);
+  const memberships = normalizeCompanyMembershipRows(
+    (data ?? []) as OrganizationMembershipQueryRow[]
+  );
   const activeMemberships = memberships.filter(
     (membership) =>
       membership.member_status === "active" && membership.organization?.status === "active"
@@ -114,7 +127,10 @@ export async function getCurrentUserCompanyContext(
     };
   }
 
-  const companyContext = await getCompanyMembershipContextForUser(supabase, profileResult.profile.id);
+  const companyContext = await getCompanyMembershipContextForUser(
+    supabase,
+    profileResult.profile.id
+  );
 
   if (!companyContext.ok) {
     return companyContext;

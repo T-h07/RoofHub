@@ -432,6 +432,9 @@ export type Database = {
       }
       organizations: {
         Row: {
+          contact_email: string | null
+          contact_phone: string | null
+          coverage_area: string | null
           created_at: string
           created_by_user_id: string
           description: string | null
@@ -441,8 +444,12 @@ export type Database = {
           slug: string
           status: Database["public"]["Enums"]["organization_status"]
           updated_at: string
+          website_url: string | null
         }
         Insert: {
+          contact_email?: string | null
+          contact_phone?: string | null
+          coverage_area?: string | null
           created_at?: string
           created_by_user_id: string
           description?: string | null
@@ -452,8 +459,12 @@ export type Database = {
           slug: string
           status?: Database["public"]["Enums"]["organization_status"]
           updated_at?: string
+          website_url?: string | null
         }
         Update: {
+          contact_email?: string | null
+          contact_phone?: string | null
+          coverage_area?: string | null
           created_at?: string
           created_by_user_id?: string
           description?: string | null
@@ -463,6 +474,7 @@ export type Database = {
           slug?: string
           status?: Database["public"]["Enums"]["organization_status"]
           updated_at?: string
+          website_url?: string | null
         }
         Relationships: [
           {

@@ -59,6 +59,16 @@ export const TRAFFIC_CONTROL_RULES = {
     windowSeconds: 6 * 60 * 60,
     maxAttempts: 4,
   },
+  companyProfileUpdatePerUser: {
+    bucket: "company.profile_update.user",
+    windowSeconds: 30 * 60,
+    maxAttempts: 30,
+  },
+  companyLogoUpdatePerUser: {
+    bucket: "company.logo_update.user",
+    windowSeconds: 30 * 60,
+    maxAttempts: 20,
+  },
   messagingCreateConversationPerUser: {
     bucket: "messaging.create_conversation.user",
     windowSeconds: 10 * 60,
