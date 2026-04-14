@@ -3,6 +3,7 @@
 import { createServerSupabaseClient } from "@/lib/supabase";
 import { getCurrentUserProfile } from "@/lib/auth/profile";
 import { isProviderRole } from "@/lib/auth/roles";
+import { resolveProviderListingCreationContext } from "@/lib/listings/ownership";
 import { AUDIT_EVENT_TYPES, recordSecurityAuditEvent } from "@/lib/security/audit";
 import { enforceTrafficControl, TRAFFIC_CONTROL_RULES } from "@/lib/security/traffic-control";
 import type { Enums } from "@/types/database";
@@ -309,7 +310,7 @@ async function ensureDraftAccess(
 ) {
   const query = supabase
     .from("listings")
-    .select("id, owner_id, listing_status")
+    .select("id, owner_id, organization_id, listing_status")
     .eq("id", draftId)
     .eq("owner_id", userId)
     .limit(1);
@@ -319,13 +320,23 @@ async function ensureDraftAccess(
     return {
       ok: false as const,
       message: "Draft listing not found or inaccessible.",
-      listing: null as { id: string; owner_id: string; listing_status: string } | null,
+      listing: null as {
+        id: string;
+        owner_id: string;
+        organization_id: string | null;
+        listing_status: string;
+      } | null,
     };
   }
 
   return {
     ok: true as const,
-    listing: data as { id: string; owner_id: string; listing_status: string },
+    listing: data as {
+      id: string;
+      owner_id: string;
+      organization_id: string | null;
+      listing_status: string;
+    },
   };
 }
 
@@ -480,10 +491,28 @@ export async function saveProviderWizardStepAction(
 
       const draftId = isUuid(createDraftId) ? createDraftId : crypto.randomUUID();
       const slug = buildDraftSlug(basicsValidation.payload.title, draftId);
+      const listingCreationContextResult = await resolveProviderListingCreationContext(
+        supabase,
+        profile
+      );
+
+      if (!listingCreationContextResult.ok) {
+        return {
+          ok: false,
+          draftId: null,
+          message: listingCreationContextResult.message,
+        };
+      }
+
+      const listingCreationContext = listingCreationContextResult.context;
 
       const { error } = await supabase.from("listings").insert({
         id: draftId,
         owner_id: profile.id,
+        organization_id: listingCreationContext.organizationId,
+        created_by_user_id: profile.id,
+        assigned_agent_user_id:
+          listingCreationContext.ownershipMode === "company" ? profile.id : null,
         slug,
         title: basicsValidation.payload.title,
         description: basicsValidation.payload.description,

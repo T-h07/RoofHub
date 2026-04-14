@@ -99,3 +99,12 @@ For dependency/lockfile/scanner specifics, also follow `docs/supply-chain-guardr
 - Membership role/status/remove mutations are owner/admin-scoped with admin anti-escalation limits.
 - Last-owner protections prevent role/status/remove operations from removing final active owner coverage.
 - Invite/member actions are traffic-controlled and recorded through structured audit events.
+
+## NM-PT34 validation notes
+
+- Listings now support nullable `organization_id` with backward-compatible individual ownership.
+- Listing actor attribution fields (`created_by_user_id`, `assigned_agent_user_id`, `published_by_user_id`) are persisted in schema and write paths.
+- Provider listing creation resolves company ownership server-side from active membership context; client payload does not choose organization ownership.
+- Listings insert/update/delete RLS policies now require active organization membership when `organization_id` is present.
+- Listing image owner-scoped policies now enforce the same active membership requirement for company-owned listings.
+- Public company profile listing feed and workspace listing counts resolve organization-owned listings with legacy owner fallback.

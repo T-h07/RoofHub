@@ -203,8 +203,10 @@ export async function loadPublicCompanyProfileBySlug(
     } = await supabase
       .from("listings")
       .select(PUBLIC_COMPANY_LISTINGS_SELECT, { count: "exact" })
-      .eq("owner_id", companyProfileRow.created_by_user_id)
       .eq("listing_status", PUBLIC_DISCOVERY_STATUS)
+      .or(
+        `organization_id.eq.${companyProfileRow.id},and(organization_id.is.null,owner_id.eq.${companyProfileRow.created_by_user_id})`
+      )
       .order("published_at", {
         ascending: false,
         nullsFirst: false,

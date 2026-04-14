@@ -16,6 +16,10 @@ export const PROVIDER_LISTING_STATUS_VALUES = [
 export type ProviderManagedListingRow = Pick<
   Tables<"listings">,
   | "id"
+  | "organization_id"
+  | "created_by_user_id"
+  | "assigned_agent_user_id"
+  | "published_by_user_id"
   | "slug"
   | "title"
   | "listing_status"
@@ -36,6 +40,7 @@ export type ProviderManagedListingRow = Pick<
 };
 
 export type ProviderManagedListing = Omit<ProviderManagedListingRow, "listing_images"> & {
+  ownershipMode: "individual" | "company";
   coverImagePath: string | null;
   coverImageUrl: string | null;
 };

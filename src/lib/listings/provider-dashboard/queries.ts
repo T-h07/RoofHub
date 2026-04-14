@@ -17,6 +17,10 @@ import { isProviderListingStatusFilter } from "./types";
 
 const PROVIDER_MANAGED_LISTINGS_SELECT = `
   id,
+  organization_id,
+  created_by_user_id,
+  assigned_agent_user_id,
+  published_by_user_id,
   slug,
   title,
   listing_status,
@@ -229,6 +233,10 @@ export async function loadProviderManagedListings(
 
     return {
       id: listing.id,
+      organization_id: listing.organization_id,
+      created_by_user_id: listing.created_by_user_id,
+      assigned_agent_user_id: listing.assigned_agent_user_id,
+      published_by_user_id: listing.published_by_user_id,
       slug: listing.slug,
       title: listing.title,
       listing_status: listing.listing_status,
@@ -242,6 +250,7 @@ export async function loadProviderManagedListings(
       archived_at: listing.archived_at,
       updated_at: listing.updated_at,
       created_at: listing.created_at,
+      ownershipMode: listing.organization_id ? "company" : "individual",
       coverImagePath: coverEntry?.coverImagePath ?? null,
       coverImageUrl: coverEntry?.signedUrl ?? null,
     } satisfies ProviderManagedListing;

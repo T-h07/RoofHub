@@ -225,8 +225,10 @@ export default async function CompanyWorkspacePage({ searchParams }: CompanyWork
   const { count: publishedListingCount } = await supabase
     .from("listings")
     .select("id", { count: "exact", head: true })
-    .eq("owner_id", user.id)
-    .eq("listing_status", PUBLIC_DISCOVERY_STATUS);
+    .eq("listing_status", PUBLIC_DISCOVERY_STATUS)
+    .or(
+      `organization_id.eq.${ownerOrganization.id},and(organization_id.is.null,owner_id.eq.${user.id})`
+    );
 
   return (
     <MainContainer size="wide" className="space-y-5">

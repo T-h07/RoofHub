@@ -31,6 +31,10 @@ type ProviderMutationContext =
 type ProviderOwnedListingStatus = {
   id: string;
   owner_id: string;
+  organization_id: string | null;
+  created_by_user_id: string;
+  assigned_agent_user_id: string | null;
+  published_by_user_id: string | null;
   listing_status: ProviderListingStatus;
   published_at: string | null;
 };
@@ -92,7 +96,8 @@ function getLifecycleStatusSuccessMessage(nextStatus: ProviderListingStatus) {
 
 function buildStatusPatch(
   nextStatus: ProviderListingStatus,
-  currentListing: ProviderOwnedListingStatus
+  currentListing: ProviderOwnedListingStatus,
+  actorUserId: string
 ) {
   if (nextStatus === "draft") {
     return {
@@ -106,6 +111,7 @@ function buildStatusPatch(
     return {
       listing_status: nextStatus,
       published_at: currentListing.published_at ?? new Date().toISOString(),
+      published_by_user_id: actorUserId,
       archived_at: null,
     };
   }
@@ -157,7 +163,9 @@ async function loadProviderOwnedListing(
 ) {
   const query = supabase
     .from("listings")
-    .select("id, owner_id, listing_status, published_at")
+    .select(
+      "id, owner_id, organization_id, created_by_user_id, assigned_agent_user_id, published_by_user_id, listing_status, published_at"
+    )
     .eq("id", input.listingId)
     .eq("owner_id", input.userId)
     .limit(1);
@@ -316,7 +324,7 @@ export async function updateProviderListingLifecycleStatusAction(
     };
   }
 
-  const patch = buildStatusPatch(nextStatus, currentListing);
+  const patch = buildStatusPatch(nextStatus, currentListing, profile.id);
   const updateQuery = supabase
     .from("listings")
     .update(patch)

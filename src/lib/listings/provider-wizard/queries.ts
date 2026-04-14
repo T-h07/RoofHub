@@ -15,6 +15,10 @@ import type {
 
 const PROVIDER_DRAFT_SUMMARY_SELECT = `
   id,
+  organization_id,
+  created_by_user_id,
+  assigned_agent_user_id,
+  published_by_user_id,
   slug,
   title,
   listing_status,
@@ -29,6 +33,10 @@ const PROVIDER_DRAFT_SUMMARY_SELECT = `
 const PROVIDER_DRAFT_EDITOR_SELECT = `
   id,
   owner_id,
+  organization_id,
+  created_by_user_id,
+  assigned_agent_user_id,
+  published_by_user_id,
   slug,
   title,
   description,

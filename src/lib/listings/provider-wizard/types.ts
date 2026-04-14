@@ -110,6 +110,10 @@ export type ProviderDraftEditorRecord = Pick<
   Tables<"listings">,
   | "id"
   | "owner_id"
+  | "organization_id"
+  | "created_by_user_id"
+  | "assigned_agent_user_id"
+  | "published_by_user_id"
   | "slug"
   | "title"
   | "description"
@@ -146,6 +150,10 @@ export type ProviderDraftEditorRecord = Pick<
 export type ProviderDraftSummary = Pick<
   Tables<"listings">,
   | "id"
+  | "organization_id"
+  | "created_by_user_id"
+  | "assigned_agent_user_id"
+  | "published_by_user_id"
   | "slug"
   | "title"
   | "listing_status"

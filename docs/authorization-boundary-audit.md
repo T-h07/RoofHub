@@ -59,6 +59,22 @@ Route protection improves UX but is not an authorization substitute.
 - Company branding media mutation (company logo upload/remove) is owner-scoped and backed by canonical storage path policies.
 - Public company profile reads are constrained to active organizations and published listings.
 
+### Company listing ownership model (NM-PT34 foundation)
+
+- Listings now support dual ownership mode:
+  - individual listing: `organization_id` is `null`
+  - company-owned listing: `organization_id` references an active organization workspace
+- Listing actor attribution is explicit:
+  - `created_by_user_id` tracks the original creator
+  - `assigned_agent_user_id` tracks current responsible agent when applicable
+  - `published_by_user_id` tracks publish actor when applicable
+- Server-side listing creation resolves company ownership from persisted profile + organization membership context, not client-submitted organization ids.
+- Listings insert/update/delete RLS checks enforce:
+  - provider ownership (`owner_id = auth.uid()`) or admin
+  - active organization membership when `organization_id` is set
+- Listing image read/write policies inherit the same organization-membership boundary for owner-scoped access on company-owned listings.
+- Public company listing feeds are organization-aware (`organization_id`), with legacy fallback for older owner-scoped records.
+
 ### Company team invites and membership management (NM-PT33)
 
 - Team invite creation is owner/admin-scoped and server-enforced.

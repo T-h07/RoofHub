@@ -213,12 +213,14 @@ export type Database = {
           address_text: string | null
           archived_at: string | null
           area_m2: number
+          assigned_agent_user_id: string | null
           available_from: string | null
           balcony: boolean
           bathrooms: number | null
           bedrooms: number | null
           city: string
           created_at: string
+          created_by_user_id: string
           currency_code: string
           deposit_amount: number | null
           description: string
@@ -233,12 +235,14 @@ export type Database = {
           listing_type: Database["public"]["Enums"]["listing_type"]
           longitude: number | null
           neighborhood: string | null
+          organization_id: string | null
           owner_id: string
           parking: boolean
           pets_allowed: boolean
           price_amount: number
           property_type: Database["public"]["Enums"]["property_type"]
           public_location_mode: Database["public"]["Enums"]["public_location_mode"]
+          published_by_user_id: string | null
           published_at: string | null
           slug: string
           title: string
@@ -250,12 +254,14 @@ export type Database = {
           address_text?: string | null
           archived_at?: string | null
           area_m2: number
+          assigned_agent_user_id?: string | null
           available_from?: string | null
           balcony?: boolean
           bathrooms?: number | null
           bedrooms?: number | null
           city: string
           created_at?: string
+          created_by_user_id: string
           currency_code?: string
           deposit_amount?: number | null
           description: string
@@ -270,12 +276,14 @@ export type Database = {
           listing_type: Database["public"]["Enums"]["listing_type"]
           longitude?: number | null
           neighborhood?: string | null
+          organization_id?: string | null
           owner_id: string
           parking?: boolean
           pets_allowed?: boolean
           price_amount: number
           property_type: Database["public"]["Enums"]["property_type"]
           public_location_mode?: Database["public"]["Enums"]["public_location_mode"]
+          published_by_user_id?: string | null
           published_at?: string | null
           slug: string
           title: string
@@ -287,12 +295,14 @@ export type Database = {
           address_text?: string | null
           archived_at?: string | null
           area_m2?: number
+          assigned_agent_user_id?: string | null
           available_from?: string | null
           balcony?: boolean
           bathrooms?: number | null
           bedrooms?: number | null
           city?: string
           created_at?: string
+          created_by_user_id?: string
           currency_code?: string
           deposit_amount?: number | null
           description?: string
@@ -307,12 +317,14 @@ export type Database = {
           listing_type?: Database["public"]["Enums"]["listing_type"]
           longitude?: number | null
           neighborhood?: string | null
+          organization_id?: string | null
           owner_id?: string
           parking?: boolean
           pets_allowed?: boolean
           price_amount?: number
           property_type?: Database["public"]["Enums"]["property_type"]
           public_location_mode?: Database["public"]["Enums"]["public_location_mode"]
+          published_by_user_id?: string | null
           published_at?: string | null
           slug?: string
           title?: string
@@ -322,8 +334,36 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "listings_assigned_agent_user_id_fkey"
+            columns: ["assigned_agent_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "listings_created_by_user_id_fkey"
+            columns: ["created_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "listings_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "listings_owner_id_fkey"
             columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "listings_published_by_user_id_fkey"
+            columns: ["published_by_user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -850,6 +890,13 @@ export type Database = {
         Returns: number
       }
       is_organization_owner_or_admin: {
+        Args: {
+          p_organization_id: string
+          p_user_id?: string
+        }
+        Returns: boolean
+      }
+      is_active_organization_member: {
         Args: {
           p_organization_id: string
           p_user_id?: string

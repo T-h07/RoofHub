@@ -47,6 +47,10 @@ type ProviderMutationContext =
 type ProviderDraftAccess = {
   id: string;
   owner_id: string;
+  organization_id: string | null;
+  created_by_user_id: string;
+  assigned_agent_user_id: string | null;
+  published_by_user_id: string | null;
   listing_status: ProviderListingStatus;
   slug: string;
 };
@@ -219,7 +223,9 @@ async function ensureDraftAccess(
 ) {
   const query = supabase
     .from("listings")
-    .select("id, owner_id, listing_status, slug")
+    .select(
+      "id, owner_id, organization_id, created_by_user_id, assigned_agent_user_id, published_by_user_id, listing_status, slug"
+    )
     .eq("id", input.draftId)
     .eq("owner_id", input.userId)
     .limit(1);
@@ -738,6 +744,7 @@ export async function publishProviderListingDraftAction(
     .update({
       listing_status: "published",
       published_at: new Date().toISOString(),
+      published_by_user_id: profile.id,
       archived_at: null,
     })
     .eq("id", draftResult.draft.id)
