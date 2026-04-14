@@ -13,6 +13,7 @@ Treat these as untrusted input boundaries:
 - Auth forms and callback params (`src/lib/auth/*`, `src/app/auth/callback/route.ts`)
 - Profile update form payloads (`src/lib/profile/actions.ts`)
 - Company workspace create payloads (`src/lib/company/actions.ts`)
+- Company profile edit payloads and logo actions (`src/lib/company/profile-actions.ts`)
 - Provider listing wizard create/edit/publish payloads (`src/lib/listings/provider-wizard/*`)
 - Provider status transition actions (`src/lib/listings/provider-dashboard/actions.ts`)
 - Listing favorites/report actions (`src/lib/listings/favorite-actions.ts`, `src/lib/listings/detail-actions.ts`)
@@ -20,6 +21,7 @@ Treat these as untrusted input boundaries:
 - Moderation actions/queue filters (`src/lib/moderation/actions.ts`, `src/lib/moderation/queries.ts`)
 - Explore/map query params (`src/lib/listings/explore-search-params.ts`, `src/lib/listings/map-bounds.ts`)
 - Route params for listing slug and provider edit id (`src/lib/listings/public-listing-detail.ts`, `src/app/dashboard/listings/[id]/edit/page.tsx`)
+- Route params for company slug (`src/lib/company/public-profile.ts`, `src/app/companies/[slug]/page.tsx`)
 - Upload/storage metadata mutation payloads (`src/lib/listings/provider-wizard/publish-actions.ts`, `src/lib/storage/listing-images.ts`)
 
 ## Validation contract
@@ -30,6 +32,7 @@ Treat these as untrusted input boundaries:
 - Unknown enum/state values must fail closed.
 - Route and search params must use strict parsers (no permissive partial numeric parsing).
 - Company workspace setup must validate name/description bounds server-side and derive ownership from authenticated server context.
+- Company profile setup must validate contact email/phone/website/coverage bounds server-side and derive edit authority from authenticated owner membership context.
 
 ## Query and route param rules
 
@@ -39,6 +42,7 @@ Treat these as untrusted input boundaries:
 - Validate dynamic route identifiers early:
   - UUID route ids short-circuit to `notFound()` when malformed.
   - Listing slugs must match expected slug pattern and max length.
+  - Company slugs must match expected slug pattern and max length.
 - For map bounds, require four strictly-formed coordinates before query construction.
 
 ## Output safety and user-generated content
@@ -46,6 +50,7 @@ Treat these as untrusted input boundaries:
 - User-generated text is rendered as plain text by default.
 - Do not use `dangerouslySetInnerHTML` for listing descriptions, provider bios, report details, or messages.
 - Preserve readability with safe formatting (`whitespace-pre-wrap`, paragraph splitting), not HTML injection.
+- Public company profile surfaces must project only intended public-facing organization fields.
 - Any future rich-text requirement must define an explicit allowlist-based sanitization model first.
 
 ## Error handling contract
@@ -60,6 +65,7 @@ Treat these as untrusted input boundaries:
 - Validate upload payload structure server-side (ids, paths, sort order, cover flags).
 - Enforce max image count and deterministic owner/listing scoped paths.
 - Enforce strict canonical listing image path shape (`owner/{owner_uuid}/listing/{listing_uuid}/{uuid}.{ext}`).
+- Enforce strict canonical company logo path shape (`organization/{organization_uuid}/{uuid}.{ext}`).
 - Validate accepted image content via file signature checks where upload code handles media files directly.
 - Reject payloads with invalid/foreign storage paths before mutation.
 - Do not rely on client ordering/cover assumptions without server normalization.

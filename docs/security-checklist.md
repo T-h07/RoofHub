@@ -83,3 +83,11 @@ For dependency/lockfile/scanner specifics, also follow `docs/supply-chain-guardr
 - [ ] `docs/security-launch-blockers.md` is reviewed and all blockers are either resolved or explicitly accepted by launch owner.
 - [ ] `docs/security-debt-register.md` is reviewed and does not contain disguised launch blockers.
 - [ ] Production `AUTH_ALLOWED_ORIGINS`, `NEXT_PUBLIC_SITE_URL`, and Supabase redirect/site URL settings are verified to match deployed domains.
+
+## NM-PT32 validation notes
+
+- Company profile and branding mutations are owner-scoped through server-side membership resolution.
+- Company logo storage paths are canonicalized and policy-validated (`organization/{organization_uuid}/{uuid}.{ext}`).
+- Public company route exposure is constrained to active organizations plus published listings.
+- Company profile input validation covers name, description, contact email/phone, website URL, and coverage text bounds.
+- Structured audit events capture company profile/logo success and failure outcomes without secret-bearing metadata.

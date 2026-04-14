@@ -44,6 +44,7 @@ Audit and observability execution details are defined in `docs/audit-observabili
 
 - Enforce ownership server-side for listing/profile/storage/messaging mutations.
 - Enforce company workspace ownership from persisted `organization_members` records, not client mode toggles.
+- Enforce company profile and branding mutations (name/contact/coverage/logo) through persisted owner membership checks.
 - Never use client-supplied owner/provider/admin ids as authority.
 - Preserve RLS assumptions; app code must not "re-authorize" by weak client filters.
 - Admin-only behavior must have explicit role checks in server code.
@@ -64,6 +65,7 @@ Audit and observability execution details are defined in `docs/audit-observabili
 - Verify file signatures for accepted image types before upload; do not rely on browser picker or declared MIME alone.
 - Keep deterministic path format and parse/verify ownership before delete/sync operations.
 - Keep listing image path format strict (`owner/{owner_uuid}/listing/{listing_uuid}/{uuid}.{ext}`) and reject path-abuse patterns.
+- Keep company logo path format strict (`organization/{organization_uuid}/{uuid}.{ext}`) and reject path-abuse patterns.
 - No broad public write access.
 - Do not rely on overwrite/upsert behavior as standard flow (`upsert: false` default for media uploads).
 - Keep object update semantics intentionally constrained for listing images; prefer append + delete flows.
@@ -76,6 +78,7 @@ Audit and observability execution details are defined in `docs/audit-observabili
 - Conversation creation must enforce listing contactability and anti-self-contact checks.
 - Moderation actions are admin-only and must not be bypassed by provider/user controls.
 - Listing visibility must obey listing status (`published`-only for public discovery surfaces).
+- Public company pages must expose only intended public organization fields and published listing inventory.
 - Status transitions must remain centralized and validated.
 
 ### 6) Input/output safety
@@ -105,6 +108,7 @@ Audit and observability execution details are defined in `docs/audit-observabili
 - `AUTH_ALLOWED_ORIGINS` must be configured server-side for trusted auth callback/reset URL generation across local/preview/production.
 
 Google OAuth note:
+
 - App-side Google OAuth flow foundations may exist before provider setup is complete.
 - When enabled, keep client secret server-only, configure provider redirect URIs explicitly, and document callback allowlists for local/preview/production.
 

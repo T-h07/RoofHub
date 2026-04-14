@@ -23,6 +23,7 @@ Provider account classification (foundation for NM-PT31):
 
 - Public routes:
   - `/`, `/explore`, `/map`, `/listing/[slug]`
+  - `/companies/[slug]`
   - Public listing data must remain constrained to `listing_status = 'published'`.
 - Authenticated routes:
   - `/favorites`, `/messages`, `/profile`
@@ -54,6 +55,9 @@ Route protection improves UX but is not an authorization substitute.
 - Organization reads are membership-scoped (active member) or admin-scoped.
 - Organization/member mutation is owner-scoped (active owner) or admin-scoped.
 - App-layer ownership checks must continue to use persisted membership state, never client-supplied company flags.
+- Company profile editing (`/profile/company/edit`) is owner-scoped and server-enforced.
+- Company branding media mutation (company logo upload/remove) is owner-scoped and backed by canonical storage path policies.
+- Public company profile reads are constrained to active organizations and published listings.
 
 ### Favorites
 
@@ -79,6 +83,7 @@ Route protection improves UX but is not an authorization substitute.
 ## Public/private visibility boundaries
 
 - Public discovery/detail surfaces expose published listings only.
+- Public company profile surfaces expose active organizations only.
 - `draft`, `paused`, `archived`, `sold`, `rented`, and `hidden_by_admin` must not appear in public explore/map/detail/favorites results.
 - Provider internal surfaces can show owner-managed lifecycle states, including moderation-hidden status visibility for the owner.
 

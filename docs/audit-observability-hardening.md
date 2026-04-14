@@ -123,6 +123,14 @@ Message audit metadata records only safe descriptors (for example message length
 
 - `profile.role.changed`
 
+### Company workspace profile and branding
+
+- `organization.profile.updated`
+- `organization.profile.update_failed`
+- `organization.logo.updated`
+- `organization.logo.removed`
+- `organization.logo.update_failed`
+
 ## Failure observability model
 
 Important failures now emit bounded, structured audit events in these flows:
@@ -131,6 +139,7 @@ Important failures now emit bounded, structured audit events in these flows:
 - provider publish and status mutation failures
 - moderation visibility failures
 - report creation failures (sanitized outcome metadata)
+- company profile/branding mutation failures (sanitized outcome metadata)
 
 If audit DB writes fail, a sanitized structured diagnostic event (`audit.write_failed`) is emitted to server logs without secret exposure.
 
