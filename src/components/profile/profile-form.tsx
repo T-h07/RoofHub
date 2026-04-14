@@ -33,7 +33,14 @@ import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { ThemePreferenceSelector } from "@/components/theme/theme-preference-selector";
 import { signOutAction } from "@/lib/auth/actions";
-import { getRoleDescription, getRoleLabel, isAdminRole, type AppRole } from "@/lib/auth/roles";
+import {
+  getProviderAccountTypeLabel,
+  getRoleDescription,
+  getRoleLabel,
+  isAdminRole,
+  type AppRole,
+  type ProviderAccountType,
+} from "@/lib/auth/roles";
 import {
   deleteAccountAction,
   removeProfileAvatarAction,
@@ -105,6 +112,7 @@ type ProfileFormProps = {
     id: string;
     displayName: string;
     role: AppRole;
+    providerAccountType: ProviderAccountType;
     bio: string | null;
     phone: string | null;
     avatarUrl: string | null;
@@ -738,6 +746,11 @@ export function ProfileForm({ profile, account, experience }: ProfileFormProps) 
                 >
                   {getRoleLabel(profile.role)}
                 </Badge>
+                {profile.role === "provider" ? (
+                  <Badge variant="outline">
+                    {getProviderAccountTypeLabel(profile.providerAccountType)}
+                  </Badge>
+                ) : null}
               </div>
               {adminRole ? (
                 <>

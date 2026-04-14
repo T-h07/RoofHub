@@ -1,13 +1,16 @@
+import Link from "next/link";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { redirect } from "next/navigation";
-import { TriangleAlert, UserRound } from "lucide-react";
+import { Building2, TriangleAlert, UserRound } from "lucide-react";
 
 import { MainContainer } from "@/components/layout/main-container";
 import { ProfileForm, type ProfileExperience } from "@/components/profile/profile-form";
+import { buttonVariants } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { toSignInPath } from "@/lib/auth/routing";
 import { getCurrentUserProfile } from "@/lib/auth/profile";
 import { isProviderRole, type PreferredContactMethod } from "@/lib/auth/roles";
+import { getCompanyMembershipContextForUser } from "@/lib/company/context";
 import { loadProviderListingOverviewMetrics } from "@/lib/listings/provider-dashboard/queries";
 import { createServerSupabaseClient } from "@/lib/supabase";
 import type { Database, Tables } from "@/types/database";
@@ -225,6 +228,10 @@ export default async function ProfilePage() {
   }
 
   const profile = profileResult.profile;
+  const companyContextResult = await getCompanyMembershipContextForUser(supabase, profile.id);
+  const ownerOrganization = companyContextResult.ok
+    ? companyContextResult.ownerOrganization
+    : null;
   const roleExperience = isProviderRole(profile.role)
     ? await loadProviderProfileExperience(supabase, profile)
     : await loadSeekerProfileExperience(supabase, profile);
@@ -244,6 +251,7 @@ export default async function ProfilePage() {
           id: profile.id,
           displayName: profile.display_name,
           role: profile.role,
+          providerAccountType: profile.provider_account_type,
           bio: profile.bio,
           phone: profile.phone,
           avatarUrl: profile.avatar_url,
@@ -260,6 +268,59 @@ export default async function ProfilePage() {
         }}
         experience={roleExperience}
       />
+
+      {companyContextResult.ok ? ownerOrganization ? (
+        <section className="border-border bg-card relative overflow-hidden rounded-2xl border p-5 sm:p-6">
+          <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(118deg,color-mix(in_oklch,var(--primary)_10%,transparent)_0%,transparent_56%),linear-gradient(334deg,color-mix(in_oklch,var(--accent)_10%,transparent)_0%,transparent_72%)] opacity-52" />
+          <div className="relative space-y-3">
+            <div className="inline-flex items-center gap-2 text-sm font-semibold tracking-tight">
+              <Building2 className="text-primary size-4" />
+              Company workspace active
+            </div>
+            <h2 className="type-section-title">{ownerOrganization.name}</h2>
+            <p className="type-body-muted max-w-3xl">
+              This account is the owner of your RoofHub company workspace. Continue in the
+              workspace view to review company ownership context.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Link href="/profile/company" className={buttonVariants({ size: "sm" })}>
+                Open company workspace
+              </Link>
+            </div>
+          </div>
+        </section>
+      ) : (
+        <section className="border-border bg-card rounded-2xl border p-5 sm:p-6">
+          <div className="space-y-3">
+            <div className="inline-flex items-center gap-2 text-sm font-semibold tracking-tight">
+              <Building2 className="text-primary size-4" />
+              Company workspace
+            </div>
+            <h2 className="type-section-title">Create a company account foundation</h2>
+            <p className="type-body-muted max-w-3xl">
+              Set up a company workspace to operate as a company provider while keeping account
+              ownership and session handling anchored to trusted server-side membership records.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Link href="/profile/company/new" className={buttonVariants({ size: "sm" })}>
+                Create company workspace
+              </Link>
+              <Link
+                href="/profile/company"
+                className={buttonVariants({ variant: "outline", size: "sm" })}
+              >
+                Learn more
+              </Link>
+            </div>
+          </div>
+        </section>
+      ) : (
+        <EmptyState
+          icon={Building2}
+          title="Company context is temporarily unavailable"
+          description={companyContextResult.message}
+        />
+      )}
 
       {roleExperience.metrics.some((metric) => metric.value === "--") ? (
         <EmptyState
