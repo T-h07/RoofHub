@@ -1,10 +1,14 @@
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 
-import { DEFAULT_APP_ROLE, isPreferredContactMethod } from "@/lib/auth/roles";
+import {
+  DEFAULT_APP_ROLE,
+  isPreferredContactMethod,
+  isProviderAccountType,
+} from "@/lib/auth/roles";
 import type { Database, Tables } from "@/types/database";
 
 const PROFILE_SELECT =
-  "id, role, display_name, avatar_url, phone, bio, preferred_contact_method, contact_methods, contact_email, whatsapp_phone, viber_phone, created_at, updated_at";
+  "id, role, provider_account_type, display_name, avatar_url, phone, bio, preferred_contact_method, contact_methods, contact_email, whatsapp_phone, viber_phone, created_at, updated_at";
 const LEGACY_PROFILE_SELECT =
   "id, role, display_name, avatar_url, phone, bio, preferred_contact_method, created_at, updated_at";
 
@@ -12,6 +16,7 @@ export type AppProfile = Tables<"profiles">;
 type LegacyAppProfileRow = Omit<AppProfile, "contact_methods">;
 type CompatibleAppProfileRow = LegacyAppProfileRow & {
   contact_methods?: unknown;
+  provider_account_type?: unknown;
 };
 
 type EnsureProfileResult =
@@ -106,6 +111,18 @@ function isMissingContactChannelColumnError(message: string | undefined) {
   );
 }
 
+function isMissingProviderAccountTypeColumnError(message: string | undefined) {
+  if (!message) {
+    return false;
+  }
+
+  const normalized = message.toLowerCase();
+  return (
+    normalized.includes("provider_account_type") &&
+    (normalized.includes("does not exist") || normalized.includes("column"))
+  );
+}
+
 function normalizeProfileRow(row: CompatibleAppProfileRow): AppProfile {
   const normalizedPreferredMethod = isPreferredContactMethod(row.preferred_contact_method)
     ? row.preferred_contact_method
@@ -124,6 +141,9 @@ function normalizeProfileRow(row: CompatibleAppProfileRow): AppProfile {
 
   return {
     ...row,
+    provider_account_type: isProviderAccountType(row.provider_account_type)
+      ? row.provider_account_type
+      : "individual",
     preferred_contact_method: normalizedPreferredMethod,
     contact_methods: fallbackContactMethods,
     contact_email:
@@ -175,6 +195,7 @@ async function fetchProfileByUserId(
       normalize: (row) =>
         normalizeProfileRow({
           ...(row as CompatibleAppProfileRow),
+          provider_account_type: "individual",
           contact_email: null,
           whatsapp_phone: null,
           viber_phone: null,
@@ -186,6 +207,7 @@ async function fetchProfileByUserId(
       normalize: (row) =>
         normalizeProfileRow({
           ...(row as CompatibleAppProfileRow),
+          provider_account_type: "individual",
           contact_email: null,
           whatsapp_phone: null,
           viber_phone: null,
@@ -215,6 +237,7 @@ async function fetchProfileByUserId(
     }
 
     const isMissingColumnError =
+      isMissingProviderAccountTypeColumnError(error.message) ||
       isMissingContactChannelColumnError(error.message) ||
       isMissingContactMethodsColumnError(error.message);
 

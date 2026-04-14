@@ -1,11 +1,13 @@
 import type { Database } from "@/types/database";
 
 export type AppRole = Database["public"]["Enums"]["app_role"];
+export type ProviderAccountType = Database["public"]["Enums"]["provider_account_type"];
 export type PreferredContactMethod = Database["public"]["Enums"]["preferred_contact_method"];
 
 export const APP_ROLE_VALUES = ["seeker", "provider", "admin"] as const;
 export const EDITABLE_APP_ROLE_VALUES = ["seeker", "provider"] as const;
 export const DEFAULT_APP_ROLE: AppRole = "seeker";
+export const PROVIDER_ACCOUNT_TYPE_VALUES = ["individual", "company"] as const;
 
 export const PREFERRED_CONTACT_METHOD_VALUES = [
   "in_app",
@@ -17,6 +19,13 @@ export const PREFERRED_CONTACT_METHOD_VALUES = [
 
 export function isAppRole(value: unknown): value is AppRole {
   return typeof value === "string" && APP_ROLE_VALUES.includes(value as AppRole);
+}
+
+export function isProviderAccountType(value: unknown): value is ProviderAccountType {
+  return (
+    typeof value === "string" &&
+    PROVIDER_ACCOUNT_TYPE_VALUES.includes(value as ProviderAccountType)
+  );
 }
 
 export function isEditableAppRole(
@@ -58,11 +67,15 @@ export function getRoleLabel(role: AppRole) {
 export function getRoleDescription(role: AppRole) {
   switch (role) {
     case "provider":
-      return "Publish listings, manage inventory, and respond to inquiries.";
+      return "Publish listings as an individual provider or company workspace and respond to inquiries.";
     case "admin":
       return "Admin access is managed securely and not editable from public profile settings.";
     case "seeker":
     default:
       return "Browse listings, save favorites, and message providers.";
   }
+}
+
+export function getProviderAccountTypeLabel(providerAccountType: ProviderAccountType) {
+  return providerAccountType === "company" ? "Company workspace" : "Individual provider";
 }

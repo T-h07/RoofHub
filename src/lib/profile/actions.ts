@@ -4,7 +4,12 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 
 import { getCurrentUserProfile } from "@/lib/auth/profile";
-import { isAdminRole, type PreferredContactMethod } from "@/lib/auth/roles";
+import {
+  isAdminRole,
+  type PreferredContactMethod,
+  type ProviderAccountType,
+} from "@/lib/auth/roles";
+import { getCompanyMembershipContextForUser } from "@/lib/company/context";
 import { AUDIT_EVENT_TYPES, recordSecurityAuditEvent } from "@/lib/security/audit";
 import { createServerSupabaseClient } from "@/lib/supabase";
 import {
@@ -207,6 +212,19 @@ export async function updateProfileAction(
   }
 
   const currentProfile = profileResult.profile;
+  const companyContextResult = await getCompanyMembershipContextForUser(
+    supabase,
+    currentProfile.id
+  );
+
+  if (!companyContextResult.ok) {
+    return {
+      status: "error",
+      message: companyContextResult.message,
+    };
+  }
+
+  const ownsCompanyWorkspace = companyContextResult.ownsWorkspace;
   const input = readProfileFormInput(formData, currentProfile.role);
   const validationErrors = validateProfileFormInput(input);
 
@@ -214,7 +232,19 @@ export async function updateProfileAction(
     return toValidationErrorState(validationErrors);
   }
 
+  if (ownsCompanyWorkspace && input.role !== "provider") {
+    return toValidationErrorState({
+      role: "Company workspace owners must keep provider role enabled.",
+    });
+  }
+
   const nextRole = isAdminRole(currentProfile.role) ? currentProfile.role : input.role;
+  const nextProviderAccountType: ProviderAccountType =
+    nextRole === "provider"
+      ? ownsCompanyWorkspace
+        ? "company"
+        : "individual"
+      : "individual";
   const normalizedContactMethods: PreferredContactMethod[] =
     input.contactMethods.length > 0 ? input.contactMethods : ["in_app"];
   const normalizedPreferredContactMethod =
@@ -231,6 +261,7 @@ export async function updateProfileAction(
     bio: input.bio,
     phone: input.phone,
     preferred_contact_method: normalizedPreferredContactMethod,
+    provider_account_type: nextProviderAccountType,
     role: nextRole,
   };
   const extendedUpdatePayload = {

@@ -372,6 +372,108 @@ export type Database = {
           },
         ]
       }
+      organization_members: {
+        Row: {
+          created_at: string
+          id: string
+          invited_by_user_id: string | null
+          joined_at: string
+          member_status: Database["public"]["Enums"]["organization_member_status"]
+          organization_id: string
+          role: Database["public"]["Enums"]["organization_member_role"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          invited_by_user_id?: string | null
+          joined_at?: string
+          member_status?: Database["public"]["Enums"]["organization_member_status"]
+          organization_id: string
+          role?: Database["public"]["Enums"]["organization_member_role"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          invited_by_user_id?: string | null
+          joined_at?: string
+          member_status?: Database["public"]["Enums"]["organization_member_status"]
+          organization_id?: string
+          role?: Database["public"]["Enums"]["organization_member_role"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_members_invited_by_user_id_fkey"
+            columns: ["invited_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organization_members_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organization_members_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organizations: {
+        Row: {
+          created_at: string
+          created_by_user_id: string
+          description: string | null
+          id: string
+          logo_path: string | null
+          name: string
+          slug: string
+          status: Database["public"]["Enums"]["organization_status"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by_user_id: string
+          description?: string | null
+          id?: string
+          logo_path?: string | null
+          name: string
+          slug: string
+          status?: Database["public"]["Enums"]["organization_status"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by_user_id?: string
+          description?: string | null
+          id?: string
+          logo_path?: string | null
+          name?: string
+          slug?: string
+          status?: Database["public"]["Enums"]["organization_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organizations_created_by_user_id_fkey"
+            columns: ["created_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -385,6 +487,7 @@ export type Database = {
           preferred_contact_method:
             | Database["public"]["Enums"]["preferred_contact_method"]
             | null
+          provider_account_type: Database["public"]["Enums"]["provider_account_type"]
           role: Database["public"]["Enums"]["app_role"]
           updated_at: string
           viber_phone: string | null
@@ -402,6 +505,7 @@ export type Database = {
           preferred_contact_method?:
             | Database["public"]["Enums"]["preferred_contact_method"]
             | null
+          provider_account_type?: Database["public"]["Enums"]["provider_account_type"]
           role?: Database["public"]["Enums"]["app_role"]
           updated_at?: string
           viber_phone?: string | null
@@ -419,6 +523,7 @@ export type Database = {
           preferred_contact_method?:
             | Database["public"]["Enums"]["preferred_contact_method"]
             | null
+          provider_account_type?: Database["public"]["Enums"]["provider_account_type"]
           role?: Database["public"]["Enums"]["app_role"]
           updated_at?: string
           viber_phone?: string | null
@@ -548,6 +653,14 @@ export type Database = {
           retry_after_seconds: number
         }[]
       }
+      create_organization_workspace: {
+        Args: { p_description?: string; p_name: string }
+        Returns: {
+          organization_id: string
+          organization_slug: string
+          owner_member_id: string
+        }[]
+      }
       is_admin: { Args: never; Returns: boolean }
       log_security_audit_event: {
         Args: {
@@ -587,7 +700,11 @@ export type Database = {
         | "rented"
         | "hidden_by_admin"
       listing_type: "rent" | "sale"
+      organization_member_role: "owner" | "admin" | "manager" | "agent"
+      organization_member_status: "active" | "invited" | "inactive"
+      organization_status: "active" | "inactive"
       preferred_contact_method: "in_app" | "phone" | "email" | "whatsapp" | "viber"
+      provider_account_type: "individual" | "company"
       property_type: "apartment" | "house" | "studio" | "land" | "commercial"
       public_location_mode: "exact" | "approximate" | "hidden"
       report_reason:
@@ -740,7 +857,11 @@ export const Constants = {
         "hidden_by_admin",
       ],
       listing_type: ["rent", "sale"],
+      organization_member_role: ["owner", "admin", "manager", "agent"],
+      organization_member_status: ["active", "invited", "inactive"],
+      organization_status: ["active", "inactive"],
       preferred_contact_method: ["in_app", "phone", "email", "whatsapp", "viber"],
+      provider_account_type: ["individual", "company"],
       property_type: ["apartment", "house", "studio", "land", "commercial"],
       public_location_mode: ["exact", "approximate", "hidden"],
       report_reason: [

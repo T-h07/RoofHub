@@ -33,6 +33,8 @@ export const AUDIT_EVENT_TYPES = {
   authCallbackFailed: "auth.callback.failed",
   authProfileBootstrapFailed: "auth.profile_bootstrap.failed",
   profileRoleChanged: "profile.role.changed",
+  organizationWorkspaceCreated: "organization.workspace.created",
+  organizationWorkspaceCreateFailed: "organization.workspace.create_failed",
   listingDraftCreated: "provider.listing_draft.created",
   listingDraftStepSaved: "provider.listing_draft.step_saved",
   listingPhotosSynced: "provider.listing_photos.synced",

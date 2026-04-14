@@ -49,6 +49,16 @@ export const TRAFFIC_CONTROL_RULES = {
     windowSeconds: 10 * 60,
     maxAttempts: 40,
   },
+  companyWorkspaceCreatePerIp: {
+    bucket: "company.create_workspace.ip",
+    windowSeconds: 30 * 60,
+    maxAttempts: 8,
+  },
+  companyWorkspaceCreatePerUser: {
+    bucket: "company.create_workspace.user",
+    windowSeconds: 6 * 60 * 60,
+    maxAttempts: 4,
+  },
   messagingCreateConversationPerUser: {
     bucket: "messaging.create_conversation.user",
     windowSeconds: 10 * 60,
