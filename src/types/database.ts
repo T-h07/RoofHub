@@ -430,6 +430,83 @@ export type Database = {
           },
         ]
       }
+      organization_member_invites: {
+        Row: {
+          accepted_at: string | null
+          accepted_by_user_id: string | null
+          created_at: string
+          expires_at: string
+          id: string
+          invite_email: string | null
+          invite_status: Database["public"]["Enums"]["organization_invite_status"]
+          invite_token: string
+          invited_by_user_id: string | null
+          organization_id: string
+          role: Database["public"]["Enums"]["organization_member_role"]
+          target_user_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          accepted_by_user_id?: string | null
+          created_at?: string
+          expires_at?: string
+          id?: string
+          invite_email?: string | null
+          invite_status?: Database["public"]["Enums"]["organization_invite_status"]
+          invite_token?: string
+          invited_by_user_id?: string | null
+          organization_id: string
+          role?: Database["public"]["Enums"]["organization_member_role"]
+          target_user_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          accepted_at?: string | null
+          accepted_by_user_id?: string | null
+          created_at?: string
+          expires_at?: string
+          id?: string
+          invite_email?: string | null
+          invite_status?: Database["public"]["Enums"]["organization_invite_status"]
+          invite_token?: string
+          invited_by_user_id?: string | null
+          organization_id?: string
+          role?: Database["public"]["Enums"]["organization_member_role"]
+          target_user_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_member_invites_accepted_by_user_id_fkey"
+            columns: ["accepted_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organization_member_invites_invited_by_user_id_fkey"
+            columns: ["invited_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organization_member_invites_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organization_member_invites_target_user_id_fkey"
+            columns: ["target_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organizations: {
         Row: {
           contact_email: string | null
@@ -673,6 +750,112 @@ export type Database = {
           owner_member_id: string
         }[]
       }
+      create_organization_member_invite: {
+        Args: {
+          p_expires_in_days?: number
+          p_invite_email?: string
+          p_organization_id: string
+          p_role?: Database["public"]["Enums"]["organization_member_role"]
+          p_target_user_id?: string
+        }
+        Returns: {
+          expires_at: string
+          invite_email: string | null
+          invite_id: string
+          invite_role: Database["public"]["Enums"]["organization_member_role"]
+          invite_status: Database["public"]["Enums"]["organization_invite_status"]
+          invite_token: string
+          organization_id: string
+          target_user_id: string | null
+        }[]
+      }
+      accept_organization_member_invite: {
+        Args: {
+          p_invite_token: string
+        }
+        Returns: {
+          acceptance_outcome: string
+          invite_id: string
+          invite_status: Database["public"]["Enums"]["organization_invite_status"]
+          member_id: string
+          membership_role: Database["public"]["Enums"]["organization_member_role"]
+          organization_id: string
+        }[]
+      }
+      revoke_organization_member_invite: {
+        Args: {
+          p_invite_id: string
+        }
+        Returns: {
+          invite_id: string
+          invite_role: Database["public"]["Enums"]["organization_member_role"]
+          invite_status: Database["public"]["Enums"]["organization_invite_status"]
+          organization_id: string
+        }[]
+      }
+      update_organization_member_role: {
+        Args: {
+          p_membership_id: string
+          p_new_role: Database["public"]["Enums"]["organization_member_role"]
+        }
+        Returns: {
+          membership_id: string
+          new_role: Database["public"]["Enums"]["organization_member_role"]
+          organization_id: string
+          previous_role: Database["public"]["Enums"]["organization_member_role"]
+          user_id: string
+        }[]
+      }
+      update_organization_member_status: {
+        Args: {
+          p_membership_id: string
+          p_new_status: Database["public"]["Enums"]["organization_member_status"]
+        }
+        Returns: {
+          membership_id: string
+          new_status: Database["public"]["Enums"]["organization_member_status"]
+          organization_id: string
+          previous_status: Database["public"]["Enums"]["organization_member_status"]
+          role: Database["public"]["Enums"]["organization_member_role"]
+          user_id: string
+        }[]
+      }
+      remove_organization_member: {
+        Args: {
+          p_membership_id: string
+        }
+        Returns: {
+          membership_id: string
+          organization_id: string
+          removed_role: Database["public"]["Enums"]["organization_member_role"]
+          removed_status: Database["public"]["Enums"]["organization_member_status"]
+          user_id: string
+        }[]
+      }
+      current_user_primary_email: {
+        Args: never
+        Returns: string
+      }
+      organization_active_member_role: {
+        Args: {
+          p_organization_id: string
+          p_user_id?: string
+        }
+        Returns: Database["public"]["Enums"]["organization_member_role"]
+      }
+      organization_active_owner_count: {
+        Args: {
+          p_organization_id: string
+        }
+        Returns: number
+      }
+      is_organization_owner_or_admin: {
+        Args: {
+          p_organization_id: string
+          p_user_id?: string
+        }
+        Returns: boolean
+      }
       is_admin: { Args: never; Returns: boolean }
       log_security_audit_event: {
         Args: {
@@ -712,6 +895,7 @@ export type Database = {
         | "rented"
         | "hidden_by_admin"
       listing_type: "rent" | "sale"
+      organization_invite_status: "pending" | "accepted" | "revoked" | "expired"
       organization_member_role: "owner" | "admin" | "manager" | "agent"
       organization_member_status: "active" | "invited" | "inactive"
       organization_status: "active" | "inactive"
@@ -869,6 +1053,7 @@ export const Constants = {
         "hidden_by_admin",
       ],
       listing_type: ["rent", "sale"],
+      organization_invite_status: ["pending", "accepted", "revoked", "expired"],
       organization_member_role: ["owner", "admin", "manager", "agent"],
       organization_member_status: ["active", "invited", "inactive"],
       organization_status: ["active", "inactive"],

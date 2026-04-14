@@ -36,15 +36,34 @@ export type CompanyMembershipSummary = Pick<
   organization: CompanyWorkspaceSummary | null;
 };
 
+const ROLE_PRIORITY: Record<Tables<"organization_members">["role"], number> = {
+  owner: 1,
+  admin: 2,
+  manager: 3,
+  agent: 4,
+};
+
+function sortMembershipByRolePriority(left: CompanyMembershipSummary, right: CompanyMembershipSummary) {
+  const leftPriority = ROLE_PRIORITY[left.role] ?? 99;
+  const rightPriority = ROLE_PRIORITY[right.role] ?? 99;
+  return leftPriority - rightPriority;
+}
+
 type CompanyMembershipContext =
   | {
       ok: true;
       memberships: CompanyMembershipSummary[];
       activeMemberships: CompanyMembershipSummary[];
+      primaryMembership: CompanyMembershipSummary | null;
+      primaryOrganization: CompanyWorkspaceSummary | null;
       ownerMembership: CompanyMembershipSummary | null;
       ownerOrganization: CompanyWorkspaceSummary | null;
+      managementMembership: CompanyMembershipSummary | null;
+      managementOrganization: CompanyWorkspaceSummary | null;
       hasMembership: boolean;
       ownsWorkspace: boolean;
+      activeRole: Tables<"organization_members">["role"] | null;
+      canManageTeam: boolean;
     }
   | {
       ok: false;
@@ -100,18 +119,32 @@ export async function getCompanyMembershipContextForUser(
     (membership) =>
       membership.member_status === "active" && membership.organization?.status === "active"
   );
+  const sortedActiveMemberships = [...activeMemberships].sort(sortMembershipByRolePriority);
+  const primaryMembership = sortedActiveMemberships[0] ?? null;
+  const primaryOrganization = primaryMembership?.organization ?? null;
   const ownerMembership =
     activeMemberships.find((membership) => membership.role === "owner") ?? null;
   const ownerOrganization = ownerMembership?.organization ?? null;
+  const managementMembership =
+    activeMemberships.find(
+      (membership) => membership.role === "owner" || membership.role === "admin"
+    ) ?? null;
+  const managementOrganization = managementMembership?.organization ?? null;
 
   return {
     ok: true,
     memberships,
     activeMemberships,
+    primaryMembership,
+    primaryOrganization,
     ownerMembership,
     ownerOrganization,
+    managementMembership,
+    managementOrganization,
     hasMembership: activeMemberships.length > 0,
     ownsWorkspace: Boolean(ownerMembership),
+    activeRole: primaryMembership?.role ?? null,
+    canManageTeam: Boolean(managementMembership),
   };
 }
 

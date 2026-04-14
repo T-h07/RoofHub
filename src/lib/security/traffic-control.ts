@@ -69,6 +69,21 @@ export const TRAFFIC_CONTROL_RULES = {
     windowSeconds: 30 * 60,
     maxAttempts: 20,
   },
+  companyInviteCreatePerUser: {
+    bucket: "company.invite_create.user",
+    windowSeconds: 30 * 60,
+    maxAttempts: 40,
+  },
+  companyMemberMutatePerUser: {
+    bucket: "company.member_mutation.user",
+    windowSeconds: 30 * 60,
+    maxAttempts: 120,
+  },
+  companyInviteAcceptPerUser: {
+    bucket: "company.invite_accept.user",
+    windowSeconds: 30 * 60,
+    maxAttempts: 30,
+  },
   messagingCreateConversationPerUser: {
     bucket: "messaging.create_conversation.user",
     windowSeconds: 10 * 60,
