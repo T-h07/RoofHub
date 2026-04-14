@@ -59,6 +59,23 @@ Route protection improves UX but is not an authorization substitute.
 - Company branding media mutation (company logo upload/remove) is owner-scoped and backed by canonical storage path policies.
 - Public company profile reads are constrained to active organizations and published listings.
 
+### Company team invites and membership management (NM-PT33)
+
+- Team invite creation is owner/admin-scoped and server-enforced.
+- Invite targets are validated server-side for either:
+  - explicit RoofHub user id, or
+  - normalized email, with account linking supported at acceptance time.
+- Invite acceptance is bound to authenticated identity:
+  - target-user invites require `auth.uid()` match
+  - email invites require signed-in primary email match
+- Role, suspend/reactivate, and remove actions are owner/admin-scoped and server-enforced.
+- Admin scope is intentionally constrained:
+  - admin cannot assign owner/admin roles
+  - admin cannot mutate/remove owner/admin members
+- Owner continuity is protected:
+  - role/status/remove paths cannot leave an organization without at least one active owner.
+- Company team read surfaces distinguish active members, suspended members, and pending invites from persisted server-backed state.
+
 ### Favorites
 
 - Favorite create/delete/read operations are scoped to the authenticated user id.
@@ -130,4 +147,3 @@ Targeted hardening outcomes:
 - Messaging access remains participant-only.
 - Public listing surfaces remain published-only by default.
 - Any authorization model changes require updates to this document, `docs/security-baseline.md`, and `docs/security-checklist.md`.
-- Future company member invites/roles must extend this document before merge.

@@ -91,3 +91,11 @@ For dependency/lockfile/scanner specifics, also follow `docs/supply-chain-guardr
 - Public company route exposure is constrained to active organizations plus published listings.
 - Company profile input validation covers name, description, contact email/phone, website URL, and coverage text bounds.
 - Structured audit events capture company profile/logo success and failure outcomes without secret-bearing metadata.
+
+## NM-PT33 validation notes
+
+- Team invite creation is owner/admin-scoped and server-enforced through membership-derived context.
+- Invite acceptance is tied to authenticated identity (target user id or normalized invite-email match).
+- Membership role/status/remove mutations are owner/admin-scoped with admin anti-escalation limits.
+- Last-owner protections prevent role/status/remove operations from removing final active owner coverage.
+- Invite/member actions are traffic-controlled and recorded through structured audit events.

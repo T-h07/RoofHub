@@ -45,6 +45,9 @@ Audit and observability execution details are defined in `docs/audit-observabili
 - Enforce ownership server-side for listing/profile/storage/messaging mutations.
 - Enforce company workspace ownership from persisted `organization_members` records, not client mode toggles.
 - Enforce company profile and branding mutations (name/contact/coverage/logo) through persisted owner membership checks.
+- Enforce company invite creation, invite revocation, role updates, status updates, and member removal through persisted owner/admin membership checks.
+- Company invite acceptance must be bound to authenticated user identity (target user id match or invite-email match), never client-asserted claims.
+- Protect owner continuity for company membership mutations (at least one active owner must remain).
 - Never use client-supplied owner/provider/admin ids as authority.
 - Preserve RLS assumptions; app code must not "re-authorize" by weak client filters.
 - Admin-only behavior must have explicit role checks in server code.

@@ -60,6 +60,18 @@ Key model:
 - `createCompanyWorkspaceAction`
   - per-IP company workspace bootstrap control
   - per-user company workspace bootstrap control
+- `createCompanyTeamInviteAction`
+  - per-user company invite creation control
+- `revokeCompanyTeamInviteAction`
+  - per-user company member-mutation control (scoped by invite id)
+- `updateCompanyTeamMemberRoleAction`
+  - per-user company member-mutation control (scoped by membership id)
+- `updateCompanyTeamMemberStatusAction`
+  - per-user company member-mutation control (scoped by membership id)
+- `removeCompanyTeamMemberAction`
+  - per-user company member-mutation control (scoped by membership id)
+- `acceptCompanyTeamInviteAction`
+  - per-user invite-acceptance control
 
 ### Resource-consumption-sensitive
 

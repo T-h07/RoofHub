@@ -131,6 +131,22 @@ Message audit metadata records only safe descriptors (for example message length
 - `organization.logo.removed`
 - `organization.logo.update_failed`
 
+### Company team invites and membership lifecycle
+
+- `organization.invite.created`
+- `organization.invite.create_failed`
+- `organization.invite.accepted`
+- `organization.invite.accept_failed`
+- `organization.invite.revoked`
+- `organization.invite.revoke_failed`
+- `organization.member.role_changed`
+- `organization.member.role_change_failed`
+- `organization.member.suspended`
+- `organization.member.reactivated`
+- `organization.member.status_update_failed`
+- `organization.member.removed`
+- `organization.member.remove_failed`
+
 ## Failure observability model
 
 Important failures now emit bounded, structured audit events in these flows:
