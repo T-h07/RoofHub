@@ -120,10 +120,12 @@ export default async function DashboardListingsPage({ searchParams }: DashboardL
     <MainContainer size="wide" className="space-y-5">
       <section className="border-border/75 bg-card/60 space-y-3 rounded-xl border p-5 sm:p-6">
         <Badge variant="primary">My listings</Badge>
-        <h1 className="type-page-title max-w-4xl">Manage owned listings with status-aware lifecycle actions.</h1>
+        <h1 className="type-page-title max-w-4xl">
+          Manage listings with status-aware lifecycle actions.
+        </h1>
         <p className="type-body-muted max-w-3xl">
-          Filter by listing state, continue edits, and update lifecycle status transitions with ownership-safe
-          backend persistence.
+          Filter by listing state, continue edits, and update lifecycle transitions across individual and
+          company-owned inventory.
         </p>
         <div className="flex flex-wrap gap-2">
           <Link href="/dashboard/listings/new" className={buttonVariants({ size: "sm" })}>
@@ -189,7 +191,7 @@ export default async function DashboardListingsPage({ searchParams }: DashboardL
       </section>
 
       {!listingsResult.ok ? (
-        <EmptyState icon={Rows3} title="Owned listings unavailable" description={listingsResult.message} />
+        <EmptyState icon={Rows3} title="Managed listings unavailable" description={listingsResult.message} />
       ) : listingsResult.listings.length === 0 ? (
         <EmptyState
           icon={Rows3}

@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { getMapStyleUrl } from "@/lib/config/map";
+import { resolveProviderListingCreationContext } from "@/lib/listings/ownership";
 import { getProviderRouteContext } from "@/lib/listings/provider-wizard/access";
 import { PROVIDER_WIZARD_DEFAULT_VALUES } from "@/lib/listings/provider-wizard/types";
 import { loadProviderContactSettings } from "@/lib/listings/provider-wizard/queries";
@@ -27,6 +28,24 @@ export default async function NewDashboardListingPage() {
     return <ProviderAccessRequired />;
   }
 
+  const listingCreationContextResult = await resolveProviderListingCreationContext(
+    context.supabase,
+    context.profile
+  );
+
+  if (!listingCreationContextResult.ok) {
+    return (
+      <MainContainer size="content">
+        <EmptyState
+          icon={PlusSquare}
+          title="Listing creation context unavailable"
+          description={listingCreationContextResult.message}
+        />
+      </MainContainer>
+    );
+  }
+
+  const listingCreationContext = listingCreationContextResult.context;
   const contactSettings = await loadProviderContactSettings(context.supabase, context.profile.id);
   const initialValues = {
     ...PROVIDER_WIZARD_DEFAULT_VALUES,
@@ -48,6 +67,11 @@ export default async function NewDashboardListingPage() {
           Build listing identity, pricing, facts, map pin placement, photos, and publish readiness in
           sequence. Drafts persist incrementally and can be safely resumed.
         </p>
+        <div className="inline-flex items-center rounded-full border border-border/70 bg-muted/25 px-3 py-1.5 text-xs text-muted-foreground">
+          {listingCreationContext.ownershipMode === "company"
+            ? `New listings will be owned by ${listingCreationContext.organizationName ?? "your company workspace"}.`
+            : "New listings will be created as individual listings for this provider account."}
+        </div>
         <div className="flex flex-wrap gap-2">
           <Link href="/dashboard" className={buttonVariants({ variant: "outline", size: "sm" })}>
             Back to dashboard

@@ -79,6 +79,7 @@ export default async function EditDashboardListingPage({
   const mapStyleUrl = getMapStyleUrl();
   const isHiddenByAdmin = draftResult.draft.listing_status === "hidden_by_admin";
   const isPubliclyVisible = draftResult.draft.listing_status === "published";
+  const ownershipLabel = draftResult.draft.organization_id ? "Company listing" : "Individual listing";
 
   return (
     <MainContainer size="wide" className="space-y-5">
@@ -89,6 +90,9 @@ export default async function EditDashboardListingPage({
           Updates are saved step-by-step through the shared provider workflow. Status controls and visibility
           consequences are handled explicitly so public discovery state stays reliable.
         </p>
+        <div className="inline-flex items-center rounded-full border border-border/70 bg-muted/25 px-3 py-1.5 text-xs text-muted-foreground">
+          {ownershipLabel}
+        </div>
         <div className="border-border/70 bg-muted/25 flex flex-wrap items-center justify-between gap-3 rounded-lg border px-3.5 py-3">
           <div className="flex items-center gap-2">
             <span className="text-muted-foreground text-xs">Current status</span>

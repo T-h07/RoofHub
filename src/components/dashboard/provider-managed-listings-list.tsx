@@ -4,6 +4,7 @@ import { Building2, Clock3, MapPin, SquareArrowOutUpRight } from "lucide-react";
 
 import { ProviderListingLifecycleActions } from "@/components/dashboard/provider-listing-lifecycle-actions";
 import { ProviderListingStatusBadge } from "@/components/dashboard/provider-listing-status-badge";
+import { Badge } from "@/components/ui/badge";
 import type { ProviderManagedListing, ProviderListingType } from "@/lib/listings/provider-dashboard/types";
 
 type ProviderManagedListingsListProps = {
@@ -64,6 +65,18 @@ function buildEditHref(listingId: string) {
   return `/dashboard/listings/${listingId}/edit?step=basics`;
 }
 
+function renderOwnershipBadge(listing: ProviderManagedListing) {
+  return listing.ownershipMode === "company" ? (
+    <Badge variant="outline" className="text-[10px]">
+      Company listing
+    </Badge>
+  ) : (
+    <Badge variant="outline" className="text-[10px]">
+      Individual listing
+    </Badge>
+  );
+}
+
 function renderPreviewImage(listing: ProviderManagedListing) {
   if (listing.coverImageUrl) {
     return (
@@ -106,13 +119,16 @@ export function ProviderManagedListingsList({ listings }: ProviderManagedListing
                     </div>
                     <div className="min-w-0 space-y-1">
                       <p className="truncate font-semibold tracking-tight">{listing.title}</p>
-                      <p className="text-muted-foreground flex items-center gap-2 text-xs">
-                        <span className="inline-flex items-center gap-1">
-                          <Building2 className="size-3.5" aria-hidden="true" />
-                          {LISTING_TYPE_LABELS[listing.listing_type]} • {formatPropertyType(listing.property_type)}
-                        </span>
-                        <span>{formatPriceLabel(listing)}</span>
-                      </p>
+                      <div className="flex flex-wrap items-center gap-2">
+                        {renderOwnershipBadge(listing)}
+                        <p className="text-muted-foreground flex items-center gap-2 text-xs">
+                          <span className="inline-flex items-center gap-1">
+                            <Building2 className="size-3.5" aria-hidden="true" />
+                            {LISTING_TYPE_LABELS[listing.listing_type]} • {formatPropertyType(listing.property_type)}
+                          </span>
+                          <span>{formatPriceLabel(listing)}</span>
+                        </p>
+                      </div>
                       <p className="text-muted-foreground inline-flex items-center gap-1 text-xs">
                         <MapPin className="size-3.5" aria-hidden="true" />
                         {formatLocationLabel(listing)}
@@ -170,6 +186,15 @@ export function ProviderManagedListingsList({ listings }: ProviderManagedListing
                 </p>
               </div>
               <ProviderListingStatusBadge status={listing.listing_status} />
+            </div>
+
+            <div className="flex items-center justify-between gap-2">
+              {renderOwnershipBadge(listing)}
+              <p className="text-muted-foreground text-[11px]">
+                {listing.ownershipMode === "company"
+                  ? "Managed through company workspace"
+                  : "Managed as individual profile"}
+              </p>
             </div>
 
             <div className="border-border/70 bg-muted/25 relative h-40 overflow-hidden rounded-lg border">
