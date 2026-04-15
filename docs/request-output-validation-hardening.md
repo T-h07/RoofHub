@@ -17,6 +17,7 @@ Treat these as untrusted input boundaries:
 - Company team invite/member payloads (`src/lib/company/team-actions.ts`, `src/lib/company/team-validation.ts`)
 - Provider listing wizard create/edit/publish payloads (`src/lib/listings/provider-wizard/*`)
 - Provider status transition actions (`src/lib/listings/provider-dashboard/actions.ts`)
+- Company listing workflow actions and review notes (`src/lib/listings/company-workflow/actions.ts`, `src/lib/listings/company-workflow/queries.ts`)
 - Listing favorites/report actions (`src/lib/listings/favorite-actions.ts`, `src/lib/listings/detail-actions.ts`)
 - Messaging create/send/read/list/thread actions (`src/lib/messaging/actions.ts`, `src/lib/messaging/queries.ts`)
 - Moderation actions/queue filters (`src/lib/moderation/actions.ts`, `src/lib/moderation/queries.ts`)
@@ -37,6 +38,8 @@ Treat these as untrusted input boundaries:
 - Company profile setup must validate contact email/phone/website/coverage bounds server-side and derive edit authority from authenticated owner membership context.
 - Company team invite flows must validate invite method, target (email/user id), role, and mutation references (membership/invite ids) before execution.
 - Company invite acceptance must validate token shape and enforce authenticated user-to-invite target matching server-side.
+- Company listing workflow actions must validate listing id shape, action allowlist, and bounded review-note length before execution.
+- Company listing workflow timeline reads must validate membership access server-side and reject non-member/non-admin readers.
 
 ## Query and route param rules
 
@@ -78,6 +81,7 @@ Treat these as untrusted input boundaries:
 
 - Status and action fields must use explicit allowlists:
   - provider lifecycle statuses
+  - company listing workflow statuses/actions
   - moderation actions (`hide`/`unhide`)
   - report reasons and moderation filters
   - listing type/property type/contact preference values

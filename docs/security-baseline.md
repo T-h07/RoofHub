@@ -47,6 +47,8 @@ Audit and observability execution details are defined in `docs/audit-observabili
 - Enforce company profile and branding mutations (name/contact/coverage/logo) through persisted owner membership checks.
 - Enforce company invite creation, invite revocation, role updates, status updates, and member removal through persisted owner/admin membership checks.
 - Enforce company listing ownership assignment through persisted active organization membership checks when `listings.organization_id` is set.
+- Enforce company listing review workflow transitions (submit/needs-changes/approve/publish/unpublish) through trusted server mutations backed by persisted membership role checks.
+- Restrict company listing review/publish actions to reviewer-capable membership roles (`owner`/`admin`/`manager`) with creator or assigned-agent submit constraints.
 - Company invite acceptance must be bound to authenticated user identity (target user id match or invite-email match), never client-asserted claims.
 - Protect owner continuity for company membership mutations (at least one active owner must remain).
 - Never use client-supplied owner/provider/admin ids as authority.
@@ -82,6 +84,7 @@ Audit and observability execution details are defined in `docs/audit-observabili
 - Conversation creation must enforce listing contactability and anti-self-contact checks.
 - Moderation actions are admin-only and must not be bypassed by provider/user controls.
 - Listing visibility must obey listing status (`published`-only for public discovery surfaces).
+- Company listing review states (`draft`, `submitted_for_review`, `needs_changes`, `approved`, `unpublished`) are internal-only and must never leak to public discovery/detail/company feeds.
 - Public company pages must expose only intended public organization fields and published listing inventory.
 - Status transitions must remain centralized and validated.
 

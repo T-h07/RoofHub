@@ -108,3 +108,12 @@ For dependency/lockfile/scanner specifics, also follow `docs/supply-chain-guardr
 - Listings insert/update/delete RLS policies now require active organization membership when `organization_id` is present.
 - Listing image owner-scoped policies now enforce the same active membership requirement for company-owned listings.
 - Public company profile listing feed and workspace listing counts resolve organization-owned listings with legacy owner fallback.
+
+## NM-PT35 validation notes
+
+- Company-owned listings now use enforced workflow statuses (`draft`, `submitted_for_review`, `needs_changes`, `approved`, `published`, `unpublished`).
+- Company workflow transitions are server-trusted through a dedicated RPC with role + transition enforcement; client status toggles are not authority.
+- Reviewer actions (`needs_changes`, `approve`, `publish`, `unpublish`) are restricted to owner/admin/manager roles; submit is constrained to creator/assigned-agent/reviewer.
+- Company workflow actions are traffic-controlled at server action boundaries with listing/action scoped limits.
+- Company workflow notes and timeline events are persisted (`listing_workflow_events`) and membership-scoped for reads.
+- Public listing visibility remains restricted to `listing_status = 'published'`; company `approved` state is internal-only until explicit publish.

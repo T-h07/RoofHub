@@ -103,6 +103,21 @@ Notes:
 
 Status transitions include `from_status` and `to_status` when applicable.
 
+### Company listing approval workflow (NM-PT35)
+
+- Persisted workflow timeline events are captured in `public.listing_workflow_events`.
+- Timeline event types:
+  - `created`
+  - `submitted_for_review`
+  - `needs_changes`
+  - `approved`
+  - `published`
+  - `unpublished`
+- Workflow transition actions also emit security audit events through existing provider listing status events:
+  - `provider.listing_status.changed`
+  - `provider.listing_status.change_failed`
+- Workflow timeline notes are bounded and sanitized for length; no secrets/tokens are allowed in note metadata.
+
 ### Reporting and moderation
 
 - `moderation.report.created`

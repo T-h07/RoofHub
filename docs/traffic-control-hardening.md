@@ -55,6 +55,8 @@ Key model:
   - per-listing publish control
 - `updateProviderListingLifecycleStatusAction`
   - per-listing status-transition control
+- `transitionCompanyListingWorkflowAction`
+  - per-user company listing workflow mutation control (scoped by listing id + action)
 - `updateListingModerationVisibilityAction`
   - per-admin moderation mutation control
 - `createCompanyWorkspaceAction`

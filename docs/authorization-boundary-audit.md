@@ -28,7 +28,7 @@ Provider account classification (foundation for NM-PT31):
 - Authenticated routes:
   - `/favorites`, `/messages`, `/profile`
 - Provider-scoped routes:
-  - `/dashboard`, `/dashboard/listings`, `/dashboard/listings/new`, `/dashboard/listings/[id]/edit`
+  - `/dashboard`, `/dashboard/listings`, `/dashboard/listings/new`, `/dashboard/listings/[id]/edit`, `/dashboard/listings/[id]/workflow`
   - Provider role is required; ownership checks still apply in every mutation/read query.
 - Admin-scoped route:
   - `/admin/moderation`
@@ -91,6 +91,22 @@ Route protection improves UX but is not an authorization substitute.
 - Owner continuity is protected:
   - role/status/remove paths cannot leave an organization without at least one active owner.
 - Company team read surfaces distinguish active members, suspended members, and pending invites from persisted server-backed state.
+
+### Company listing approval workflow V1 (NM-PT35)
+
+- Company-owned listings now use enforced workflow statuses:
+  - `draft`
+  - `submitted_for_review`
+  - `needs_changes`
+  - `approved`
+  - `published`
+  - `unpublished`
+- Workflow transitions are server-trusted through `transition_company_listing_workflow(...)`; client state is not authority.
+- Submit-for-review is allowed for listing creator/assigned agent and reviewer-capable roles.
+- Needs-changes, approve, publish, and unpublish are restricted to reviewer-capable roles (`owner`, `admin`, `manager`) or platform admin.
+- Company listing inserts are constrained to `draft` status; invalid direct transitions are blocked through trigger-level enforcement.
+- Public visibility remains `listing_status = 'published'`; `approved` is internal-only until an explicit publish action.
+- Workflow timeline rows are persisted in `listing_workflow_events` and are readable only by active organization members or platform admins.
 
 ### Favorites
 
