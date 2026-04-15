@@ -3,6 +3,11 @@
 import { revalidatePath } from "next/cache";
 
 import { getCurrentUserProfile } from "@/lib/auth/profile";
+import { buildWizardValuesFromDraft } from "@/lib/listings/provider-wizard/mapping";
+import {
+  evaluateProviderPublishReadiness,
+  type ProviderPublishBlocker,
+} from "@/lib/listings/provider-wizard/publish";
 import { AUDIT_EVENT_TYPES, recordSecurityAuditEvent } from "@/lib/security/audit";
 import { enforceTrafficControl, TRAFFIC_CONTROL_RULES } from "@/lib/security/traffic-control";
 import { createServerSupabaseClient } from "@/lib/supabase";
@@ -32,6 +37,7 @@ export type TransitionCompanyListingWorkflowResult = {
   message: string;
   previousStatus?: Enums<"listing_status">;
   nextStatus?: Enums<"listing_status">;
+  blockers?: ProviderPublishBlocker[];
 };
 
 type TransitionRpcRow = {
@@ -42,6 +48,51 @@ type TransitionRpcRow = {
   event_type: Enums<"listing_workflow_event_type">;
   published_at: string | null;
   published_by_user_id: string | null;
+};
+
+const WORKFLOW_REVIEW_READINESS_LISTING_SELECT = `
+  id,
+  owner_id,
+  organization_id,
+  created_by_user_id,
+  assigned_agent_user_id,
+  published_by_user_id,
+  slug,
+  title,
+  description,
+  listing_type,
+  property_type,
+  listing_status,
+  price_amount,
+  currency_code,
+  deposit_amount,
+  area_m2,
+  bedrooms,
+  bathrooms,
+  floor_number,
+  total_floors,
+  city,
+  neighborhood,
+  address_text,
+  available_from,
+  furnished,
+  parking,
+  pets_allowed,
+  elevator,
+  balcony,
+  internet_included,
+  utilities_included,
+  heating_type,
+  public_location_mode,
+  latitude,
+  longitude,
+  updated_at,
+  created_at
+`;
+
+type ListingImageReadinessRow = {
+  id: string;
+  is_cover: boolean;
 };
 
 function isUuid(value: string | null | undefined) {
@@ -121,6 +172,65 @@ function toSuccessMessage(action: CompanyListingWorkflowAction) {
     default:
       return "Workflow action completed.";
   }
+}
+
+async function ensureSubmitForReviewReadiness(input: {
+  supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>;
+  listingId: string;
+}): Promise<{ ok: true } | { ok: false; message: string; blockers?: ProviderPublishBlocker[] }> {
+  const { data: listingDraft, error: listingDraftError } = await input.supabase
+    .from("listings")
+    .select(WORKFLOW_REVIEW_READINESS_LISTING_SELECT)
+    .eq("id", input.listingId)
+    .maybeSingle();
+
+  if (listingDraftError || !listingDraft) {
+    return {
+      ok: false,
+      message: "Listing details could not be validated for review readiness.",
+    };
+  }
+
+  const { data: listingImages, error: listingImagesError } = await input.supabase
+    .from("listing_images")
+    .select("id, is_cover")
+    .eq("listing_id", input.listingId);
+
+  if (listingImagesError) {
+    return {
+      ok: false,
+      message: "Listing photos could not be validated for review readiness.",
+    };
+  }
+
+  const listingValues = buildWizardValuesFromDraft(listingDraft, {
+    preferredContactMethod: "",
+    contactMethods: ["in_app"],
+    contactEmail: "",
+    phone: "",
+    whatsappPhone: "",
+    viberPhone: "",
+  });
+
+  const normalizedImages = (listingImages ?? []) as ListingImageReadinessRow[];
+  const reviewReadiness = evaluateProviderPublishReadiness({
+    values: listingValues,
+    imageCount: normalizedImages.length,
+    hasCoverImage: normalizedImages.some((image) => image.is_cover),
+  });
+
+  if (reviewReadiness.isReady) {
+    return { ok: true };
+  }
+
+  const primaryBlocker = reviewReadiness.blockers[0];
+  return {
+    ok: false,
+    message: primaryBlocker
+      ? `Listing is not review-ready yet: ${primaryBlocker.title}.`
+      : "Listing is not review-ready yet.",
+    blockers: reviewReadiness.blockers,
+  };
 }
 
 async function revalidateListingWorkflowPaths(input: {
@@ -208,6 +318,21 @@ export async function transitionCompanyListingWorkflowAction(
       ok: false,
       message: trafficResult.message,
     };
+  }
+
+  if (input.action === "submit_for_review") {
+    const readiness = await ensureSubmitForReviewReadiness({
+      supabase,
+      listingId: input.listingId,
+    });
+
+    if (!readiness.ok) {
+      return {
+        ok: false,
+        message: readiness.message,
+        blockers: readiness.blockers,
+      };
+    }
   }
 
   const { data, error } = await supabase
