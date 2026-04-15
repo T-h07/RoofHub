@@ -4,6 +4,7 @@ import { createServerSupabaseClient } from "@/lib/supabase";
 import { getCurrentUserProfile } from "@/lib/auth/profile";
 import { isProviderRole } from "@/lib/auth/roles";
 import { resolveProviderListingCreationContext } from "@/lib/listings/ownership";
+import { recordCompanyListingCreatedWorkflowEvent } from "@/lib/listings/company-workflow/actions";
 import { AUDIT_EVENT_TYPES, recordSecurityAuditEvent } from "@/lib/security/audit";
 import { enforceTrafficControl, TRAFFIC_CONTROL_RULES } from "@/lib/security/traffic-control";
 import type { Enums } from "@/types/database";
@@ -561,6 +562,14 @@ export async function saveProviderWizardStepAction(
           },
         },
       });
+
+      if (listingCreationContext.ownershipMode === "company") {
+        await recordCompanyListingCreatedWorkflowEvent({
+          listingId: draftId,
+          actorUserId: profile.id,
+          actorRole: profile.role,
+        });
+      }
 
       return {
         ok: true,

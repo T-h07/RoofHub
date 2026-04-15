@@ -291,6 +291,16 @@ export async function updateProviderListingLifecycleStatusAction(
   }
 
   const currentListing = listingResult.listing;
+
+  if (currentListing.organization_id) {
+    return {
+      ok: false,
+      message:
+        "Company-owned listings use internal workflow actions. Open the listing workflow panel to continue.",
+      previousStatus: currentListing.listing_status,
+    };
+  }
+
   if (currentListing.listing_status === nextStatus) {
     return {
       ok: true,

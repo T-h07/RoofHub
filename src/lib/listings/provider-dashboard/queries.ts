@@ -61,13 +61,21 @@ async function countProviderListingsByStatus(
   supabase: SupabaseClient<Database>,
   input: {
     userId: string;
+    organizationId?: string | null;
     status?: ProviderListingStatus;
   }
 ) {
   let query = supabase
     .from("listings")
-    .select("id", { count: "exact", head: true })
-    .eq("owner_id", input.userId);
+    .select("id", { count: "exact", head: true });
+
+  if (input.organizationId) {
+    query = query.or(
+      `organization_id.eq.${input.organizationId},and(organization_id.is.null,owner_id.eq.${input.userId})`
+    );
+  } else {
+    query = query.eq("owner_id", input.userId);
+  }
 
   if (input.status) {
     query = query.eq("listing_status", input.status);
@@ -93,12 +101,22 @@ export async function loadProviderListingOverviewMetrics(
   supabase: SupabaseClient<Database>,
   input: {
     userId: string;
+    organizationId?: string | null;
   }
 ) {
+  const scopedInput = {
+    userId: input.userId,
+    organizationId: input.organizationId ?? null,
+  };
+
   const [
     totalResult,
     publishedResult,
     draftResult,
+    submittedForReviewResult,
+    needsChangesResult,
+    approvedResult,
+    unpublishedResult,
     pausedResult,
     archivedResult,
     soldResult,
@@ -106,21 +124,29 @@ export async function loadProviderListingOverviewMetrics(
     hiddenByAdminResult,
     unreadResult,
   ] = await Promise.all([
-    countProviderListingsByStatus(supabase, input),
-    countProviderListingsByStatus(supabase, { ...input, status: "published" }),
-    countProviderListingsByStatus(supabase, { ...input, status: "draft" }),
-    countProviderListingsByStatus(supabase, { ...input, status: "paused" }),
-    countProviderListingsByStatus(supabase, { ...input, status: "archived" }),
-    countProviderListingsByStatus(supabase, { ...input, status: "sold" }),
-    countProviderListingsByStatus(supabase, { ...input, status: "rented" }),
-    countProviderListingsByStatus(supabase, { ...input, status: "hidden_by_admin" }),
-    loadProviderUnreadLeadCount(supabase, input.userId),
+    countProviderListingsByStatus(supabase, scopedInput),
+    countProviderListingsByStatus(supabase, { ...scopedInput, status: "published" }),
+    countProviderListingsByStatus(supabase, { ...scopedInput, status: "draft" }),
+    countProviderListingsByStatus(supabase, { ...scopedInput, status: "submitted_for_review" }),
+    countProviderListingsByStatus(supabase, { ...scopedInput, status: "needs_changes" }),
+    countProviderListingsByStatus(supabase, { ...scopedInput, status: "approved" }),
+    countProviderListingsByStatus(supabase, { ...scopedInput, status: "unpublished" }),
+    countProviderListingsByStatus(supabase, { ...scopedInput, status: "paused" }),
+    countProviderListingsByStatus(supabase, { ...scopedInput, status: "archived" }),
+    countProviderListingsByStatus(supabase, { ...scopedInput, status: "sold" }),
+    countProviderListingsByStatus(supabase, { ...scopedInput, status: "rented" }),
+    countProviderListingsByStatus(supabase, { ...scopedInput, status: "hidden_by_admin" }),
+    loadProviderUnreadLeadCount(supabase, scopedInput.userId),
   ]);
 
   const failedResult = [
     totalResult,
     publishedResult,
     draftResult,
+    submittedForReviewResult,
+    needsChangesResult,
+    approvedResult,
+    unpublishedResult,
     pausedResult,
     archivedResult,
     soldResult,
@@ -136,6 +162,10 @@ export async function loadProviderListingOverviewMetrics(
         total: 0,
         published: 0,
         draft: 0,
+        submittedForReview: 0,
+        needsChanges: 0,
+        approved: 0,
+        unpublished: 0,
         paused: 0,
         archived: 0,
         sold: 0,
@@ -152,6 +182,10 @@ export async function loadProviderListingOverviewMetrics(
       total: totalResult.count,
       published: publishedResult.count,
       draft: draftResult.count,
+      submittedForReview: submittedForReviewResult.count,
+      needsChanges: needsChangesResult.count,
+      approved: approvedResult.count,
+      unpublished: unpublishedResult.count,
       paused: pausedResult.count,
       archived: archivedResult.count,
       sold: soldResult.count,
@@ -166,6 +200,7 @@ export async function loadProviderManagedListings(
   supabase: SupabaseClient<Database>,
   input: {
     userId: string;
+    organizationId?: string | null;
     statusFilter?: ProviderListingStatusFilter;
     limit?: number;
   }
@@ -185,7 +220,13 @@ export async function loadProviderManagedListings(
     .order("created_at", { ascending: false })
     .limit(normalizedLimit);
 
-  query = query.eq("owner_id", input.userId);
+  if (input.organizationId) {
+    query = query.or(
+      `organization_id.eq.${input.organizationId},and(organization_id.is.null,owner_id.eq.${input.userId})`
+    );
+  } else {
+    query = query.eq("owner_id", input.userId);
+  }
 
   if (statusFilter !== "all") {
     query = query.eq("listing_status", statusFilter);

@@ -5,7 +5,11 @@ export type ProviderListingStatus = Enums<"listing_status">;
 
 export const PROVIDER_LISTING_STATUS_VALUES = [
   "draft",
+  "submitted_for_review",
+  "needs_changes",
+  "approved",
   "published",
+  "unpublished",
   "paused",
   "archived",
   "sold",
@@ -49,6 +53,10 @@ export type ProviderListingOverviewMetrics = {
   total: number;
   published: number;
   draft: number;
+  submittedForReview: number;
+  needsChanges: number;
+  approved: number;
+  unpublished: number;
   paused: number;
   archived: number;
   sold: number;
@@ -61,6 +69,10 @@ export const PROVIDER_LISTING_STATUS_FILTERS = [
   "all",
   "published",
   "draft",
+  "submitted_for_review",
+  "needs_changes",
+  "approved",
+  "unpublished",
   "paused",
   "sold",
   "rented",

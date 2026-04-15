@@ -208,6 +208,67 @@ export type Database = {
           },
         ]
       }
+      listing_workflow_events: {
+        Row: {
+          actor_user_id: string | null
+          created_at: string
+          event_type: Database["public"]["Enums"]["listing_workflow_event_type"]
+          from_status: Database["public"]["Enums"]["listing_status"] | null
+          id: string
+          listing_id: string
+          metadata: Json
+          note: string | null
+          organization_id: string
+          to_status: Database["public"]["Enums"]["listing_status"] | null
+        }
+        Insert: {
+          actor_user_id?: string | null
+          created_at?: string
+          event_type: Database["public"]["Enums"]["listing_workflow_event_type"]
+          from_status?: Database["public"]["Enums"]["listing_status"] | null
+          id?: string
+          listing_id: string
+          metadata?: Json
+          note?: string | null
+          organization_id: string
+          to_status?: Database["public"]["Enums"]["listing_status"] | null
+        }
+        Update: {
+          actor_user_id?: string | null
+          created_at?: string
+          event_type?: Database["public"]["Enums"]["listing_workflow_event_type"]
+          from_status?: Database["public"]["Enums"]["listing_status"] | null
+          id?: string
+          listing_id?: string
+          metadata?: Json
+          note?: string | null
+          organization_id?: string
+          to_status?: Database["public"]["Enums"]["listing_status"] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "listing_workflow_events_actor_user_id_fkey"
+            columns: ["actor_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "listing_workflow_events_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "listing_workflow_events_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       listings: {
         Row: {
           address_text: string | null
@@ -903,7 +964,26 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_company_listing_reviewer: {
+        Args: {
+          p_organization_id: string
+          p_user_id?: string
+        }
+        Returns: boolean
+      }
       is_admin: { Args: never; Returns: boolean }
+      log_listing_workflow_event: {
+        Args: {
+          p_actor_user_id?: string
+          p_event_type: Database["public"]["Enums"]["listing_workflow_event_type"]
+          p_from_status?: Database["public"]["Enums"]["listing_status"]
+          p_listing_id: string
+          p_metadata?: Json
+          p_note?: string
+          p_to_status?: Database["public"]["Enums"]["listing_status"]
+        }
+        Returns: string
+      }
       log_security_audit_event: {
         Args: {
           p_actor_role?: Database["public"]["Enums"]["app_role"]
@@ -920,6 +1000,22 @@ export type Database = {
         }
         Returns: string
       }
+      transition_company_listing_workflow: {
+        Args: {
+          p_action: string
+          p_listing_id: string
+          p_note?: string
+        }
+        Returns: {
+          event_type: Database["public"]["Enums"]["listing_workflow_event_type"]
+          listing_id: string
+          next_status: Database["public"]["Enums"]["listing_status"]
+          organization_id: string
+          previous_status: Database["public"]["Enums"]["listing_status"]
+          published_at: string | null
+          published_by_user_id: string | null
+        }[]
+      }
       is_valid_listing_image_path: {
         Args: { object_name: string }
         Returns: boolean
@@ -935,12 +1031,23 @@ export type Database = {
       heating_type: "central" | "electric" | "gas" | "district" | "other"
       listing_status:
         | "draft"
+        | "submitted_for_review"
+        | "needs_changes"
+        | "approved"
         | "published"
+        | "unpublished"
         | "paused"
         | "archived"
         | "sold"
         | "rented"
         | "hidden_by_admin"
+      listing_workflow_event_type:
+        | "created"
+        | "submitted_for_review"
+        | "needs_changes"
+        | "approved"
+        | "published"
+        | "unpublished"
       listing_type: "rent" | "sale"
       organization_invite_status: "pending" | "accepted" | "revoked" | "expired"
       organization_member_role: "owner" | "admin" | "manager" | "agent"
@@ -1092,12 +1199,24 @@ export const Constants = {
       heating_type: ["central", "electric", "gas", "district", "other"],
       listing_status: [
         "draft",
+        "submitted_for_review",
+        "needs_changes",
+        "approved",
         "published",
+        "unpublished",
         "paused",
         "archived",
         "sold",
         "rented",
         "hidden_by_admin",
+      ],
+      listing_workflow_event_type: [
+        "created",
+        "submitted_for_review",
+        "needs_changes",
+        "approved",
+        "published",
+        "unpublished",
       ],
       listing_type: ["rent", "sale"],
       organization_invite_status: ["pending", "accepted", "revoked", "expired"],

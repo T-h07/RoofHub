@@ -2,7 +2,11 @@ import type { ProviderListingStatus } from "./types";
 
 const STATUS_TRANSITION_MAP: Record<ProviderListingStatus, ProviderListingStatus[]> = {
   draft: ["published", "archived"],
+  submitted_for_review: [],
+  needs_changes: [],
+  approved: [],
   published: ["paused", "archived", "sold", "rented"],
+  unpublished: [],
   paused: ["published", "archived", "sold", "rented"],
   archived: ["draft"],
   sold: ["archived"],

@@ -655,6 +655,14 @@ export async function publishProviderListingDraftAction(
     };
   }
 
+  if (draftResult.draft.organization_id) {
+    return {
+      ok: false,
+      message:
+        "Company-owned listings must be published through the company workflow after review and approval.",
+    };
+  }
+
   const imagesResult = await loadListingImages(supabase, input.draftId);
   if (!imagesResult.ok) {
     return {
