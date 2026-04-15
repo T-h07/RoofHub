@@ -1,5 +1,14 @@
 import type { ComponentType } from "react";
-import { Building2, CircleCheckBig, CirclePause, ClipboardList, LockKeyhole, MessagesSquare } from "lucide-react";
+import {
+  Building2,
+  CircleCheckBig,
+  CirclePause,
+  ClipboardList,
+  ClipboardPenLine,
+  LockKeyhole,
+  MessagesSquare,
+  RefreshCw,
+} from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { ProviderListingOverviewMetrics } from "@/lib/listings/provider-dashboard/types";
@@ -38,6 +47,34 @@ export function ProviderOverviewMetrics({ metrics }: ProviderOverviewMetricsProp
       value: metrics.draft,
       detail: "Still in creation or revision workflow.",
       icon: ClipboardList,
+    },
+    {
+      id: "submitted",
+      label: "In review",
+      value: metrics.submittedForReview,
+      detail: "Submitted and waiting for reviewer action.",
+      icon: ClipboardPenLine,
+    },
+    {
+      id: "needs-changes",
+      label: "Needs changes",
+      value: metrics.needsChanges,
+      detail: "Returned for agent revisions with reviewer feedback.",
+      icon: RefreshCw,
+    },
+    {
+      id: "approved",
+      label: "Approved",
+      value: metrics.approved,
+      detail: "Approved internally and ready for explicit publish.",
+      icon: CircleCheckBig,
+    },
+    {
+      id: "unpublished",
+      label: "Unpublished",
+      value: metrics.unpublished,
+      detail: "Previously public listings that were intentionally removed.",
+      icon: LockKeyhole,
     },
     {
       id: "paused",

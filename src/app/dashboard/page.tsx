@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { getProviderRouteContext } from "@/lib/listings/provider-wizard/access";
+import { resolveProviderListingCreationContext } from "@/lib/listings/ownership";
 import {
   loadProviderListingOverviewMetrics,
   loadProviderManagedListings,
@@ -35,12 +36,23 @@ export default async function DashboardPage() {
     );
   }
 
+  const listingCreationContext = await resolveProviderListingCreationContext(
+    context.supabase,
+    context.profile
+  );
+  const organizationId =
+    listingCreationContext.ok && listingCreationContext.context.ownershipMode === "company"
+      ? listingCreationContext.context.organizationId
+      : null;
+
   const [overviewResult, recentListingsResult] = await Promise.all([
     loadProviderListingOverviewMetrics(context.supabase, {
       userId: context.profile.id,
+      organizationId,
     }),
     loadProviderManagedListings(context.supabase, {
       userId: context.profile.id,
+      organizationId,
       statusFilter: "all",
       limit: 6,
     }),

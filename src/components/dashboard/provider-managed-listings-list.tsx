@@ -5,6 +5,7 @@ import { Building2, Clock3, MapPin, SquareArrowOutUpRight } from "lucide-react";
 import { ProviderListingLifecycleActions } from "@/components/dashboard/provider-listing-lifecycle-actions";
 import { ProviderListingStatusBadge } from "@/components/dashboard/provider-listing-status-badge";
 import { Badge } from "@/components/ui/badge";
+import { buttonVariants } from "@/components/ui/button";
 import type { ProviderManagedListing, ProviderListingType } from "@/lib/listings/provider-dashboard/types";
 
 type ProviderManagedListingsListProps = {
@@ -159,12 +160,29 @@ export function ProviderManagedListingsList({ listings }: ProviderManagedListing
                   </p>
                 </td>
                 <td className="px-4 py-3.5">
-                  <ProviderListingLifecycleActions
-                    listingId={listing.id}
-                    listingType={listing.listing_type}
-                    currentStatus={listing.listing_status}
-                    editHref={buildEditHref(listing.id)}
-                  />
+                  {listing.ownershipMode === "company" ? (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Link
+                        href={`/dashboard/listings/${listing.id}/workflow`}
+                        className={buttonVariants({ size: "sm" })}
+                      >
+                        Workflow
+                      </Link>
+                      <Link
+                        href={buildEditHref(listing.id)}
+                        className={buttonVariants({ variant: "outline", size: "sm" })}
+                      >
+                        Edit
+                      </Link>
+                    </div>
+                  ) : (
+                    <ProviderListingLifecycleActions
+                      listingId={listing.id}
+                      listingType={listing.listing_type}
+                      currentStatus={listing.listing_status}
+                      editHref={buildEditHref(listing.id)}
+                    />
+                  )}
                 </td>
               </tr>
             ))}
@@ -218,12 +236,29 @@ export function ProviderManagedListingsList({ listings }: ProviderManagedListing
               ) : null}
             </div>
 
-            <ProviderListingLifecycleActions
-              listingId={listing.id}
-              listingType={listing.listing_type}
-              currentStatus={listing.listing_status}
-              editHref={buildEditHref(listing.id)}
-            />
+            {listing.ownershipMode === "company" ? (
+              <div className="flex flex-wrap gap-2">
+                <Link
+                  href={`/dashboard/listings/${listing.id}/workflow`}
+                  className={buttonVariants({ size: "sm" })}
+                >
+                  Workflow
+                </Link>
+                <Link
+                  href={buildEditHref(listing.id)}
+                  className={buttonVariants({ variant: "outline", size: "sm" })}
+                >
+                  Edit
+                </Link>
+              </div>
+            ) : (
+              <ProviderListingLifecycleActions
+                listingId={listing.id}
+                listingType={listing.listing_type}
+                currentStatus={listing.listing_status}
+                editHref={buildEditHref(listing.id)}
+              />
+            )}
           </article>
         ))}
       </div>

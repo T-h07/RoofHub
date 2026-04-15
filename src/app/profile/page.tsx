@@ -11,6 +11,7 @@ import { toSignInPath } from "@/lib/auth/routing";
 import { getCurrentUserProfile } from "@/lib/auth/profile";
 import { isProviderRole, type PreferredContactMethod } from "@/lib/auth/roles";
 import { getCompanyMembershipContextForUser } from "@/lib/company/context";
+import { resolveProviderListingCreationContext } from "@/lib/listings/ownership";
 import { loadProviderListingOverviewMetrics } from "@/lib/listings/provider-dashboard/queries";
 import { createServerSupabaseClient } from "@/lib/supabase";
 import type { Database, Tables } from "@/types/database";
@@ -161,10 +162,12 @@ async function loadSeekerProfileExperience(
 
 async function loadProviderProfileExperience(
   supabase: SupabaseClient<Database>,
-  profile: Tables<"profiles">
+  profile: Tables<"profiles">,
+  organizationId: string | null
 ) {
   const overviewResult = await loadProviderListingOverviewMetrics(supabase, {
     userId: profile.id,
+    organizationId,
   });
   const completion = buildProfileCompletion(profile);
 
@@ -235,8 +238,15 @@ export default async function ProfilePage() {
   const profile = profileResult.profile;
   const companyContextResult = await getCompanyMembershipContextForUser(supabase, profile.id);
   const ownerOrganization = companyContextResult.ok ? companyContextResult.ownerOrganization : null;
+  const listingCreationContextResult = isProviderRole(profile.role)
+    ? await resolveProviderListingCreationContext(supabase, profile)
+    : null;
+  const providerOrganizationId =
+    listingCreationContextResult && listingCreationContextResult.ok
+      ? listingCreationContextResult.context.organizationId
+      : null;
   const roleExperience = isProviderRole(profile.role)
-    ? await loadProviderProfileExperience(supabase, profile)
+    ? await loadProviderProfileExperience(supabase, profile, providerOrganizationId)
     : await loadSeekerProfileExperience(supabase, profile);
 
   const contactMethods: PreferredContactMethod[] =

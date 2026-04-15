@@ -20,6 +20,7 @@ import {
   loadProviderListingOverviewMetrics,
   loadProviderManagedListings,
 } from "@/lib/listings/provider-dashboard/queries";
+import { resolveProviderListingCreationContext } from "@/lib/listings/ownership";
 import { getProviderRouteContext } from "@/lib/listings/provider-wizard/access";
 import { cn } from "@/lib/utils";
 
@@ -53,6 +54,10 @@ function formatFilterCount(filter: ProviderListingStatusFilter, counts: {
   total: number;
   published: number;
   draft: number;
+  submittedForReview: number;
+  needsChanges: number;
+  approved: number;
+  unpublished: number;
   paused: number;
   sold: number;
   rented: number;
@@ -66,6 +71,14 @@ function formatFilterCount(filter: ProviderListingStatusFilter, counts: {
       return counts.published;
     case "draft":
       return counts.draft;
+    case "submitted_for_review":
+      return counts.submittedForReview;
+    case "needs_changes":
+      return counts.needsChanges;
+    case "approved":
+      return counts.approved;
+    case "unpublished":
+      return counts.unpublished;
     case "paused":
       return counts.paused;
     case "sold":
@@ -104,13 +117,23 @@ export default async function DashboardListingsPage({ searchParams }: DashboardL
 
   const rawStatusFilter = readStatusFilter(resolvedSearchParams);
   const statusFilter = isProviderListingStatusFilter(rawStatusFilter) ? rawStatusFilter : "all";
+  const listingCreationContext = await resolveProviderListingCreationContext(
+    context.supabase,
+    context.profile
+  );
+  const organizationId =
+    listingCreationContext.ok && listingCreationContext.context.ownershipMode === "company"
+      ? listingCreationContext.context.organizationId
+      : null;
 
   const [overviewResult, listingsResult] = await Promise.all([
     loadProviderListingOverviewMetrics(context.supabase, {
       userId: context.profile.id,
+      organizationId,
     }),
     loadProviderManagedListings(context.supabase, {
       userId: context.profile.id,
+      organizationId,
       statusFilter,
       limit: 180,
     }),

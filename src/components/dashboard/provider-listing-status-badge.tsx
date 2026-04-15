@@ -10,6 +10,13 @@ function getStatusVariant(status: ProviderListingStatus) {
   switch (status) {
     case "published":
       return "success" as const;
+    case "approved":
+      return "primary" as const;
+    case "submitted_for_review":
+      return "warning" as const;
+    case "needs_changes":
+    case "unpublished":
+      return "outline" as const;
     case "draft":
     case "paused":
       return "warning" as const;

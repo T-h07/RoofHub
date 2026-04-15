@@ -80,6 +80,7 @@ export default async function EditDashboardListingPage({
   const isHiddenByAdmin = draftResult.draft.listing_status === "hidden_by_admin";
   const isPubliclyVisible = draftResult.draft.listing_status === "published";
   const ownershipLabel = draftResult.draft.organization_id ? "Company listing" : "Individual listing";
+  const isCompanyListing = Boolean(draftResult.draft.organization_id);
 
   return (
     <MainContainer size="wide" className="space-y-5">
@@ -101,14 +102,28 @@ export default async function EditDashboardListingPage({
               Public visibility: {isPubliclyVisible ? "Visible on explore/map/detail" : "Hidden from public discovery"}
             </span>
           </div>
-          <ProviderListingLifecycleActions
-            listingId={draftResult.draft.id}
-            listingType={draftResult.draft.listing_type}
-            currentStatus={draftResult.draft.listing_status}
-            hideEditAction
-            showUnsavedWarning
-          />
+          {isCompanyListing ? (
+            <Link
+              href={`/dashboard/listings/${draftResult.draft.id}/workflow`}
+              className={buttonVariants({ size: "sm" })}
+            >
+              Open workflow
+            </Link>
+          ) : (
+            <ProviderListingLifecycleActions
+              listingId={draftResult.draft.id}
+              listingType={draftResult.draft.listing_type}
+              currentStatus={draftResult.draft.listing_status}
+              hideEditAction
+              showUnsavedWarning
+            />
+          )}
         </div>
+        {isCompanyListing ? (
+          <div className="border-border/70 bg-surface-soft rounded-lg border px-3.5 py-3 text-xs text-muted-foreground">
+            Company listings use dedicated review workflow actions for submit, approve, publish, and unpublish.
+          </div>
+        ) : null}
         {isHiddenByAdmin ? (
           <div className="border-destructive/40 bg-destructive/10 text-destructive-foreground rounded-lg border px-3.5 py-3 text-sm">
             <p className="inline-flex items-center gap-1.5 font-semibold">
