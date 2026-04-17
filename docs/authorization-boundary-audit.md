@@ -108,6 +108,18 @@ Route protection improves UX but is not an authorization substitute.
 - Public visibility remains `listing_status = 'published'`; `approved` is internal-only until an explicit publish action.
 - Workflow timeline rows are persisted in `listing_workflow_events` and are readable only by active organization members or platform admins.
 
+### Company dashboard and approval queue (NM-PT36)
+
+- Company dashboard data is resolved from trusted server membership context (`getCurrentUserCompanyContext`) and not client-supplied organization identifiers.
+- Dashboard metrics, pending-review queue, and activity feed use dedicated security-definer RPCs:
+  - `get_company_dashboard_overview(...)`
+  - `get_company_dashboard_pending_queue(...)`
+  - `get_company_dashboard_activity_feed(...)`
+- These RPCs require active organization membership (or admin role) before returning company-internal data.
+- Pending-review queue actions remain reviewer-scoped in UI and server workflows (`owner`/`admin`/`manager`).
+- Company workflow listing reads now use trusted RPC access (`get_company_listing_workflow_listing(...)`) so reviewer-capable members can access review surfaces without broadening generic listing read policies.
+- Team-invite activity in dashboard feed is constrained to owner/admin membership visibility.
+
 ### Favorites
 
 - Favorite create/delete/read operations are scoped to the authenticated user id.

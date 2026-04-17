@@ -76,3 +76,14 @@ PT20 can now build on:
 - centralized lifecycle transition mutation path
 - sold/rented status model extension
 - real unread lead count integration point for inbox/realtime expansion
+
+## PT36 extension: company operational dashboard
+
+PT36 extends `/dashboard` for company-provider accounts:
+
+- company overview metrics (draft, pending review, published, active members)
+- pending review queue for reviewer-capable company roles
+- role-aware quick actions and company-scoped activity feed
+- trusted server-backed company dashboard query layer through membership-gated RPCs
+
+Individual-provider dashboard behavior from PT19 remains unchanged.

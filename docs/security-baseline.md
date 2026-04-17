@@ -49,6 +49,7 @@ Audit and observability execution details are defined in `docs/audit-observabili
 - Enforce company listing ownership assignment through persisted active organization membership checks when `listings.organization_id` is set.
 - Enforce company listing review workflow transitions (submit/needs-changes/approve/publish/unpublish) through trusted server mutations backed by persisted membership role checks.
 - Restrict company listing review/publish actions to reviewer-capable membership roles (`owner`/`admin`/`manager`) with creator or assigned-agent submit constraints.
+- For company operational dashboards, use trusted server-side organization resolution and membership-gated query paths (RLS-compatible or security-definer RPCs with explicit membership checks); do not trust client-selected company scope.
 - Company invite acceptance must be bound to authenticated user identity (target user id match or invite-email match), never client-asserted claims.
 - Protect owner continuity for company membership mutations (at least one active owner must remain).
 - Never use client-supplied owner/provider/admin ids as authority.

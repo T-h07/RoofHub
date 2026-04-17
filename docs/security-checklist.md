@@ -118,3 +118,11 @@ For dependency/lockfile/scanner specifics, also follow `docs/supply-chain-guardr
 - Company workflow actions are traffic-controlled at server action boundaries with listing/action scoped limits.
 - Company workflow notes and timeline events are persisted (`listing_workflow_events`) and membership-scoped for reads.
 - Public listing visibility remains restricted to `listing_status = 'published'`; company `approved` state is internal-only until explicit publish.
+
+## NM-PT36 validation notes
+
+- Company dashboard metrics, pending-review queue rows, and activity feed rows are loaded through trusted security-definer RPCs that require active organization membership.
+- Dashboard queries derive organization scope from server-backed membership resolution and do not trust client-provided organization ids.
+- Company workflow context read path now uses a trusted RPC so reviewer roles can access review surfaces without widening generic listing-read policies.
+- Role-aware dashboard controls keep reviewer quick actions scoped to `owner`/`admin`/`manager`; non-reviewer members do not receive reviewer-only controls.
+- Company invite activity in the dashboard feed is limited to owner/admin visibility to preserve team-management access boundaries.
