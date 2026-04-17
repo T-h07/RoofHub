@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { LayoutDashboard, PlusSquare, Rows3, TriangleAlert } from "lucide-react";
 
+import { CompanyDashboardWorkspace } from "@/components/company/company-dashboard-workspace";
 import { ProviderManagedListingsList } from "@/components/dashboard/provider-managed-listings-list";
 import { ProviderOverviewMetrics } from "@/components/dashboard/provider-overview-metrics";
 import { ProviderUnreadLeadsPlaceholder } from "@/components/dashboard/provider-unread-leads-placeholder";
@@ -9,6 +10,8 @@ import { MainContainer } from "@/components/layout/main-container";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
+import { loadCompanyDashboardWorkspace } from "@/lib/company/dashboard-queries";
+import { toCompanyLogoPublicUrl } from "@/lib/company/logo";
 import { getProviderRouteContext } from "@/lib/listings/provider-wizard/access";
 import { resolveProviderListingCreationContext } from "@/lib/listings/ownership";
 import {
@@ -40,6 +43,62 @@ export default async function DashboardPage() {
     context.supabase,
     context.profile
   );
+
+  if (
+    !listingCreationContext.ok &&
+    context.profile.provider_account_type === "company"
+  ) {
+    return (
+      <MainContainer size="content">
+        <EmptyState
+          icon={LayoutDashboard}
+          title="Company dashboard unavailable"
+          description={listingCreationContext.message}
+          action={
+            <Link href="/profile/company" className={buttonVariants({ size: "sm" })}>
+              Open company workspace
+            </Link>
+          }
+        />
+      </MainContainer>
+    );
+  }
+
+  if (
+    listingCreationContext.ok &&
+    listingCreationContext.context.ownershipMode === "company"
+  ) {
+    const dashboardResult = await loadCompanyDashboardWorkspace(context.supabase);
+
+    if (!dashboardResult.ok) {
+      return (
+        <MainContainer size="content">
+          <EmptyState
+            icon={LayoutDashboard}
+            title="Company dashboard unavailable"
+            description={dashboardResult.message}
+            action={
+              <Link href="/profile/company" className={buttonVariants({ size: "sm" })}>
+                Open company workspace
+              </Link>
+            }
+          />
+        </MainContainer>
+      );
+    }
+
+    const logoUrl = toCompanyLogoPublicUrl(
+      context.supabase,
+      dashboardResult.workspace.organization.logo_path
+    );
+
+    return (
+      <MainContainer size="wide" className="space-y-5">
+        <CompanyDashboardWorkspace workspace={dashboardResult.workspace} logoUrl={logoUrl} />
+      </MainContainer>
+    );
+  }
+
   const organizationId =
     listingCreationContext.ok && listingCreationContext.context.ownershipMode === "company"
       ? listingCreationContext.context.organizationId

@@ -217,6 +217,7 @@ function revalidateCompanyTeamPaths(input: { organizationSlug: string }) {
   revalidatePath("/profile");
   revalidatePath("/profile/company");
   revalidatePath("/profile/company/team");
+  revalidatePath("/dashboard");
   revalidatePath(`/companies/${input.organizationSlug}`);
   revalidatePath("/companies/[slug]", "page");
 }
@@ -870,6 +871,7 @@ export async function acceptCompanyTeamInviteAction(
   revalidatePath("/profile");
   revalidatePath("/profile/company");
   revalidatePath("/profile/company/team");
+  revalidatePath("/dashboard");
 
   if (organizationRow?.slug) {
     revalidatePath(`/companies/${organizationRow.slug}`);

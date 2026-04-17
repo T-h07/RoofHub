@@ -113,6 +113,7 @@ function revalidateCompanyPaths(slug: string) {
   revalidatePath("/", "layout");
   revalidatePath("/profile/company");
   revalidatePath("/profile/company/edit");
+  revalidatePath("/dashboard");
   revalidatePath(`/companies/${slug}`);
   revalidatePath("/companies/[slug]", "page");
 }

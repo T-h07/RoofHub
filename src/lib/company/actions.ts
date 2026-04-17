@@ -224,6 +224,8 @@ export async function createCompanyWorkspaceAction(
   revalidatePath("/profile");
   revalidatePath("/profile/company");
   revalidatePath("/profile/company/edit");
+  revalidatePath("/dashboard");
+  revalidatePath("/dashboard/listings");
   revalidatePath(`/companies/${data.organization_slug}`);
   revalidatePath("/companies/[slug]", "page");
 

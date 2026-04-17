@@ -130,14 +130,17 @@ export default async function CompanyWorkspacePage({ searchParams }: CompanyWork
                 . Continue in the workspace and public profile.
               </p>
               <div className="flex flex-wrap gap-2">
+                <Link href="/dashboard" className={buttonVariants({ size: "sm" })}>
+                  Open operations dashboard
+                </Link>
                 {managementMembership ? (
-                  <Link href="/profile/company/team" className={buttonVariants({ size: "sm" })}>
+                  <Link href="/profile/company/team" className={buttonVariants({ variant: "outline", size: "sm" })}>
                     Open team management
                   </Link>
                 ) : null}
                 <Link
                   href={`/companies/${primaryOrganization.slug}`}
-                  className={buttonVariants({ variant: "outline", size: "sm" })}
+                  className={buttonVariants({ variant: "ghost", size: "sm" })}
                 >
                   View public company page
                 </Link>
@@ -261,7 +264,10 @@ export default async function CompanyWorkspacePage({ searchParams }: CompanyWork
         listingCount={publishedListingCount ?? 0}
         actions={
           <>
-            <Link href="/profile/company/edit" className={buttonVariants({ size: "sm" })}>
+            <Link href="/dashboard" className={buttonVariants({ size: "sm" })}>
+              Open operations dashboard
+            </Link>
+            <Link href="/profile/company/edit" className={buttonVariants({ variant: "outline", size: "sm" })}>
               Complete company profile
             </Link>
             <Link
@@ -337,6 +343,9 @@ export default async function CompanyWorkspacePage({ searchParams }: CompanyWork
           </header>
 
           <div className="space-y-3">
+            <Link href="/dashboard" className={buttonVariants({ size: "sm" })}>
+              Open operations dashboard
+            </Link>
             <Link href="/profile/company/edit" className={buttonVariants({ size: "sm" })}>
               Edit company profile
             </Link>
