@@ -93,6 +93,18 @@ export default async function DashboardListingWorkflowPage({ params }: Dashboard
         <p className="type-body-muted mt-2 max-w-3xl">
           Agent-created company listings remain private until review and publish actions are completed by trusted company workflow roles.
         </p>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Link href="/dashboard/listings" className={buttonVariants({ variant: "outline", size: "sm" })}>
+            Back to listings
+          </Link>
+          {(workflowResult.viewerRole === "owner" ||
+            workflowResult.viewerRole === "admin" ||
+            workflowResult.viewerRole === "manager") ? (
+            <Link href="/dashboard/activity" className={buttonVariants({ variant: "ghost", size: "sm" })}>
+              Open activity log
+            </Link>
+          ) : null}
+        </div>
       </section>
 
       <CompanyListingWorkflowPanel

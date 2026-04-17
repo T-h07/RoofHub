@@ -1,5 +1,6 @@
 import Link from "next/link";
 import {
+  Activity,
   ArrowRight,
   BadgeCheck,
   Building2,
@@ -13,10 +14,12 @@ import {
   Megaphone,
   PlusSquare,
   Rows3,
+  ShieldAlert,
   Sparkles,
   Users,
 } from "lucide-react";
 
+import { CompanyActivityFeed } from "@/components/company/company-activity-feed";
 import { CompanyIdentityHeader } from "@/components/company/company-identity-header";
 import { ProviderListingStatusBadge } from "@/components/dashboard/provider-listing-status-badge";
 import { Badge } from "@/components/ui/badge";
@@ -24,11 +27,9 @@ import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import type {
-  CompanyDashboardActivityItem,
   CompanyDashboardOverviewMetrics,
   CompanyDashboardWorkspaceData,
 } from "@/lib/company/dashboard-queries";
-import { formatProviderListingStatus } from "@/lib/listings/provider-dashboard/status";
 import { cn } from "@/lib/utils";
 
 type CompanyDashboardWorkspaceProps = {
@@ -54,19 +55,6 @@ type QuickAction = {
   variant?: "default" | "outline" | "ghost";
 };
 
-function formatDateTime(value: string | null) {
-  if (!value) {
-    return "--";
-  }
-
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) {
-    return "--";
-  }
-
-  return parsed.toLocaleString();
-}
-
 function formatFreshness(value: string | null) {
   if (!value) {
     return "Submitted time unavailable";
@@ -91,33 +79,6 @@ function formatFreshness(value: string | null) {
 
   const diffDays = Math.round(diffHours / 24);
   return `${diffDays}d ago`;
-}
-
-function getWorkflowEventLabel(eventType: string) {
-  switch (eventType) {
-    case "created":
-      return "Draft created";
-    case "submitted_for_review":
-      return "Submitted for review";
-    case "needs_changes":
-      return "Needs changes requested";
-    case "approved":
-      return "Listing approved";
-    case "published":
-      return "Listing published";
-    case "unpublished":
-      return "Listing unpublished";
-    case "invite.created":
-      return "Invite sent";
-    case "invite.accepted":
-      return "Invite accepted";
-    case "invite.revoked":
-      return "Invite revoked";
-    case "invite.expired":
-      return "Invite expired";
-    default:
-      return eventType;
-  }
 }
 
 function buildOverviewCards(
@@ -217,6 +178,16 @@ function buildQuickActions(workspace: CompanyDashboardWorkspaceData): QuickActio
     );
   }
 
+  if (workspace.canViewActivityFeed) {
+    actions.push({
+      href: "/dashboard/activity",
+      label: "Open activity log",
+      detail: "Review membership, workflow, and publishing history.",
+      icon: Activity,
+      variant: "outline",
+    });
+  }
+
   actions.push(
     {
       href: "/dashboard/listings/new",
@@ -261,22 +232,6 @@ function buildQuickActions(workspace: CompanyDashboardWorkspaceData): QuickActio
   return actions;
 }
 
-function renderActivityContext(event: CompanyDashboardActivityItem) {
-  if (event.source === "listing_workflow") {
-    if (event.fromStatus || event.toStatus) {
-      return `${event.fromStatus ? formatProviderListingStatus(event.fromStatus) : "--"} -> ${event.toStatus ? formatProviderListingStatus(event.toStatus) : "--"}`;
-    }
-
-    return "Listing workflow event";
-  }
-
-  if (event.inviteRole) {
-    return `Invite role: ${event.inviteRole}`;
-  }
-
-  return "Team invite event";
-}
-
 export function CompanyDashboardWorkspace({ workspace, logoUrl }: CompanyDashboardWorkspaceProps) {
   const overviewCards = buildOverviewCards(
     workspace.overview,
@@ -319,6 +274,14 @@ export function CompanyDashboardWorkspace({ workspace, logoUrl }: CompanyDashboa
             >
               Public page
             </Link>
+            {workspace.canViewActivityFeed ? (
+              <Link
+                href="/dashboard/activity"
+                className={buttonVariants({ variant: "outline", size: "sm" })}
+              >
+                Activity log
+              </Link>
+            ) : null}
           </>
         }
       />
@@ -468,50 +431,43 @@ export function CompanyDashboardWorkspace({ workspace, logoUrl }: CompanyDashboa
 
           <Card className="border-border/80 bg-card/88">
             <CardHeader className="border-border/70 border-b pb-4">
-              <div className="space-y-2">
-                <Badge variant="outline">Activity feed</Badge>
-                <CardTitle className="text-xl">Recent workspace events</CardTitle>
-                <p className="type-body-muted">
-                  Workflow and membership events captured from persisted RoofHub records.
-                </p>
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="space-y-2">
+                  <Badge variant="outline">Activity feed</Badge>
+                  <CardTitle className="text-xl">Recent workspace events</CardTitle>
+                  <p className="type-body-muted">
+                    Workflow and membership events captured from persisted RoofHub records.
+                  </p>
+                </div>
+                {workspace.canViewActivityFeed ? (
+                  <Link href="/dashboard/activity" className={buttonVariants({ variant: "ghost", size: "sm" })}>
+                    Full activity log
+                  </Link>
+                ) : null}
               </div>
             </CardHeader>
             <CardContent className="pt-5">
-              {workspace.activityUnavailableMessage ? (
+              {!workspace.canViewActivityFeed ? (
+                <EmptyState
+                  icon={ShieldAlert}
+                  title="Activity feed is role-limited"
+                  description={
+                    workspace.activityAccessMessage ??
+                    "Owner, admin, or manager role is required for company activity visibility."
+                  }
+                />
+              ) : workspace.activityUnavailableMessage ? (
                 <EmptyState
                   icon={Sparkles}
                   title="Activity feed unavailable"
                   description={workspace.activityUnavailableMessage}
                 />
-              ) : workspace.activity.length === 0 ? (
-                <EmptyState
-                  icon={Sparkles}
-                  title="No activity yet"
-                  description="Activity appears when listings move through workflow or team invite actions occur."
-                />
               ) : (
-                <ol className="space-y-3">
-                  {workspace.activity.map((event) => (
-                    <li
-                      key={event.id}
-                      className="border-border/70 bg-surface-soft/84 rounded-xl border px-3.5 py-3"
-                    >
-                      <p className="text-sm font-semibold">{getWorkflowEventLabel(event.eventType)}</p>
-                      <p className="text-muted-foreground mt-1 text-xs">
-                        {event.actorDisplayName ?? "System"} • {event.targetLabel}
-                      </p>
-                      <p className="text-muted-foreground mt-1 text-xs">{renderActivityContext(event)}</p>
-                      {event.note ? (
-                        <p className="border-border/70 bg-card/84 mt-2 rounded-lg border px-2.5 py-2 text-xs text-foreground/90">
-                          {event.note}
-                        </p>
-                      ) : null}
-                      <p className="text-muted-foreground mt-2 text-[11px]">
-                        {formatDateTime(event.occurredAt)}
-                      </p>
-                    </li>
-                  ))}
-                </ol>
+                <CompanyActivityFeed
+                  activity={workspace.activity.slice(0, 7)}
+                  emptyTitle="No activity yet"
+                  emptyDescription="Activity appears when listings move through workflow, publishing, and team operations."
+                />
               )}
             </CardContent>
           </Card>

@@ -104,6 +104,9 @@ export default async function CompanyTeamPage() {
             <Link href="/profile/company" className={buttonVariants({ variant: "outline", size: "sm" })}>
               Back to workspace
             </Link>
+            <Link href="/dashboard/activity" className={buttonVariants({ variant: "ghost", size: "sm" })}>
+              Activity log
+            </Link>
             <Link
               href={`/companies/${organization.slug}`}
               className={buttonVariants({ variant: "ghost", size: "sm" })}

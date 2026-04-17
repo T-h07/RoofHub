@@ -3,7 +3,14 @@
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { CheckCircle2, ClipboardCheck, LoaderCircle, MessageSquarePlus, Send, ShieldCheck } from "lucide-react";
+import {
+  CheckCircle2,
+  ClipboardCheck,
+  LoaderCircle,
+  MessageSquarePlus,
+  Send,
+  ShieldCheck,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import {
@@ -149,6 +156,11 @@ export function CompanyListingWorkflowPanel({
   const [note, setNote] = useState("");
 
   const actions = useMemo(() => buildWorkflowActions(capabilities), [capabilities]);
+  const reviewerNotesTimeline = useMemo(
+    () =>
+      timeline.filter((event) => typeof event.note === "string" && event.note.trim().length > 0),
+    [timeline]
+  );
 
   function runAction(action: ActionDefinition, workflowNote?: string) {
     startTransition(async () => {
@@ -263,6 +275,47 @@ export function CompanyListingWorkflowPanel({
                     {event.note}
                   </p>
                 ) : null}
+              </li>
+            ))}
+          </ol>
+        )}
+      </section>
+
+      <section className="border-border bg-card rounded-2xl border p-5 sm:p-6">
+        <header className="border-border/70 mb-4 flex items-center justify-between gap-3 border-b pb-4">
+          <div className="space-y-1">
+            <p className="type-label">Reviewer notes</p>
+            <h3 className="type-section-title">Review note timeline</h3>
+          </div>
+          <Badge variant="outline">{reviewerNotesTimeline.length} notes</Badge>
+        </header>
+
+        {reviewerNotesTimeline.length === 0 ? (
+          <EmptyState
+            icon={MessageSquarePlus}
+            title="No reviewer notes yet"
+            description="Reviewer notes appear here whenever changes are requested or approvals include context."
+          />
+        ) : (
+          <ol className="space-y-3">
+            {reviewerNotesTimeline.map((event) => (
+              <li key={`${event.id}:note`} className="border-border/70 bg-card/55 rounded-xl border px-3.5 py-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-sm font-semibold">{COMPANY_LISTING_WORKFLOW_EVENT_LABELS[event.event_type]}</p>
+                  <span className="text-muted-foreground text-xs">{formatTimelineDate(event.created_at)}</span>
+                </div>
+                <p className="text-muted-foreground mt-1 text-xs">
+                  {event.actorProfile?.display_name ?? "Unknown member"}
+                </p>
+                {event.from_status || event.to_status ? (
+                  <p className="text-muted-foreground mt-1 text-xs">
+                    {event.from_status ? formatProviderListingStatus(event.from_status) : "--"} →{" "}
+                    {event.to_status ? formatProviderListingStatus(event.to_status) : "--"}
+                  </p>
+                ) : null}
+                <p className="border-border/70 bg-surface-soft mt-2 rounded-lg border px-2.5 py-2 text-xs text-foreground/95">
+                  {event.note}
+                </p>
               </li>
             ))}
           </ol>
