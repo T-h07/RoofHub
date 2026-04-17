@@ -58,6 +58,9 @@ Treat these as untrusted input boundaries:
 - Do not use `dangerouslySetInnerHTML` for listing descriptions, provider bios, report details, or messages.
 - Preserve readability with safe formatting (`whitespace-pre-wrap`, paragraph splitting), not HTML injection.
 - Public company profile surfaces must project only intended public-facing organization fields.
+- Public listing attribution surfaces (cards/detail trust panel) must expose only public-safe company and agent fields:
+  company id/name/slug/logo and optional assigned-agent id/display name/avatar.
+- Public listing attribution must never include organization membership records, internal workflow notes, invite state, or audit-only metadata.
 - Any future rich-text requirement must define an explicit allowlist-based sanitization model first.
 
 ## Error handling contract
