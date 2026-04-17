@@ -1,3 +1,5 @@
+import Image from "next/image";
+import Link from "next/link";
 import { Bath, BedDouble, Expand, MapPin } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -52,6 +54,15 @@ function formatArea(value: number) {
   return `${new Intl.NumberFormat("en", { maximumFractionDigits: 0 }).format(value)} m²`;
 }
 
+function toInitials(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean).slice(0, 2);
+  if (parts.length === 0) {
+    return "RH";
+  }
+
+  return parts.map((part) => part[0]?.toUpperCase() ?? "").join("");
+}
+
 export function ListingDetailSummary({ listing }: ListingDetailSummaryProps) {
   const locationLabel = listing.neighborhood
     ? `${listing.neighborhood}, ${listing.city}`
@@ -80,6 +91,43 @@ export function ListingDetailSummary({ listing }: ListingDetailSummaryProps) {
           <MapPin className="size-4" aria-hidden="true" />
           {locationLabel}
         </p>
+
+        {listing.company ? (
+          <div className="border-border/70 bg-background/60 inline-flex max-w-full items-center gap-2 rounded-lg border px-2.5 py-1.5">
+            <span className="border-border/70 bg-background relative flex size-6 shrink-0 items-center justify-center overflow-hidden rounded-md border">
+              {listing.company.logoUrl ? (
+                <Image
+                  src={listing.company.logoUrl}
+                  alt={`${listing.company.name} logo`}
+                  fill
+                  unoptimized
+                  sizes="24px"
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <span className="text-[10px] font-semibold tracking-tight">
+                  {toInitials(listing.company.name)}
+                </span>
+              )}
+            </span>
+
+            <p className="text-foreground/92 min-w-0 text-xs leading-5 sm:text-sm">
+              <span className="text-muted-foreground">Backed by </span>
+              <Link
+                href={`/companies/${listing.company.slug}`}
+                className="hover:text-primary font-medium transition-colors"
+              >
+                {listing.company.name}
+              </Link>
+              {listing.assignedAgent ? (
+                <span className="text-muted-foreground">
+                  {" "}
+                  · Listed by {listing.assignedAgent.displayName}
+                </span>
+              ) : null}
+            </p>
+          </div>
+        ) : null}
 
         {listing.public_location_mode === "exact" && listing.address_text ? (
           <p className="text-muted-foreground text-sm">{listing.address_text}</p>

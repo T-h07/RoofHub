@@ -1,10 +1,11 @@
 import Image from "next/image";
 import Link from "next/link";
-import { Bath, BedDouble, Expand, Hourglass, MapPin } from "lucide-react";
+import { Bath, BedDouble, Building2, Expand, Hourglass, MapPin } from "lucide-react";
 
 import { FavoriteToggle } from "@/components/listings/favorite-toggle";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import type { PublicListingCompanyAttribution } from "@/lib/listings/public-company-attribution";
 import { cn } from "@/lib/utils";
 import {
   type ExploreListingType,
@@ -28,6 +29,7 @@ export type ListingCardListing = {
   area_m2: number;
   coverImageUrl: string | null;
   isFavorited: boolean;
+  company: PublicListingCompanyAttribution | null;
 };
 
 type ListingCardProps = {
@@ -76,6 +78,15 @@ function formatBathrooms(value: number | null) {
 
 function formatArea(value: number) {
   return `${new Intl.NumberFormat("en", { maximumFractionDigits: 0 }).format(value)} m²`;
+}
+
+function toInitials(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean).slice(0, 2);
+  if (parts.length === 0) {
+    return "RH";
+  }
+
+  return parts.map((part) => part[0]?.toUpperCase() ?? "").join("");
 }
 
 export function ListingCard({ listing, isAuthenticated, className }: ListingCardProps) {
@@ -151,7 +162,37 @@ export function ListingCard({ listing, isAuthenticated, className }: ListingCard
         </div>
 
         <div className="border-border/70 flex items-center justify-between border-t pt-3">
-          <span className="type-caption">Public listing</span>
+          {listing.company ? (
+            <Link
+              href={`/companies/${listing.company.slug}`}
+              className="hover:text-foreground/95 text-muted-foreground inline-flex min-w-0 items-center gap-1.5 text-xs transition-colors"
+            >
+              <span className="border-border/70 bg-background/70 relative flex size-5 shrink-0 items-center justify-center overflow-hidden rounded-md border">
+                {listing.company.logoUrl ? (
+                  <Image
+                    src={listing.company.logoUrl}
+                    alt={`${listing.company.name} logo`}
+                    fill
+                    unoptimized
+                    sizes="20px"
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <span className="text-[10px] font-semibold tracking-tight">
+                    {toInitials(listing.company.name)}
+                  </span>
+                )}
+              </span>
+              <span className="inline-flex min-w-0 items-center gap-1">
+                <Building2 className="size-3.5 shrink-0" aria-hidden="true" />
+                <span className="truncate font-medium tracking-tight">
+                  {listing.company.name}
+                </span>
+              </span>
+            </Link>
+          ) : (
+            <span className="type-caption">Public listing</span>
+          )}
           <Link href={`/listing/${listing.slug}`} className="text-primary text-xs font-medium hover:underline">
             View details
           </Link>

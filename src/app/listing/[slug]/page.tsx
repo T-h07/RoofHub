@@ -3,11 +3,13 @@ import { notFound } from "next/navigation";
 import { AlertTriangle, ArrowLeft, ExternalLink, MapPin } from "lucide-react";
 
 import { MainContainer } from "@/components/layout/main-container";
+import { ListingCompanyTrustPanel } from "@/components/listings/listing-company-trust-panel";
 import { ListingDetailCtaRail } from "@/components/listings/listing-detail-cta-rail";
 import {
   ListingDetailFeatures,
   ListingDetailSpecsGrid,
 } from "@/components/listings/listing-detail-facts";
+import { ListingMoreFromCompany } from "@/components/listings/listing-more-from-company";
 import { ListingImageGallery } from "@/components/listings/listing-image-gallery";
 import { ListingLocationMap } from "@/components/listings/listing-location-map";
 import { ListingProviderCard } from "@/components/listings/listing-provider-card";
@@ -155,6 +157,13 @@ export default async function ListingDetailPage({
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
         <aside className="order-1 space-y-4 xl:order-2 xl:sticky xl:top-[5.5rem] xl:self-start">
+          {listing.company ? (
+            <ListingCompanyTrustPanel
+              company={listing.company}
+              assignedAgent={listing.assignedAgent}
+            />
+          ) : null}
+
           <ListingDetailCtaRail
             listingId={listing.id}
             isAuthenticated={isAuthenticated}
@@ -244,6 +253,14 @@ export default async function ListingDetailPage({
               </p>
             )}
           </section>
+
+          {listing.company ? (
+            <ListingMoreFromCompany
+              company={listing.company}
+              listings={listing.moreFromCompany}
+              isAuthenticated={isAuthenticated}
+            />
+          ) : null}
 
           <section className="border-border/75 bg-card/58 flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-3.5">
             <p className="text-muted-foreground text-sm">
