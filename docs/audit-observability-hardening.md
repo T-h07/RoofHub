@@ -162,6 +162,21 @@ Message audit metadata records only safe descriptors (for example message length
 - `organization.member.removed`
 - `organization.member.remove_failed`
 
+## Company activity log surfaces (NM-PT39)
+
+PT39 adds trusted internal activity-log rendering for company operations:
+
+- company dashboard feed and dedicated activity log route are backed by persisted events
+- listing workflow timeline remains sourced from `public.listing_workflow_events`
+- membership/invite/admin operational timeline events are sourced from `public.security_audit_events`
+- reviewer notes are rendered in timeline context from persisted workflow notes
+
+Access boundaries:
+
+- company activity feed RPC now requires reviewer-capable membership (`owner`, `admin`, `manager`) or app admin
+- listing workflow timeline still requires authenticated company membership through trusted server/RPC checks
+- no internal activity log data is exposed on public listing/company surfaces
+
 ## Failure observability model
 
 Important failures now emit bounded, structured audit events in these flows:
@@ -189,6 +204,5 @@ Validated in this PT:
 - external SIEM/drain integrations
 - long-term retention/rotation automation
 - alert pipelines on specific audit event thresholds
-- admin-facing audit timeline UI
 
 These are intentionally deferred to later PTs so SH-PT08 stays scoped to durable event capture and safe observability foundations.

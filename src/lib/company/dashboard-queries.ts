@@ -2,9 +2,14 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import type { Json, Tables } from "@/types/database";
+import type { Tables } from "@/types/database";
 import type { Database } from "@/types/database";
 
+import {
+  mapCompanyActivityRows,
+  type CompanyActivityItem,
+  type CompanyActivityRpcRow,
+} from "./activity-feed";
 import { getCurrentUserCompanyContext, type CompanyMembershipSummary, type CompanyWorkspaceSummary } from "./context";
 import type { OrganizationMemberRole } from "./team-types";
 
@@ -12,8 +17,6 @@ type CompanyDashboardOverviewRpcRow =
   Database["public"]["Functions"]["get_company_dashboard_overview"]["Returns"][number];
 type CompanyDashboardPendingQueueRpcRow =
   Database["public"]["Functions"]["get_company_dashboard_pending_queue"]["Returns"][number];
-type CompanyDashboardActivityRpcRow =
-  Database["public"]["Functions"]["get_company_dashboard_activity_feed"]["Returns"][number];
 
 export type CompanyDashboardOverviewMetrics = {
   draftCount: number;
@@ -41,21 +44,7 @@ export type CompanyDashboardPendingQueueItem = {
   assignedAgentDisplayName: string | null;
 };
 
-export type CompanyDashboardActivityItem = {
-  id: string;
-  source: "listing_workflow" | "organization_invite";
-  eventType: string;
-  occurredAt: string;
-  actorUserId: string | null;
-  actorDisplayName: string | null;
-  targetId: string;
-  targetLabel: string;
-  note: string | null;
-  fromStatus: Tables<"listings">["listing_status"] | null;
-  toStatus: Tables<"listings">["listing_status"] | null;
-  inviteRole: OrganizationMemberRole | null;
-  inviteStatus: Database["public"]["Enums"]["organization_invite_status"] | null;
-};
+export type CompanyDashboardActivityItem = CompanyActivityItem;
 
 export type CompanyDashboardWorkspaceData = {
   profile: Tables<"profiles">;
@@ -65,6 +54,8 @@ export type CompanyDashboardWorkspaceData = {
   pendingReviewQueue: CompanyDashboardPendingQueueItem[];
   pendingQueueUnavailableMessage: string | null;
   activity: CompanyDashboardActivityItem[];
+  canViewActivityFeed: boolean;
+  activityAccessMessage: string | null;
   activityUnavailableMessage: string | null;
   isReviewer: boolean;
   isOwnerOrAdmin: boolean;
@@ -90,34 +81,6 @@ function isReviewerRole(role: OrganizationMemberRole) {
 
 function isOwnerOrAdminRole(role: OrganizationMemberRole) {
   return OWNER_OR_ADMIN_ROLE_SET.has(role);
-}
-
-function toMetadataRecord(metadata: Json): Record<string, unknown> {
-  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
-    return {};
-  }
-
-  return metadata as Record<string, unknown>;
-}
-
-function toOptionalString(value: unknown) {
-  return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
-}
-
-function toOptionalListingStatus(value: unknown): Tables<"listings">["listing_status"] | null {
-  return typeof value === "string" ? (value as Tables<"listings">["listing_status"]) : null;
-}
-
-function toOptionalInviteRole(value: unknown): OrganizationMemberRole | null {
-  return typeof value === "string" ? (value as OrganizationMemberRole) : null;
-}
-
-function toOptionalInviteStatus(
-  value: unknown
-): Database["public"]["Enums"]["organization_invite_status"] | null {
-  return typeof value === "string"
-    ? (value as Database["public"]["Enums"]["organization_invite_status"])
-    : null;
 }
 
 function mapOverviewRow(row: CompanyDashboardOverviewRpcRow): CompanyDashboardOverviewMetrics {
@@ -150,30 +113,14 @@ function mapPendingQueueRows(rows: CompanyDashboardPendingQueueRpcRow[]): Compan
   }));
 }
 
-function mapActivityRows(rows: CompanyDashboardActivityRpcRow[]): CompanyDashboardActivityItem[] {
-  return rows.map((row) => {
-    const metadata = toMetadataRecord(row.metadata);
-
-    return {
-      id: row.event_id,
-      source: row.event_source === "organization_invite" ? "organization_invite" : "listing_workflow",
-      eventType: row.event_type,
-      occurredAt: row.occurred_at,
-      actorUserId: row.actor_user_id,
-      actorDisplayName: row.actor_display_name,
-      targetId: row.target_id,
-      targetLabel: row.target_label,
-      note: toOptionalString(metadata.note),
-      fromStatus: toOptionalListingStatus(metadata.from_status),
-      toStatus: toOptionalListingStatus(metadata.to_status),
-      inviteRole: toOptionalInviteRole(metadata.role),
-      inviteStatus: toOptionalInviteStatus(metadata.status),
-    };
-  });
-}
+type LoadCompanyDashboardWorkspaceOptions = {
+  pendingQueueLimit?: number;
+  activityLimit?: number;
+};
 
 export async function loadCompanyDashboardWorkspace(
-  supabase: SupabaseClient<Database>
+  supabase: SupabaseClient<Database>,
+  options?: LoadCompanyDashboardWorkspaceOptions
 ): Promise<LoadCompanyDashboardWorkspaceResult> {
   const companyContextResult = await getCurrentUserCompanyContext(supabase);
 
@@ -197,24 +144,29 @@ export async function loadCompanyDashboardWorkspace(
 
   const reviewer = isReviewerRole(membership.role);
   const ownerOrAdmin = isOwnerOrAdminRole(membership.role);
+  const pendingQueueLimit = Math.max(0, Math.min(40, Math.trunc(options?.pendingQueueLimit ?? 10)));
+  const activityLimit = Math.max(1, Math.min(120, Math.trunc(options?.activityLimit ?? 22)));
+  const canViewActivityFeed = reviewer;
 
   const [overviewRpcResult, pendingQueueRpcResult, activityRpcResult] = await Promise.all([
     supabase.rpc("get_company_dashboard_overview", {
       p_organization_id: organization.id,
       p_viewer_user_id: companyContextResult.profile.id,
     }),
-    reviewer
+    reviewer && pendingQueueLimit > 0
       ? supabase.rpc("get_company_dashboard_pending_queue", {
           p_organization_id: organization.id,
           p_viewer_user_id: companyContextResult.profile.id,
-          p_limit: 10,
+          p_limit: pendingQueueLimit,
         })
       : Promise.resolve({ data: [], error: null }),
-    supabase.rpc("get_company_dashboard_activity_feed", {
-      p_organization_id: organization.id,
-      p_viewer_user_id: companyContextResult.profile.id,
-      p_limit: 22,
-    }),
+    canViewActivityFeed
+      ? supabase.rpc("get_company_dashboard_activity_feed", {
+          p_organization_id: organization.id,
+          p_viewer_user_id: companyContextResult.profile.id,
+          p_limit: activityLimit,
+        })
+      : Promise.resolve({ data: [], error: null }),
   ]);
 
   if (overviewRpcResult.error || !overviewRpcResult.data?.[0]) {
@@ -231,9 +183,9 @@ export async function loadCompanyDashboardWorkspace(
     : mapPendingQueueRows(
         (pendingQueueRpcResult.data ?? []) as CompanyDashboardPendingQueueRpcRow[]
       );
-  const activity = activityRpcResult.error
+  const activity = !canViewActivityFeed || activityRpcResult.error
     ? []
-    : mapActivityRows((activityRpcResult.data ?? []) as CompanyDashboardActivityRpcRow[]);
+    : mapCompanyActivityRows((activityRpcResult.data ?? []) as CompanyActivityRpcRow[]);
 
   return {
     ok: true,
@@ -247,6 +199,10 @@ export async function loadCompanyDashboardWorkspace(
         ? "Pending queue is temporarily unavailable."
         : null,
       activity,
+      canViewActivityFeed,
+      activityAccessMessage: canViewActivityFeed
+        ? null
+        : "Owner, admin, or manager role is required for company activity log visibility.",
       activityUnavailableMessage: activityRpcResult.error
         ? "Activity feed is temporarily unavailable."
         : null,
