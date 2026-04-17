@@ -933,9 +933,91 @@ export type Database = {
           user_id: string
         }[]
       }
+      get_company_dashboard_activity_feed: {
+        Args: {
+          p_limit?: number
+          p_organization_id: string
+          p_viewer_user_id?: string
+        }
+        Returns: {
+          actor_display_name: string | null
+          actor_user_id: string | null
+          event_id: string
+          event_source: string
+          event_type: string
+          metadata: Json
+          occurred_at: string
+          target_id: string
+          target_label: string
+        }[]
+      }
+      get_company_dashboard_overview: {
+        Args: {
+          p_organization_id: string
+          p_viewer_user_id?: string
+        }
+        Returns: {
+          active_member_count: number
+          draft_count: number
+          needs_changes_count: number
+          organization_id: string
+          pending_invite_count: number
+          pending_review_count: number
+          published_count: number
+          viewer_role: Database["public"]["Enums"]["organization_member_role"]
+        }[]
+      }
+      get_company_dashboard_pending_queue: {
+        Args: {
+          p_limit?: number
+          p_organization_id: string
+          p_viewer_user_id?: string
+        }
+        Returns: {
+          assigned_agent_display_name: string | null
+          assigned_agent_user_id: string | null
+          city: string
+          created_at: string
+          created_by_display_name: string | null
+          created_by_user_id: string
+          listing_id: string
+          listing_status: Database["public"]["Enums"]["listing_status"]
+          listing_type: Database["public"]["Enums"]["listing_type"]
+          neighborhood: string | null
+          property_type: Database["public"]["Enums"]["property_type"]
+          submitted_at: string | null
+          title: string
+          updated_at: string
+        }[]
+      }
+      get_company_listing_workflow_listing: {
+        Args: {
+          p_listing_id: string
+          p_viewer_user_id?: string
+        }
+        Returns: {
+          assigned_agent_user_id: string | null
+          created_by_user_id: string
+          id: string
+          listing_status: Database["public"]["Enums"]["listing_status"]
+          organization_id: string | null
+          owner_id: string
+          published_by_user_id: string | null
+          slug: string | null
+          title: string
+          updated_at: string
+        }[]
+      }
       current_user_primary_email: {
         Args: never
         Returns: string
+      }
+      organization_active_member_count: {
+        Args: {
+          p_organization_id: string
+          p_user_id?: string
+        }
+        Returns: number
       }
       organization_active_member_role: {
         Args: {

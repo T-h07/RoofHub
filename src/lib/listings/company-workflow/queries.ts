@@ -140,16 +140,32 @@ export async function loadCompanyListingWorkflowContextForViewer(
       ? Math.max(1, Math.min(64, Math.trunc(input.timelineLimit)))
       : 24;
 
-  const { data: listingRow, error: listingError } = await supabase
-    .from("listings")
-    .select(
-      "id, owner_id, organization_id, created_by_user_id, assigned_agent_user_id, published_by_user_id, listing_status, title, slug, updated_at"
-    )
-    .eq("id", input.listingId)
-    .limit(1)
-    .maybeSingle<WorkflowListingRow>();
+  const { data: listingRows, error: listingError } = await supabase.rpc(
+    "get_company_listing_workflow_listing",
+    {
+      p_listing_id: input.listingId,
+      p_viewer_user_id: input.viewerId,
+    }
+  );
 
-  if (listingError || !listingRow) {
+  if (listingError) {
+    if (listingError.code === "42501") {
+      return {
+        ok: false,
+        reason: "forbidden",
+        message: "Active company membership is required to access listing workflow.",
+      };
+    }
+
+    return {
+      ok: false,
+      reason: "error",
+      message: "Listing workflow is temporarily unavailable.",
+    };
+  }
+
+  const listingRow = (listingRows?.[0] ?? null) as WorkflowListingRow | null;
+  if (!listingRow) {
     return {
       ok: false,
       reason: "not_found",
