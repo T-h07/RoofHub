@@ -51,6 +51,10 @@ function toProfileSaveError(message: string) {
     return "One or more profile values are invalid. Review your inputs and try again.";
   }
 
+  if (isMissingContactColumnsError(message)) {
+    return "Profile schema is out of date. Apply the latest Supabase migrations and retry.";
+  }
+
   return "Profile update failed. Please try again.";
 }
 
@@ -272,20 +276,41 @@ export async function updateProfileAction(
     viber_phone: normalizedViberPhone,
   };
 
-  const { error: extendedError } = await supabase
+  let { data: updatedProfile, error } = await supabase
     .from("profiles")
     .update(extendedUpdatePayload)
-    .eq("id", currentProfile.id);
+    .eq("id", currentProfile.id)
+    .select("id")
+    .limit(1)
+    .maybeSingle();
 
-  const { error } =
-    extendedError && isMissingContactColumnsError(extendedError.message)
-      ? await supabase.from("profiles").update(baseUpdatePayload).eq("id", currentProfile.id)
-      : { error: extendedError };
+  let usedLegacyContactFallback = false;
+
+  if (error && isMissingContactColumnsError(error.message)) {
+    const legacyUpdateResult = await supabase
+      .from("profiles")
+      .update(baseUpdatePayload)
+      .eq("id", currentProfile.id)
+      .select("id")
+      .limit(1)
+      .maybeSingle();
+
+    updatedProfile = legacyUpdateResult.data;
+    error = legacyUpdateResult.error;
+    usedLegacyContactFallback = !legacyUpdateResult.error;
+  }
 
   if (error) {
     return {
       status: "error",
       message: toProfileSaveError(error.message),
+    };
+  }
+
+  if (!updatedProfile) {
+    return {
+      status: "error",
+      message: "Profile update was rejected for this account. Refresh and retry.",
     };
   }
 
@@ -311,7 +336,9 @@ export async function updateProfileAction(
 
   return {
     status: "success",
-    message: "Profile saved successfully.",
+    message: usedLegacyContactFallback
+      ? "Profile basics saved. Apply latest migrations to persist extended contact channels."
+      : "Profile saved successfully.",
   };
 }
 
@@ -344,12 +371,15 @@ export async function uploadProfileAvatarAction(
     });
 
     const previousAvatarUrl = profileResult.profile.avatar_url;
-    const { error: updateError } = await supabase
+    const { data: updatedProfile, error: updateError } = await supabase
       .from("profiles")
       .update({
         avatar_url: uploaded.publicUrl,
       })
-      .eq("id", profileResult.profile.id);
+      .eq("id", profileResult.profile.id)
+      .select("id")
+      .limit(1)
+      .maybeSingle();
 
     if (updateError) {
       try {
@@ -364,6 +394,22 @@ export async function uploadProfileAvatarAction(
       return {
         status: "error",
         message: toAvatarUploadError(updateError.message),
+      };
+    }
+
+    if (!updatedProfile) {
+      try {
+        await removeProfileAvatarByPath(supabase, {
+          userId: profileResult.profile.id,
+          storagePath: uploaded.storagePath,
+        });
+      } catch {
+        // Best effort rollback of uploaded object when profile row update fails.
+      }
+
+      return {
+        status: "error",
+        message: "Profile photo update was rejected for this account. Refresh and retry.",
       };
     }
 
@@ -415,17 +461,27 @@ export async function removeProfileAvatarAction(
     };
   }
 
-  const { error: updateError } = await supabase
+  const { data: updatedProfile, error: updateError } = await supabase
     .from("profiles")
     .update({
       avatar_url: null,
     })
-    .eq("id", profileResult.profile.id);
+    .eq("id", profileResult.profile.id)
+    .select("id")
+    .limit(1)
+    .maybeSingle();
 
   if (updateError) {
     return {
       status: "error",
       message: toAvatarRemoveError(updateError.message),
+    };
+  }
+
+  if (!updatedProfile) {
+    return {
+      status: "error",
+      message: "Profile photo removal was rejected for this account. Refresh and retry.",
     };
   }
 

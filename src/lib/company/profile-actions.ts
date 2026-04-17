@@ -41,6 +41,10 @@ function toCompanyProfileUpdateError(message: string) {
     return "One or more company profile values are invalid. Review your inputs and retry.";
   }
 
+  if (isMissingCompanyProfileColumnsError(message)) {
+    return "Company profile schema is out of date. Apply the latest Supabase migrations and retry.";
+  }
+
   return "Company profile update failed. Please retry.";
 }
 
@@ -68,6 +72,21 @@ function toCompanyLogoUploadError(message: string) {
   }
 
   return "Company logo update failed. Please retry.";
+}
+
+function isMissingCompanyProfileColumnsError(message: string | undefined) {
+  if (!message) {
+    return false;
+  }
+
+  const normalized = message.toLowerCase();
+  return (
+    normalized.includes("column") &&
+    (normalized.includes("contact_email") ||
+      normalized.includes("contact_phone") ||
+      normalized.includes("website_url") ||
+      normalized.includes("coverage_area"))
+  );
 }
 
 function toTrafficErrorState(result: { message: string }): CompanyProfileActionState {
@@ -198,17 +217,41 @@ export async function updateCompanyProfileAction(
     return toTrafficErrorState(trafficResult);
   }
 
-  const { error } = await supabase
+  const baseUpdatePayload = {
+    name: input.name,
+    description: input.description,
+  };
+  const extendedUpdatePayload = {
+    ...baseUpdatePayload,
+    contact_email: input.contactEmail,
+    contact_phone: input.contactPhone,
+    website_url: input.websiteUrl,
+    coverage_area: input.coverageArea,
+  };
+
+  let { data: updatedOrganization, error } = await supabase
     .from("organizations")
-    .update({
-      name: input.name,
-      description: input.description,
-      contact_email: input.contactEmail,
-      contact_phone: input.contactPhone,
-      website_url: input.websiteUrl,
-      coverage_area: input.coverageArea,
-    })
-    .eq("id", ownerContext.organization.id);
+    .update(extendedUpdatePayload)
+    .eq("id", ownerContext.organization.id)
+    .select("id")
+    .limit(1)
+    .maybeSingle();
+
+  let usedLegacyContactFallback = false;
+
+  if (error && isMissingCompanyProfileColumnsError(error.message)) {
+    const legacyUpdateResult = await supabase
+      .from("organizations")
+      .update(baseUpdatePayload)
+      .eq("id", ownerContext.organization.id)
+      .select("id")
+      .limit(1)
+      .maybeSingle();
+
+    updatedOrganization = legacyUpdateResult.data;
+    error = legacyUpdateResult.error;
+    usedLegacyContactFallback = !legacyUpdateResult.error;
+  }
 
   if (error) {
     await recordSecurityAuditEvent({
@@ -234,6 +277,28 @@ export async function updateCompanyProfileAction(
     };
   }
 
+  if (!updatedOrganization) {
+    await recordSecurityAuditEvent({
+      supabase,
+      event: {
+        eventType: AUDIT_EVENT_TYPES.organizationProfileUpdateFailed,
+        actorUserId: ownerContext.profile.id,
+        actorRole: ownerContext.profile.role,
+        targetType: "organization",
+        targetId: ownerContext.organization.id,
+        metadata: {
+          outcome: "empty_update_result",
+          ...requestFingerprint,
+        },
+      },
+    });
+
+    return {
+      status: "error",
+      message: "Company profile update was rejected for this account. Refresh and retry.",
+    };
+  }
+
   await recordSecurityAuditEvent({
     supabase,
     event: {
@@ -254,7 +319,9 @@ export async function updateCompanyProfileAction(
 
   return {
     status: "success",
-    message: "Company profile saved successfully.",
+    message: usedLegacyContactFallback
+      ? "Company basics saved. Apply latest migrations to persist extended contact fields."
+      : "Company profile saved successfully.",
   };
 }
 
@@ -315,12 +382,15 @@ export async function uploadCompanyLogoAction(
     });
 
     const previousLogoPath = ownerContext.organization.logo_path;
-    const { error: updateError } = await supabase
+    const { data: updatedOrganization, error: updateError } = await supabase
       .from("organizations")
       .update({
         logo_path: uploaded.storagePath,
       })
-      .eq("id", ownerContext.organization.id);
+      .eq("id", ownerContext.organization.id)
+      .select("id")
+      .limit(1)
+      .maybeSingle();
 
     if (updateError) {
       try {
@@ -353,6 +423,38 @@ export async function uploadCompanyLogoAction(
       return {
         status: "error",
         message: toCompanyLogoUploadError(updateError.message),
+      };
+    }
+
+    if (!updatedOrganization) {
+      try {
+        await removeCompanyLogoByPath(supabase, {
+          organizationId: ownerContext.organization.id,
+          storagePath: uploaded.storagePath,
+        });
+      } catch {
+        // Best effort rollback of uploaded object when organization row update fails.
+      }
+
+      await recordSecurityAuditEvent({
+        supabase,
+        event: {
+          eventType: AUDIT_EVENT_TYPES.organizationLogoUpdateFailed,
+          actorUserId: ownerContext.profile.id,
+          actorRole: ownerContext.profile.role,
+          targetType: "organization",
+          targetId: ownerContext.organization.id,
+          metadata: {
+            outcome: "empty_update_result",
+            stage: "organization_row_update",
+            ...requestFingerprint,
+          },
+        },
+      });
+
+      return {
+        status: "error",
+        message: "Company logo update was rejected for this account. Refresh and retry.",
       };
     }
 
@@ -449,12 +551,15 @@ export async function removeCompanyLogoAction(
     };
   }
 
-  const { error: updateError } = await supabase
+  const { data: updatedOrganization, error: updateError } = await supabase
     .from("organizations")
     .update({
       logo_path: null,
     })
-    .eq("id", ownerContext.organization.id);
+    .eq("id", ownerContext.organization.id)
+    .select("id")
+    .limit(1)
+    .maybeSingle();
 
   if (updateError) {
     await recordSecurityAuditEvent({
@@ -478,6 +583,29 @@ export async function removeCompanyLogoAction(
     return {
       status: "error",
       message: toCompanyLogoUploadError(updateError.message),
+    };
+  }
+
+  if (!updatedOrganization) {
+    await recordSecurityAuditEvent({
+      supabase,
+      event: {
+        eventType: AUDIT_EVENT_TYPES.organizationLogoUpdateFailed,
+        actorUserId: ownerContext.profile.id,
+        actorRole: ownerContext.profile.role,
+        targetType: "organization",
+        targetId: ownerContext.organization.id,
+        metadata: {
+          outcome: "empty_update_result",
+          stage: "organization_row_update",
+          ...requestFingerprint,
+        },
+      },
+    });
+
+    return {
+      status: "error",
+      message: "Company logo removal was rejected for this account. Refresh and retry.",
     };
   }
 
