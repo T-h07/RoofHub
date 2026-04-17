@@ -2,6 +2,7 @@ import "server-only";
 
 import { createServerSupabaseClient } from "@/lib/supabase";
 import type { Tables } from "@/types/database";
+import { canManageCompanyTeam } from "@/lib/company/permissions";
 
 import { getCurrentUserCompanyContext } from "./context";
 import type {
@@ -66,7 +67,13 @@ export async function loadCompanyTeamWorkspaceDataForCurrentUser() {
   }
 
   const managementMembership = companyContextResult.company.managementMembership;
-  if (!managementMembership?.organization) {
+  if (
+    !managementMembership?.organization ||
+    !canManageCompanyTeam(
+      managementMembership.role,
+      managementMembership.member_status
+    )
+  ) {
     return {
       ok: false as const,
       reason: "management_access_required" as const,
@@ -228,8 +235,40 @@ export async function loadCompanyInviteByTokenForCurrentUser(inviteToken: string
     };
   }
 
+  const invite = data as RawCompanyInviteDetailRow;
+  const normalizedUserEmail = user.email?.trim().toLowerCase() ?? null;
+  const inviteEmail = invite.invite_email?.trim().toLowerCase() ?? null;
+
+  const { data: managerMembership } = await supabase
+    .from("organization_members")
+    .select("id")
+    .eq("organization_id", invite.organization_id)
+    .eq("user_id", user.id)
+    .in("role", ["owner", "admin"])
+    .eq("member_status", "active")
+    .maybeSingle();
+
+  const canAccessInviteByTarget =
+    invite.target_user_id === user.id ||
+    (
+      invite.target_user_id === null &&
+      invite.invite_status === "pending" &&
+      normalizedUserEmail !== null &&
+      inviteEmail !== null &&
+      normalizedUserEmail === inviteEmail
+    );
+  const canAccessInviteByManagementRole = Boolean(managerMembership);
+
+  if (!canAccessInviteByTarget && !canAccessInviteByManagementRole) {
+    return {
+      ok: false as const,
+      reason: "not_found" as const,
+      message: "Invite not found or no longer accessible from this account.",
+    };
+  }
+
   return {
     ok: true as const,
-    invite: data as RawCompanyInviteDetailRow,
+    invite,
   };
 }

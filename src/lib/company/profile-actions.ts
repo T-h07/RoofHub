@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { getCurrentUserCompanyContext } from "@/lib/company/context";
+import { canEditCompanyProfile } from "@/lib/company/permissions";
 import {
   COMPANY_LOGO_ACTION_IDLE_STATE,
   COMPANY_PROFILE_IDLE_STATE,
@@ -130,8 +131,13 @@ async function loadCurrentOwnerOrganization(
     };
   }
 
+  const ownerMembership = companyContextResult.company.ownerMembership;
   const ownerOrganization = companyContextResult.company.ownerOrganization;
-  if (!ownerOrganization) {
+  if (
+    !ownerMembership ||
+    !ownerOrganization ||
+    !canEditCompanyProfile(ownerMembership.role, ownerMembership.member_status)
+  ) {
     return {
       ok: false as const,
       message:

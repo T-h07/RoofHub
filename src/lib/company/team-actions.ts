@@ -4,12 +4,20 @@ import { revalidatePath } from "next/cache";
 
 import { getCurrentUserProfile } from "@/lib/auth/profile";
 import { getCurrentUserCompanyContext } from "@/lib/company/context";
+import {
+  canInviteOrganizationRole,
+  canManageCompanyTeam,
+  canMutateOrganizationMemberRole,
+  canMutateOrganizationMemberStatus,
+  canRemoveOrganizationMember,
+} from "@/lib/company/permissions";
 import type { CompanyWorkspaceSummary } from "@/lib/company/context";
 import {
   COMPANY_TEAM_INVITE_IDLE_STATE,
   COMPANY_TEAM_MUTATION_IDLE_STATE,
   type CompanyTeamInviteActionState,
   type CompanyTeamMutationActionState,
+  type OrganizationMemberStatus,
 } from "@/lib/company/team-types";
 import {
   readCompanyTeamInviteInput,
@@ -47,12 +55,23 @@ type UpdateStatusRpcRow =
 type RemoveMemberRpcRow =
   Database["public"]["Functions"]["remove_organization_member"]["Returns"][number];
 
+type TeamMutationMembershipRow = Pick<
+  Tables<"organization_members">,
+  "id" | "organization_id" | "role" | "member_status" | "user_id"
+>;
+
+type TeamMutationInviteRow = Pick<
+  Tables<"organization_member_invites">,
+  "id" | "organization_id" | "role" | "invite_status"
+>;
+
 type TeamManagerContextResult =
   | {
       ok: true;
       profile: Tables<"profiles">;
       organization: CompanyWorkspaceSummary;
       membershipRole: "owner" | "admin";
+      membershipStatus: OrganizationMemberStatus;
     }
   | {
       ok: false;
@@ -242,7 +261,13 @@ async function loadTeamManagerContext(
     };
   }
 
-  if (managementMembership.role !== "owner" && managementMembership.role !== "admin") {
+  if (
+    !canManageCompanyTeam(
+      managementMembership.role,
+      managementMembership.member_status
+    )
+    || (managementMembership.role !== "owner" && managementMembership.role !== "admin")
+  ) {
     return {
       ok: false,
       message: "Only owner or admin members can manage team access.",
@@ -254,6 +279,61 @@ async function loadTeamManagerContext(
     profile: companyContextResult.profile,
     organization: managementMembership.organization,
     membershipRole: managementMembership.role,
+    membershipStatus: managementMembership.member_status,
+  };
+}
+
+async function loadScopedMembershipForTeamMutation(
+  supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>,
+  input: {
+    membershipId: string;
+    organizationId: string;
+  }
+) {
+  const { data, error } = await supabase
+    .from("organization_members")
+    .select("id, organization_id, role, member_status, user_id")
+    .eq("id", input.membershipId)
+    .eq("organization_id", input.organizationId)
+    .maybeSingle();
+
+  if (error || !data) {
+    return {
+      ok: false as const,
+      row: null as TeamMutationMembershipRow | null,
+    };
+  }
+
+  return {
+    ok: true as const,
+    row: data as TeamMutationMembershipRow,
+  };
+}
+
+async function loadScopedInviteForTeamMutation(
+  supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>,
+  input: {
+    inviteId: string;
+    organizationId: string;
+  }
+) {
+  const { data, error } = await supabase
+    .from("organization_member_invites")
+    .select("id, organization_id, role, invite_status")
+    .eq("id", input.inviteId)
+    .eq("organization_id", input.organizationId)
+    .maybeSingle();
+
+  if (error || !data) {
+    return {
+      ok: false as const,
+      row: null as TeamMutationInviteRow | null,
+    };
+  }
+
+  return {
+    ok: true as const,
+    row: data as TeamMutationInviteRow,
   };
 }
 
@@ -325,6 +405,19 @@ export async function createCompanyTeamInviteAction(
     return {
       status: "error",
       message: managerContext.message,
+    };
+  }
+
+  if (
+    !canInviteOrganizationRole(
+      managerContext.membershipRole,
+      managerContext.membershipStatus,
+      input.role
+    )
+  ) {
+    return {
+      status: "error",
+      message: "You do not have permission to invite this role.",
     };
   }
 
@@ -442,6 +535,27 @@ export async function revokeCompanyTeamInviteAction(
     return toGenericErrorState(managerContext.message);
   }
 
+  const scopedInvite = await loadScopedInviteForTeamMutation(supabase, {
+    inviteId,
+    organizationId: managerContext.organization.id,
+  });
+
+  if (!scopedInvite.ok || !scopedInvite.row) {
+    return toGenericErrorState(
+      "Invite not found in the current company workspace."
+    );
+  }
+
+  if (
+    !canInviteOrganizationRole(
+      managerContext.membershipRole,
+      managerContext.membershipStatus,
+      scopedInvite.row.role
+    )
+  ) {
+    return toGenericErrorState("You do not have permission to revoke this invite.");
+  }
+
   const requestFingerprint = await getAuditRequestFingerprint();
   const trafficResult = await enforceMemberMutationTrafficControl({
     supabase,
@@ -523,6 +637,30 @@ export async function updateCompanyTeamMemberRoleAction(
   const managerContext = await loadTeamManagerContext(supabase);
   if (!managerContext.ok) {
     return toGenericErrorState(managerContext.message);
+  }
+
+  const scopedMembership = await loadScopedMembershipForTeamMutation(supabase, {
+    membershipId,
+    organizationId: managerContext.organization.id,
+  });
+
+  if (!scopedMembership.ok || !scopedMembership.row) {
+    return toGenericErrorState(
+      "Member not found in the current company workspace."
+    );
+  }
+
+  if (
+    !canMutateOrganizationMemberRole(
+      managerContext.membershipRole,
+      managerContext.membershipStatus,
+      scopedMembership.row.role,
+      input.newRole
+    )
+  ) {
+    return toGenericErrorState(
+      "You do not have permission to change this member role."
+    );
   }
 
   const requestFingerprint = await getAuditRequestFingerprint();
@@ -610,6 +748,29 @@ export async function updateCompanyTeamMemberStatusAction(
   const managerContext = await loadTeamManagerContext(supabase);
   if (!managerContext.ok) {
     return toGenericErrorState(managerContext.message);
+  }
+
+  const scopedMembership = await loadScopedMembershipForTeamMutation(supabase, {
+    membershipId,
+    organizationId: managerContext.organization.id,
+  });
+
+  if (!scopedMembership.ok || !scopedMembership.row) {
+    return toGenericErrorState(
+      "Member not found in the current company workspace."
+    );
+  }
+
+  if (
+    !canMutateOrganizationMemberStatus(
+      managerContext.membershipRole,
+      managerContext.membershipStatus,
+      scopedMembership.row.role
+    )
+  ) {
+    return toGenericErrorState(
+      "You do not have permission to update this member status."
+    );
   }
 
   const requestFingerprint = await getAuditRequestFingerprint();
@@ -703,6 +864,27 @@ export async function removeCompanyTeamMemberAction(
   const managerContext = await loadTeamManagerContext(supabase);
   if (!managerContext.ok) {
     return toGenericErrorState(managerContext.message);
+  }
+
+  const scopedMembership = await loadScopedMembershipForTeamMutation(supabase, {
+    membershipId,
+    organizationId: managerContext.organization.id,
+  });
+
+  if (!scopedMembership.ok || !scopedMembership.row) {
+    return toGenericErrorState(
+      "Member not found in the current company workspace."
+    );
+  }
+
+  if (
+    !canRemoveOrganizationMember(
+      managerContext.membershipRole,
+      managerContext.membershipStatus,
+      scopedMembership.row.role
+    )
+  ) {
+    return toGenericErrorState("You do not have permission to remove this member.");
   }
 
   const requestFingerprint = await getAuditRequestFingerprint();

@@ -3,6 +3,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { Database, Tables } from "@/types/database";
+import { canReviewCompanyListingWorkflow } from "@/lib/company/permissions";
 
 import type {
   CompanyListingWorkflowCapabilities,
@@ -39,7 +40,11 @@ function isCompanyWorkflowReviewer(role: WorkflowMembershipRole | null) {
     return false;
   }
 
-  return role === "admin" || role === "owner" || role === "manager";
+  if (role === "admin") {
+    return true;
+  }
+
+  return canReviewCompanyListingWorkflow(role, "active");
 }
 
 function isCompanyWorkflowSubmitter(input: {

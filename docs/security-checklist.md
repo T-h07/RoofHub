@@ -126,3 +126,16 @@ For dependency/lockfile/scanner specifics, also follow `docs/supply-chain-guardr
 - Company workflow context read path now uses a trusted RPC so reviewer roles can access review surfaces without widening generic listing-read policies.
 - Role-aware dashboard controls keep reviewer quick actions scoped to `owner`/`admin`/`manager`; non-reviewer members do not receive reviewer-only controls.
 - Company invite activity in the dashboard feed is limited to owner/admin visibility to preserve team-management access boundaries.
+
+## NM-PT40 validation notes
+
+- Company permission checks are centralized in `src/lib/company/permissions.ts` and reused for team actions, dashboard visibility, and workflow reviewer derivation.
+- Team mutations resolve invite/member targets in organization scope before RPC execution, blocking cross-company ID mutation attempts.
+- Team invite detail reads now enforce app-layer access checks (target account or active owner/admin membership) in addition to RLS.
+- Company pending-review queue RPC access is reviewer-scoped (`owner`/`admin`/`manager`) and fails closed for non-reviewer members.
+- Workflow timeline visibility is reduced to reviewer roles or listing-responsible actors (creator/assigned agent).
+- Private company listing reads now require active membership for `organization_id` listings, preventing suspended-member owner-id fallback reads.
+- Listing image storage object policies now enforce active company membership for owner-scoped company listing media access.
+- Invite-email access checks now use server-trusted primary email resolution (`current_user_primary_email()`), not JWT claim assumptions.
+- Listing update RLS now keeps ownership/attribution fields immutable while allowing legitimate owner edits after reviewer publish actions.
+- Dependency audit high finding resolved by bumping `next` from `16.2.2` to `16.2.4` (GHSA-q4gf-8mx6-v5v3 remediation).

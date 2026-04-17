@@ -40,6 +40,10 @@ import {
   updateCompanyTeamMemberStatusAction,
 } from "@/lib/company/team-actions";
 import {
+  getAssignableOrganizationRolesForMemberMutation,
+  getInvitableOrganizationRoles,
+} from "@/lib/company/permissions";
+import {
   COMPANY_TEAM_INVITE_IDLE_STATE,
   COMPANY_TEAM_MUTATION_IDLE_STATE,
   type CompanyInviteWithRelations,
@@ -125,14 +129,6 @@ function getStatusBadgeVariant(status: CompanyTeamMemberWithProfile["member_stat
   }
 
   return "outline" as const;
-}
-
-function getRoleOptions(viewerMembershipRole: "owner" | "admin") {
-  if (viewerMembershipRole === "owner") {
-    return ["owner", "admin", "manager", "agent"] as const;
-  }
-
-  return ["manager", "agent"] as const;
 }
 
 export function CompanyTeamManagement({
@@ -238,7 +234,7 @@ export function CompanyTeamManagement({
     setInviteRevocationDialog(null);
   }
 
-  const roleOptions = getRoleOptions(viewerMembershipRole);
+  const inviteRoleOptions = getInvitableOrganizationRoles(viewerMembershipRole, "active");
 
   return (
     <div className="space-y-5">
@@ -328,9 +324,11 @@ export function CompanyTeamManagement({
             <Field>
               <Label htmlFor="invite-role">Role</Label>
               <Select id="invite-role" name="role" defaultValue="agent">
-                <option value="admin">Admin</option>
-                <option value="manager">Manager</option>
-                <option value="agent">Agent</option>
+                {inviteRoleOptions.map((roleOption) => (
+                  <option key={`invite-role-${roleOption}`} value={roleOption}>
+                    {ORGANIZATION_MEMBER_ROLE_LABELS[roleOption]}
+                  </option>
+                ))}
               </Select>
               {inviteState.errors?.role ? <FieldError>{inviteState.errors.role}</FieldError> : null}
               <FieldHelp>Assigned when the invite is accepted.</FieldHelp>
@@ -390,6 +388,13 @@ export function CompanyTeamManagement({
               const adminRestricted = viewerMembershipRole === "admin" && isTargetPrivileged;
               const canManageStatus = !adminRestricted && !isLastOwner;
               const canManageRemoval = !adminRestricted && !isLastOwner;
+              const assignableRoleOptions = getAssignableOrganizationRolesForMemberMutation(
+                viewerMembershipRole,
+                "active",
+                member.role
+              );
+              const canManageRole = assignableRoleOptions.length > 0;
+              const memberRoleOptions = canManageRole ? assignableRoleOptions : [member.role];
 
               return (
                 <li
@@ -434,15 +439,20 @@ export function CompanyTeamManagement({
                             id={`member-role-${member.id}`}
                             name="newRole"
                             defaultValue={member.role}
-                            disabled={isMutationPending || adminRestricted}
+                            disabled={isMutationPending || !canManageRole}
                           >
-                            {roleOptions.map((roleOption) => (
+                            {memberRoleOptions.map((roleOption) => (
                               <option key={`${member.id}-${roleOption}`} value={roleOption}>
                                 {ORGANIZATION_MEMBER_ROLE_LABELS[roleOption]}
                               </option>
                             ))}
                           </Select>
-                          <Button type="submit" variant="outline" size="sm" disabled={isMutationPending || adminRestricted}>
+                          <Button
+                            type="submit"
+                            variant="outline"
+                            size="sm"
+                            disabled={isMutationPending || !canManageRole}
+                          >
                             {isMutationPending ? <LoaderCircle className="size-4 animate-spin" /> : null}
                             Update
                           </Button>

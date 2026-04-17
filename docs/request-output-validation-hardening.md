@@ -38,8 +38,10 @@ Treat these as untrusted input boundaries:
 - Company profile setup must validate contact email/phone/website/coverage bounds server-side and derive edit authority from authenticated owner membership context.
 - Company team invite flows must validate invite method, target (email/user id), role, and mutation references (membership/invite ids) before execution.
 - Company invite acceptance must validate token shape and enforce authenticated user-to-invite target matching server-side.
+- Company invite token detail loaders must enforce server-side target/manager access checks after lookup, not rely only on client token possession.
 - Company listing workflow actions must validate listing id shape, action allowlist, and bounded review-note length before execution.
 - Company listing workflow timeline reads must validate membership access server-side and reject non-member/non-admin readers.
+- Company pending-review queue loaders must enforce reviewer-role visibility server-side.
 
 ## Query and route param rules
 
@@ -99,6 +101,7 @@ Treat these as untrusted input boundaries:
 - Generic user-safe error messaging for backend failures.
 - Company ownership/membership resolution must continue to come from persisted organization membership data, not client role toggles.
 - Company invite and membership mutations must continue to use server-side validated identifiers (no client-only role/member authority assumptions).
+- Company workflow and queue visibility must remain reviewer-scoped where reviewer-only operational data is exposed.
 
 ## Deferred from SH-PT04
 

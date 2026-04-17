@@ -120,6 +120,19 @@ Route protection improves UX but is not an authorization substitute.
 - Company workflow listing reads now use trusted RPC access (`get_company_listing_workflow_listing(...)`) so reviewer-capable members can access review surfaces without broadening generic listing read policies.
 - Team-invite activity in dashboard feed is constrained to owner/admin membership visibility.
 
+### Company permissions hardening (NM-PT40)
+
+- Company permission checks are centralized through `src/lib/company/permissions.ts` and reused across team mutations, dashboard loaders, and workflow role derivation.
+- Team invite/member mutations now enforce organization-scoped target resolution before RPC execution, reducing cross-company direct-object mutation risk.
+- Team invite token reads now include app-layer access verification (invite target identity or active owner/admin membership), not RLS-only assumptions.
+- Company pending-review queue RPC access is reviewer-scoped (`owner`/`admin`/`manager`) and no longer broadly available to all active members.
+- Company workflow listing context reads are restricted to reviewer roles or listing-responsible actors (creator/assigned agent), not generic same-org membership.
+- Workflow timeline table reads are restricted to reviewer roles or listing-responsible actors to reduce internal overexposure of review notes/history.
+- Owner private listing reads now require active company membership when `organization_id` is set, preventing suspended/removed members from retaining owner-id private access.
+- Listing image storage object read/write/delete owner paths now require active company membership for company-owned listings, closing suspended-owner residual media access.
+- Invite-email visibility policy now uses server-trusted primary email resolution (`current_user_primary_email()`), avoiding JWT-claim trust assumptions.
+- Listing update RLS now preserves immutable attribution fields (`owner_id`, `organization_id`, `created_by_user_id`, `published_by_user_id`) while allowing legitimate owner edits after reviewer publish actions.
+
 ### Favorites
 
 - Favorite create/delete/read operations are scoped to the authenticated user id.

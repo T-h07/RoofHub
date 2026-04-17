@@ -4,6 +4,11 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { Tables } from "@/types/database";
 import type { Database } from "@/types/database";
+import {
+  canManageCompanyTeam,
+  canReviewCompanyListingWorkflow,
+  canViewCompanyActivityFeed,
+} from "@/lib/company/permissions";
 
 import {
   mapCompanyActivityRows,
@@ -11,7 +16,6 @@ import {
   type CompanyActivityRpcRow,
 } from "./activity-feed";
 import { getCurrentUserCompanyContext, type CompanyMembershipSummary, type CompanyWorkspaceSummary } from "./context";
-import type { OrganizationMemberRole } from "./team-types";
 
 type CompanyDashboardOverviewRpcRow =
   Database["public"]["Functions"]["get_company_dashboard_overview"]["Returns"][number];
@@ -72,17 +76,6 @@ export type LoadCompanyDashboardWorkspaceResult =
       message: string;
     };
 
-const REVIEWER_ROLE_SET = new Set<OrganizationMemberRole>(["owner", "admin", "manager"]);
-const OWNER_OR_ADMIN_ROLE_SET = new Set<OrganizationMemberRole>(["owner", "admin"]);
-
-function isReviewerRole(role: OrganizationMemberRole) {
-  return REVIEWER_ROLE_SET.has(role);
-}
-
-function isOwnerOrAdminRole(role: OrganizationMemberRole) {
-  return OWNER_OR_ADMIN_ROLE_SET.has(role);
-}
-
 function mapOverviewRow(row: CompanyDashboardOverviewRpcRow): CompanyDashboardOverviewMetrics {
   return {
     draftCount: row.draft_count,
@@ -142,11 +135,20 @@ export async function loadCompanyDashboardWorkspace(
     };
   }
 
-  const reviewer = isReviewerRole(membership.role);
-  const ownerOrAdmin = isOwnerOrAdminRole(membership.role);
+  const reviewer = canReviewCompanyListingWorkflow(
+    membership.role,
+    membership.member_status
+  );
+  const ownerOrAdmin = canManageCompanyTeam(
+    membership.role,
+    membership.member_status
+  );
   const pendingQueueLimit = Math.max(0, Math.min(40, Math.trunc(options?.pendingQueueLimit ?? 10)));
   const activityLimit = Math.max(1, Math.min(120, Math.trunc(options?.activityLimit ?? 22)));
-  const canViewActivityFeed = reviewer;
+  const canViewActivityFeed = canViewCompanyActivityFeed(
+    membership.role,
+    membership.member_status
+  );
 
   const [overviewRpcResult, pendingQueueRpcResult, activityRpcResult] = await Promise.all([
     supabase.rpc("get_company_dashboard_overview", {
