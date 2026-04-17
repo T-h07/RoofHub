@@ -7,6 +7,9 @@ import { createListingImageSignedUrl } from "@/lib/supabase/storage/listing-imag
 import type { Database } from "@/types/database";
 
 import type {
+  ProviderInventoryMapListing,
+  ProviderInventoryMapListingRow,
+  ProviderInventoryMapScope,
   ProviderListingOverviewMetrics,
   ProviderListingStatus,
   ProviderListingStatusFilter,
@@ -41,6 +44,132 @@ const PROVIDER_MANAGED_LISTINGS_SELECT = `
   )
 `;
 
+const PROVIDER_MANAGED_LISTINGS_LEGACY_SELECT = `
+  id,
+  owner_id,
+  slug,
+  title,
+  listing_status,
+  listing_type,
+  property_type,
+  price_amount,
+  currency_code,
+  city,
+  neighborhood,
+  published_at,
+  archived_at,
+  updated_at,
+  created_at,
+  listing_images (
+    storage_path,
+    is_cover,
+    sort_order
+  )
+`;
+
+const PROVIDER_INVENTORY_MAP_LISTINGS_SELECT = `
+  id,
+  organization_id,
+  slug,
+  title,
+  listing_status,
+  listing_type,
+  property_type,
+  price_amount,
+  currency_code,
+  city,
+  neighborhood,
+  latitude,
+  longitude,
+  public_location_mode,
+  updated_at
+`;
+
+const PROVIDER_INVENTORY_MAP_LISTINGS_LEGACY_SELECT = `
+  id,
+  owner_id,
+  slug,
+  title,
+  listing_status,
+  listing_type,
+  property_type,
+  price_amount,
+  currency_code,
+  city,
+  neighborhood,
+  latitude,
+  longitude,
+  public_location_mode,
+  updated_at
+`;
+
+const STRICT_COORDINATE_PATTERN = /^-?\d+(?:\.\d+)?$/;
+const MAX_COORDINATE_TOKEN_LENGTH = 32;
+
+type ProviderManagedListingLegacyRow = Pick<
+  Database["public"]["Tables"]["listings"]["Row"],
+  | "id"
+  | "owner_id"
+  | "slug"
+  | "title"
+  | "listing_status"
+  | "listing_type"
+  | "property_type"
+  | "price_amount"
+  | "currency_code"
+  | "city"
+  | "neighborhood"
+  | "published_at"
+  | "archived_at"
+  | "updated_at"
+  | "created_at"
+> & {
+  listing_images:
+    | Array<
+        Pick<
+          Database["public"]["Tables"]["listing_images"]["Row"],
+          "storage_path" | "is_cover" | "sort_order"
+        >
+      >
+    | null;
+};
+
+type ProviderInventoryMapListingLegacyRow = Pick<
+  Database["public"]["Tables"]["listings"]["Row"],
+  | "id"
+  | "owner_id"
+  | "slug"
+  | "title"
+  | "listing_status"
+  | "listing_type"
+  | "property_type"
+  | "price_amount"
+  | "currency_code"
+  | "city"
+  | "neighborhood"
+  | "latitude"
+  | "longitude"
+  | "public_location_mode"
+  | "updated_at"
+>;
+
+function isMissingOwnershipColumnsError(input: {
+  code?: string | null;
+  message?: string | null;
+}) {
+  const message = (input.message ?? "").toLowerCase();
+  if (input.code !== "42703") {
+    return false;
+  }
+
+  return (
+    (message.includes("listings.organization_id") && message.includes("does not exist")) ||
+    (message.includes("listings.created_by_user_id") && message.includes("does not exist")) ||
+    (message.includes("listings.assigned_agent_user_id") && message.includes("does not exist")) ||
+    (message.includes("listings.published_by_user_id") && message.includes("does not exist"))
+  );
+}
+
 function getCoverImagePath(images: ProviderManagedListingRow["listing_images"]): string | null {
   if (!images || images.length === 0) {
     return null;
@@ -55,6 +184,27 @@ function getCoverImagePath(images: ProviderManagedListingRow["listing_images"]):
   });
 
   return sortedImages[0]?.storage_path ?? null;
+}
+
+function parseCoordinate(value: number | string | null) {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : null;
+  }
+
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const normalized = value.trim();
+  if (
+    normalized.length > MAX_COORDINATE_TOKEN_LENGTH ||
+    !STRICT_COORDINATE_PATTERN.test(normalized)
+  ) {
+    return null;
+  }
+
+  const parsed = Number.parseFloat(normalized);
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 async function countProviderListingsByStatus(
@@ -83,7 +233,33 @@ async function countProviderListingsByStatus(
 
   const { count, error } = await query;
 
-  if (error) {
+  if (!error) {
+    return {
+      ok: true as const,
+      count: count ?? 0,
+    };
+  }
+
+  if (!isMissingOwnershipColumnsError({ code: error.code ?? null, message: error.message ?? null })) {
+    return {
+      ok: false as const,
+      message: "Listing metrics are temporarily unavailable.",
+      count: 0,
+    };
+  }
+
+  let legacyQuery = supabase
+    .from("listings")
+    .select("id", { count: "exact", head: true })
+    .eq("owner_id", input.userId);
+
+  if (input.status) {
+    legacyQuery = legacyQuery.eq("listing_status", input.status);
+  }
+
+  const { count: legacyCount, error: legacyError } = await legacyQuery;
+
+  if (legacyError) {
     return {
       ok: false as const,
       message: "Listing metrics are temporarily unavailable.",
@@ -93,7 +269,7 @@ async function countProviderListingsByStatus(
 
   return {
     ok: true as const,
-    count: count ?? 0,
+    count: legacyCount ?? 0,
   };
 }
 
@@ -213,12 +389,15 @@ export async function loadProviderManagedListings(
     ? input.statusFilter
     : "all";
 
-  let query = supabase
-    .from("listings")
-    .select(PROVIDER_MANAGED_LISTINGS_SELECT)
-    .order("updated_at", { ascending: false })
-    .order("created_at", { ascending: false })
-    .limit(normalizedLimit);
+  const buildPrimaryQuery = () =>
+    supabase
+      .from("listings")
+      .select(PROVIDER_MANAGED_LISTINGS_SELECT)
+      .order("updated_at", { ascending: false })
+      .order("created_at", { ascending: false })
+      .limit(normalizedLimit);
+
+  let query = buildPrimaryQuery();
 
   if (input.organizationId) {
     query = query.or(
@@ -232,19 +411,86 @@ export async function loadProviderManagedListings(
     query = query.eq("listing_status", statusFilter);
   }
 
-  const { data, error } = await query;
+  const primaryResult = await query;
 
-  if (error) {
-    return {
-      ok: false as const,
-      message: "Your listings are temporarily unavailable.",
-      listings: [] as ProviderManagedListing[],
-    };
+  let listingRows: ProviderManagedListingRow[] = [];
+  let legacyRows: ProviderManagedListingLegacyRow[] = [];
+  let usedLegacyProjection = false;
+
+  if (primaryResult.error) {
+    if (
+      !isMissingOwnershipColumnsError({
+        code: primaryResult.error.code ?? null,
+        message: primaryResult.error.message ?? null,
+      })
+    ) {
+      return {
+        ok: false as const,
+        message: "Your listings are temporarily unavailable.",
+        listings: [] as ProviderManagedListing[],
+      };
+    }
+
+    usedLegacyProjection = true;
+    let legacyQuery = supabase
+      .from("listings")
+      .select(PROVIDER_MANAGED_LISTINGS_LEGACY_SELECT)
+      .order("updated_at", { ascending: false })
+      .order("created_at", { ascending: false })
+      .limit(normalizedLimit)
+      .eq("owner_id", input.userId);
+
+    if (statusFilter !== "all") {
+      legacyQuery = legacyQuery.eq("listing_status", statusFilter);
+    }
+
+    const legacyResult = await legacyQuery;
+
+    if (legacyResult.error) {
+      return {
+        ok: false as const,
+        message: "Your listings are temporarily unavailable.",
+        listings: [] as ProviderManagedListing[],
+      };
+    }
+
+    legacyRows = (legacyResult.data ?? []) as ProviderManagedListingLegacyRow[];
+  } else {
+    listingRows = (primaryResult.data ?? []) as ProviderManagedListingRow[];
   }
 
-  const listingRows = (data ?? []) as ProviderManagedListingRow[];
+  const unifiedRows: ProviderManagedListingRow[] = usedLegacyProjection
+    ? legacyRows.map((listing) => ({
+        id: listing.id,
+        organization_id: null,
+        created_by_user_id: listing.owner_id,
+        assigned_agent_user_id: null,
+        published_by_user_id: null,
+        slug: listing.slug,
+        title: listing.title,
+        listing_status: listing.listing_status,
+        listing_type: listing.listing_type,
+        property_type: listing.property_type,
+        price_amount: listing.price_amount,
+        currency_code: listing.currency_code,
+        city: listing.city,
+        neighborhood: listing.neighborhood,
+        published_at: listing.published_at,
+        archived_at: listing.archived_at,
+        updated_at: listing.updated_at,
+        created_at: listing.created_at,
+        listing_images: listing.listing_images,
+      }))
+    : listingRows;
+
+  if (usedLegacyProjection) {
+    console.warn(
+      "[ProviderDashboard] listings ownership columns are missing; falling back to owner-only managed listing projection."
+    );
+  }
+
   const coverImageUrlEntries = await Promise.all(
-    listingRows.map(async (listing) => {
+    unifiedRows.map(async (listing) => {
       const coverImagePath = getCoverImagePath(listing.listing_images);
       if (!coverImagePath) {
         return [listing.id, null, null] as const;
@@ -269,7 +515,7 @@ export async function loadProviderManagedListings(
     ])
   );
 
-  const listings: ProviderManagedListing[] = listingRows.map((listing) => {
+  const listings: ProviderManagedListing[] = unifiedRows.map((listing) => {
     const coverEntry = coverImageMap.get(listing.id);
 
     return {
@@ -300,5 +546,171 @@ export async function loadProviderManagedListings(
   return {
     ok: true as const,
     listings,
+  };
+}
+
+export async function loadProviderInventoryMapListings(
+  supabase: SupabaseClient<Database>,
+  input: {
+    userId: string;
+    organizationId?: string | null;
+    scope?: ProviderInventoryMapScope;
+    statusFilter?: ProviderListingStatusFilter;
+    limit?: number;
+  }
+) {
+  const normalizedLimit =
+    typeof input.limit === "number" && Number.isFinite(input.limit)
+      ? Math.max(1, Math.min(500, Math.trunc(input.limit)))
+      : 250;
+  const normalizedScope = input.scope ?? "owner";
+  const statusFilter = isProviderListingStatusFilter(input.statusFilter)
+    ? input.statusFilter
+    : "all";
+
+  let query = supabase
+    .from("listings")
+    .select(PROVIDER_INVENTORY_MAP_LISTINGS_SELECT, { count: "exact" })
+    .order("updated_at", { ascending: false })
+    .limit(normalizedLimit);
+
+  if (normalizedScope === "organization") {
+    if (!input.organizationId) {
+      return {
+        ok: false as const,
+        message: "Company inventory map context is missing organization scope.",
+        listings: [] as ProviderInventoryMapListing[],
+        totalCount: 0,
+        mappableCount: 0,
+      };
+    }
+
+    query = query.eq("organization_id", input.organizationId);
+  } else if (normalizedScope === "mixed" && input.organizationId) {
+    query = query.or(
+      `organization_id.eq.${input.organizationId},and(organization_id.is.null,owner_id.eq.${input.userId})`
+    );
+  } else {
+    query = query.eq("owner_id", input.userId);
+  }
+
+  if (statusFilter !== "all") {
+    query = query.eq("listing_status", statusFilter);
+  }
+
+  const primaryResult = await query;
+
+  let usedLegacyProjection = false;
+  let listingRows: ProviderInventoryMapListingRow[] = [];
+  let legacyRows: ProviderInventoryMapListingLegacyRow[] = [];
+  let totalCount = primaryResult.count ?? 0;
+
+  if (primaryResult.error) {
+    if (
+      !isMissingOwnershipColumnsError({
+        code: primaryResult.error.code ?? null,
+        message: primaryResult.error.message ?? null,
+      })
+    ) {
+      return {
+        ok: false as const,
+        message: "Inventory map listings are temporarily unavailable.",
+        listings: [] as ProviderInventoryMapListing[],
+        totalCount: 0,
+        mappableCount: 0,
+      };
+    }
+
+    usedLegacyProjection = true;
+    let legacyQuery = supabase
+      .from("listings")
+      .select(PROVIDER_INVENTORY_MAP_LISTINGS_LEGACY_SELECT, { count: "exact" })
+      .order("updated_at", { ascending: false })
+      .limit(normalizedLimit)
+      .eq("owner_id", input.userId);
+
+    if (statusFilter !== "all") {
+      legacyQuery = legacyQuery.eq("listing_status", statusFilter);
+    }
+
+    const legacyResult = await legacyQuery;
+
+    if (legacyResult.error) {
+      return {
+        ok: false as const,
+        message: "Inventory map listings are temporarily unavailable.",
+        listings: [] as ProviderInventoryMapListing[],
+        totalCount: 0,
+        mappableCount: 0,
+      };
+    }
+
+    legacyRows = (legacyResult.data ?? []) as ProviderInventoryMapListingLegacyRow[];
+    totalCount = legacyResult.count ?? 0;
+  } else {
+    listingRows = (primaryResult.data ?? []) as ProviderInventoryMapListingRow[];
+  }
+
+  const unifiedRows: ProviderInventoryMapListingRow[] = usedLegacyProjection
+    ? legacyRows.map((listing) => ({
+        id: listing.id,
+        organization_id: null,
+        slug: listing.slug,
+        title: listing.title,
+        listing_status: listing.listing_status,
+        listing_type: listing.listing_type,
+        property_type: listing.property_type,
+        price_amount: listing.price_amount,
+        currency_code: listing.currency_code,
+        city: listing.city,
+        neighborhood: listing.neighborhood,
+        latitude: listing.latitude,
+        longitude: listing.longitude,
+        public_location_mode: listing.public_location_mode,
+        updated_at: listing.updated_at,
+      }))
+    : listingRows;
+
+  if (usedLegacyProjection) {
+    console.warn(
+      "[ProviderDashboard] listings ownership columns are missing; falling back to owner-only inventory map projection."
+    );
+  }
+
+  const listings = unifiedRows
+    .map((listing) => {
+      const latitude = parseCoordinate(listing.latitude);
+      const longitude = parseCoordinate(listing.longitude);
+
+      if (latitude === null || longitude === null) {
+        return null;
+      }
+
+      return {
+        id: listing.id,
+        organization_id: listing.organization_id,
+        slug: listing.slug,
+        title: listing.title,
+        listing_status: listing.listing_status,
+        listing_type: listing.listing_type,
+        property_type: listing.property_type,
+        price_amount: listing.price_amount,
+        currency_code: listing.currency_code,
+        city: listing.city,
+        neighborhood: listing.neighborhood,
+        public_location_mode: listing.public_location_mode,
+        updated_at: listing.updated_at,
+        ownershipMode: listing.organization_id ? "company" : "individual",
+        latitude,
+        longitude,
+      } satisfies ProviderInventoryMapListing;
+    })
+    .filter((listing): listing is ProviderInventoryMapListing => Boolean(listing));
+
+  return {
+    ok: true as const,
+    listings,
+    totalCount,
+    mappableCount: listings.length,
   };
 }

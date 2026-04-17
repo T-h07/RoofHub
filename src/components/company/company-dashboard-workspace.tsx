@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 
 import { CompanyActivityFeed } from "@/components/company/company-activity-feed";
+import { ProviderInventoryMap } from "@/components/dashboard/provider-inventory-map";
 import { CompanyIdentityHeader } from "@/components/company/company-identity-header";
 import { ProviderListingStatusBadge } from "@/components/dashboard/provider-listing-status-badge";
 import { Badge } from "@/components/ui/badge";
@@ -30,11 +31,27 @@ import type {
   CompanyDashboardOverviewMetrics,
   CompanyDashboardWorkspaceData,
 } from "@/lib/company/dashboard-queries";
+import type { ProviderInventoryMapListing } from "@/lib/listings/provider-dashboard/types";
 import { cn } from "@/lib/utils";
 
 type CompanyDashboardWorkspaceProps = {
   workspace: CompanyDashboardWorkspaceData;
   logoUrl: string | null;
+  mapStyleUrl: string;
+  inventoryMapResult:
+    | {
+        ok: true;
+        listings: ProviderInventoryMapListing[];
+        totalCount: number;
+        mappableCount: number;
+      }
+    | {
+        ok: false;
+        message: string;
+        listings: ProviderInventoryMapListing[];
+        totalCount: number;
+        mappableCount: number;
+      };
 };
 
 type OverviewMetricCard = {
@@ -232,7 +249,12 @@ function buildQuickActions(workspace: CompanyDashboardWorkspaceData): QuickActio
   return actions;
 }
 
-export function CompanyDashboardWorkspace({ workspace, logoUrl }: CompanyDashboardWorkspaceProps) {
+export function CompanyDashboardWorkspace({
+  workspace,
+  logoUrl,
+  mapStyleUrl,
+  inventoryMapResult,
+}: CompanyDashboardWorkspaceProps) {
   const overviewCards = buildOverviewCards(
     workspace.overview,
     workspace.isReviewer,
@@ -315,6 +337,24 @@ export function CompanyDashboardWorkspace({ workspace, logoUrl }: CompanyDashboa
           </Link>
         ))}
       </section>
+
+      {inventoryMapResult.ok ? (
+        <ProviderInventoryMap
+          mapStyleUrl={mapStyleUrl}
+          listings={inventoryMapResult.listings}
+          totalCount={inventoryMapResult.totalCount}
+          title="Company inventory map"
+          description="Map company-owned listings in this workspace scope and move directly into workflow actions."
+          emptyDescription="Company listings with saved coordinates will appear here after listing-location setup."
+          inventoryHref="/dashboard/listings"
+        />
+      ) : (
+        <EmptyState
+          icon={Globe}
+          title="Company inventory map unavailable"
+          description={inventoryMapResult.message}
+        />
+      )}
 
       <section className="grid gap-5 xl:grid-cols-[minmax(0,1.65fr)_minmax(0,1fr)]">
         <Card id="pending-review-queue" className="border-border/80 bg-card/88">

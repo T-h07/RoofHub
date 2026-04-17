@@ -8,7 +8,6 @@ import { EXPLORE_PAGE_SIZE, type ExploreSearchState } from "./explore-search-par
 import { loadFavoriteListingIdsForUser } from "./favorites";
 import {
   normalizePublicListingCompanyAttribution,
-  PUBLIC_LISTING_COMPANY_RELATION_SELECT,
   type PublicListingCompanyAttribution,
   type PublicListingCompanyRow,
 } from "./public-company-attribution";
@@ -18,6 +17,7 @@ import { PUBLIC_DISCOVERY_STATUS } from "./visibility";
 type PublicExploreListingRow = Pick<
   Tables<"listings">,
   | "id"
+  | "organization_id"
   | "slug"
   | "title"
   | "listing_type"
@@ -35,12 +35,11 @@ type PublicExploreListingRow = Pick<
   listing_images:
     | Array<Pick<Tables<"listing_images">, "storage_path" | "is_cover" | "sort_order">>
     | null;
-  organization: PublicListingCompanyRow | null;
 };
 
 export type PublicExploreListing = Omit<
   PublicExploreListingRow,
-  "listing_images" | "organization"
+  "listing_images" | "organization_id"
 > & {
   coverImageUrl: string | null;
   coverImagePath: string | null;
@@ -89,8 +88,42 @@ const PUBLIC_EXPLORE_LISTINGS_SELECT = `
     is_cover,
     sort_order
   ),
-  ${PUBLIC_LISTING_COMPANY_RELATION_SELECT}
+  organization_id
 `;
+
+const PUBLIC_EXPLORE_LISTINGS_LEGACY_SELECT = `
+  id,
+  slug,
+  title,
+  listing_type,
+  property_type,
+  price_amount,
+  currency_code,
+  city,
+  neighborhood,
+  bedrooms,
+  bathrooms,
+  area_m2,
+  published_at,
+  created_at,
+  listing_images (
+    storage_path,
+    is_cover,
+    sort_order
+  )
+`;
+
+function isMissingOrganizationOwnershipColumnError(input: {
+  code?: string | null;
+  message?: string | null;
+}) {
+  const message = (input.message ?? "").toLowerCase();
+  return (
+    input.code === "42703" &&
+    message.includes("organization_id") &&
+    message.includes("listings")
+  );
+}
 
 function getCoverImagePath(
   images: PublicExploreListingRow["listing_images"]
@@ -140,6 +173,38 @@ async function loadPublishedCityOptions() {
   return normalizeCityOptions((data ?? []) as Array<{ city: string }>);
 }
 
+async function loadExploreOrganizationRowsByIds(
+  supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>,
+  organizationIds: string[]
+) {
+  if (organizationIds.length === 0) {
+    return new Map<string, PublicListingCompanyRow>();
+  }
+
+  const { data, error } = await supabase
+    .from("organizations")
+    .select("id, name, slug, logo_path, status")
+    .in("id", organizationIds);
+
+  if (error) {
+    console.error("[Explore] organization attribution query failed", {
+      code: error.code ?? null,
+      message: error.message ?? null,
+      details: error.details ?? null,
+      hint: error.hint ?? null,
+      organization_ids_count: organizationIds.length,
+    });
+    return new Map<string, PublicListingCompanyRow>();
+  }
+
+  return new Map(
+    ((data ?? []) as PublicListingCompanyRow[]).map((organization) => [
+      organization.id,
+      organization,
+    ])
+  );
+}
+
 export async function loadPublicExploreListings(state: ExploreSearchState): Promise<PublicExploreResult> {
   try {
     const cityOptions = await loadPublishedCityOptions();
@@ -150,51 +215,155 @@ export async function loadPublicExploreListings(state: ExploreSearchState): Prom
     const rangeStart = (state.page - 1) * EXPLORE_PAGE_SIZE;
     const rangeEnd = rangeStart + EXPLORE_PAGE_SIZE - 1;
 
-    let query = applyPublicListingFilters(
+    const primaryQuery = applyPublicListingFilters(
       supabase
         .from("listings")
         .select(PUBLIC_EXPLORE_LISTINGS_SELECT, { count: "exact" }),
       state
     );
 
+    let sortedPrimaryQuery = primaryQuery;
     if (state.sort === "price_asc") {
-      query = query.order("price_amount", { ascending: true }).order("published_at", {
-        ascending: false,
-        nullsFirst: false,
-      });
+      sortedPrimaryQuery = sortedPrimaryQuery
+        .order("price_amount", { ascending: true })
+        .order("published_at", {
+          ascending: false,
+          nullsFirst: false,
+        });
     } else if (state.sort === "price_desc") {
-      query = query.order("price_amount", { ascending: false }).order("published_at", {
-        ascending: false,
-        nullsFirst: false,
-      });
+      sortedPrimaryQuery = sortedPrimaryQuery
+        .order("price_amount", { ascending: false })
+        .order("published_at", {
+          ascending: false,
+          nullsFirst: false,
+        });
     } else {
-      query = query.order("published_at", {
-        ascending: false,
-        nullsFirst: false,
-      }).order("created_at", {
-        ascending: false,
-      });
+      sortedPrimaryQuery = sortedPrimaryQuery
+        .order("published_at", {
+          ascending: false,
+          nullsFirst: false,
+        })
+        .order("created_at", {
+          ascending: false,
+        });
     }
 
-    const { data, error, count } = await query.range(rangeStart, rangeEnd);
+    const primaryResult = await sortedPrimaryQuery.range(rangeStart, rangeEnd);
 
-    if (error) {
-      console.error("[Explore] public listings query failed", {
-        code: error.code,
-        message: error.message,
+    let listingRows: PublicExploreListingRow[] = [];
+    let totalCount = 0;
+    let ownershipColumnMissing = false;
+
+    if (primaryResult.error) {
+      ownershipColumnMissing = isMissingOrganizationOwnershipColumnError({
+        code: primaryResult.error.code ?? null,
+        message: primaryResult.error.message ?? null,
       });
-      return {
-        ok: false,
-        message: "We couldn’t load listings right now. Please refresh and try again.",
-        listings: [],
-        totalCount: 0,
-        totalPages: 0,
-        cityOptions,
-        viewerUserId: user?.id ?? null,
-      };
+
+      if (!ownershipColumnMissing) {
+        console.error("[Explore] public listings query failed", {
+          code: primaryResult.error.code ?? null,
+          message: primaryResult.error.message ?? null,
+          details: primaryResult.error.details ?? null,
+          hint: primaryResult.error.hint ?? null,
+          query_page: state.page,
+          query_sort: state.sort,
+        });
+        return {
+          ok: false,
+          message: "We couldn’t load listings right now. Please refresh and try again.",
+          listings: [],
+          totalCount: 0,
+          totalPages: 0,
+          cityOptions,
+          viewerUserId: user?.id ?? null,
+        };
+      }
+
+      const legacyQuery = applyPublicListingFilters(
+        supabase
+          .from("listings")
+          .select(PUBLIC_EXPLORE_LISTINGS_LEGACY_SELECT, { count: "exact" }),
+        state
+      );
+
+      let sortedLegacyQuery = legacyQuery;
+      if (state.sort === "price_asc") {
+        sortedLegacyQuery = sortedLegacyQuery
+          .order("price_amount", { ascending: true })
+          .order("published_at", {
+            ascending: false,
+            nullsFirst: false,
+          });
+      } else if (state.sort === "price_desc") {
+        sortedLegacyQuery = sortedLegacyQuery
+          .order("price_amount", { ascending: false })
+          .order("published_at", {
+            ascending: false,
+            nullsFirst: false,
+          });
+      } else {
+        sortedLegacyQuery = sortedLegacyQuery
+          .order("published_at", {
+            ascending: false,
+            nullsFirst: false,
+          })
+          .order("created_at", {
+            ascending: false,
+          });
+      }
+
+      const legacyResult = await sortedLegacyQuery.range(rangeStart, rangeEnd);
+
+      if (legacyResult.error) {
+        console.error("[Explore] public listings legacy fallback failed", {
+          code: legacyResult.error.code ?? null,
+          message: legacyResult.error.message ?? null,
+          details: legacyResult.error.details ?? null,
+          hint: legacyResult.error.hint ?? null,
+          query_page: state.page,
+          query_sort: state.sort,
+        });
+        return {
+          ok: false,
+          message: "We couldn’t load listings right now. Please refresh and try again.",
+          listings: [],
+          totalCount: 0,
+          totalPages: 0,
+          cityOptions,
+          viewerUserId: user?.id ?? null,
+        };
+      }
+
+      listingRows = (
+        (legacyResult.data ?? []) as Array<Omit<PublicExploreListingRow, "organization_id">>
+      ).map((listing) => ({
+        ...listing,
+        organization_id: null,
+      }));
+      totalCount = legacyResult.count ?? 0;
+    } else {
+      listingRows = (primaryResult.data ?? []) as PublicExploreListingRow[];
+      totalCount = primaryResult.count ?? 0;
     }
 
-    const listingRows = (data ?? []) as PublicExploreListingRow[];
+    if (ownershipColumnMissing) {
+      console.warn(
+        "[Explore] listings.organization_id is missing; running legacy explore projection without company attribution."
+      );
+    }
+
+    const organizationIds = Array.from(
+      new Set(
+        listingRows
+          .map((listing) => listing.organization_id ?? null)
+          .filter((organizationId): organizationId is string => Boolean(organizationId))
+      )
+    );
+    const organizationById = await loadExploreOrganizationRowsByIds(
+      supabase,
+      organizationIds
+    );
     const favoriteListingIds =
       user && listingRows.length > 0
         ? await loadFavoriteListingIdsForUser(
@@ -250,11 +419,13 @@ export async function loadPublicExploreListings(state: ExploreSearchState): Prom
         coverImagePath: coverEntry?.coverImagePath ?? null,
         coverImageUrl: coverEntry?.signedUrl ?? null,
         isFavorited: favoriteListingIds.has(listing.id),
-        company: normalizePublicListingCompanyAttribution(supabase, listing.organization),
+        company: normalizePublicListingCompanyAttribution(
+          supabase,
+          listing.organization_id ? organizationById.get(listing.organization_id) ?? null : null
+        ),
       };
     });
 
-    const totalCount = count ?? 0;
     const totalPages = totalCount > 0 ? Math.ceil(totalCount / EXPLORE_PAGE_SIZE) : 0;
 
     return {

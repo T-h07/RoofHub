@@ -49,6 +49,36 @@ export type ProviderManagedListing = Omit<ProviderManagedListingRow, "listing_im
   coverImageUrl: string | null;
 };
 
+export type ProviderInventoryMapListingRow = Pick<
+  Tables<"listings">,
+  | "id"
+  | "organization_id"
+  | "slug"
+  | "title"
+  | "listing_status"
+  | "listing_type"
+  | "property_type"
+  | "price_amount"
+  | "currency_code"
+  | "city"
+  | "neighborhood"
+  | "latitude"
+  | "longitude"
+  | "public_location_mode"
+  | "updated_at"
+>;
+
+export type ProviderInventoryMapListing = Omit<
+  ProviderInventoryMapListingRow,
+  "latitude" | "longitude"
+> & {
+  ownershipMode: "individual" | "company";
+  latitude: number;
+  longitude: number;
+};
+
+export type ProviderInventoryMapScope = "owner" | "organization" | "mixed";
+
 export type ProviderListingOverviewMetrics = {
   total: number;
   published: number;

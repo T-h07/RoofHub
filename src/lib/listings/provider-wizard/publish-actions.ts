@@ -189,6 +189,23 @@ function normalizeSupabaseError(message: string) {
   return "Listing update failed. Please retry.";
 }
 
+function isMissingListingOwnershipColumnsError(input: {
+  code?: string | null;
+  message?: string | null;
+}) {
+  const message = (input.message ?? "").toLowerCase();
+  if (input.code !== "42703") {
+    return false;
+  }
+
+  return (
+    (message.includes("listings.organization_id") && message.includes("does not exist")) ||
+    (message.includes("listings.created_by_user_id") && message.includes("does not exist")) ||
+    (message.includes("listings.assigned_agent_user_id") && message.includes("does not exist")) ||
+    (message.includes("listings.published_by_user_id") && message.includes("does not exist"))
+  );
+}
+
 async function ensureProviderMutationContext(): Promise<ProviderMutationContext> {
   const supabase = await createServerSupabaseClient();
   const profileResult = await getCurrentUserProfile(supabase);
@@ -232,17 +249,46 @@ async function ensureDraftAccess(
 
   const { data, error } = await query.maybeSingle();
 
-  if (error || !data) {
+  if (!error && data) {
     return {
-      ok: false as const,
-      message: "Draft listing not found or inaccessible.",
-      listing: null as ProviderDraftAccess | null,
+      ok: true as const,
+      listing: data as ProviderDraftAccess,
     };
   }
 
+  if (error && isMissingListingOwnershipColumnsError({ code: error.code ?? null, message: error.message ?? null })) {
+    const legacyResult = await supabase
+      .from("listings")
+      .select("id, owner_id, listing_status, slug")
+      .eq("id", input.draftId)
+      .eq("owner_id", input.userId)
+      .limit(1)
+      .maybeSingle();
+
+    if (!legacyResult.error && legacyResult.data) {
+      console.warn(
+        "[ProviderWizard] listings ownership columns are missing; falling back to legacy draft access projection for photo/publish actions."
+      );
+      return {
+        ok: true as const,
+        listing: {
+          id: legacyResult.data.id,
+          owner_id: legacyResult.data.owner_id,
+          organization_id: null,
+          created_by_user_id: legacyResult.data.owner_id,
+          assigned_agent_user_id: null,
+          published_by_user_id: null,
+          listing_status: legacyResult.data.listing_status,
+          slug: legacyResult.data.slug,
+        } satisfies ProviderDraftAccess,
+      };
+    }
+  }
+
   return {
-    ok: true as const,
-    listing: data as ProviderDraftAccess,
+    ok: false as const,
+    message: "Draft listing not found or inaccessible.",
+    listing: null as ProviderDraftAccess | null,
   };
 }
 
@@ -760,7 +806,35 @@ export async function publishProviderListingDraftAction(
     .select("slug, listing_status")
     .limit(1);
 
-  const { data, error } = await updateQuery.maybeSingle();
+  let { data, error } = await updateQuery.maybeSingle();
+
+  if (
+    error &&
+    isMissingListingOwnershipColumnsError({
+      code: error.code ?? null,
+      message: error.message ?? null,
+    })
+  ) {
+    console.warn(
+      "[ProviderWizard] listings ownership columns are missing; falling back to legacy publish update projection."
+    );
+
+    const legacyUpdateResult = await supabase
+      .from("listings")
+      .update({
+        listing_status: "published",
+        published_at: new Date().toISOString(),
+        archived_at: null,
+      })
+      .eq("id", draftResult.draft.id)
+      .eq("owner_id", profile.id)
+      .select("slug, listing_status")
+      .limit(1)
+      .maybeSingle();
+
+    data = legacyUpdateResult.data;
+    error = legacyUpdateResult.error;
+  }
 
   if (error || !data) {
     await recordSecurityAuditEvent({

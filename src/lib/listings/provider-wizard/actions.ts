@@ -7,7 +7,7 @@ import { resolveProviderListingCreationContext } from "@/lib/listings/ownership"
 import { recordCompanyListingCreatedWorkflowEvent } from "@/lib/listings/company-workflow/actions";
 import { AUDIT_EVENT_TYPES, recordSecurityAuditEvent } from "@/lib/security/audit";
 import { enforceTrafficControl, TRAFFIC_CONTROL_RULES } from "@/lib/security/traffic-control";
-import type { Enums } from "@/types/database";
+import type { Database, Enums } from "@/types/database";
 
 import {
   PROVIDER_WIZARD_DEFAULT_VALUES,
@@ -231,6 +231,23 @@ function normalizeSupabaseError(message: string) {
   return "Draft save failed. Please retry.";
 }
 
+function isMissingListingOwnershipColumnsError(input: {
+  code?: string | null;
+  message?: string | null;
+}) {
+  const message = (input.message ?? "").toLowerCase();
+  if (input.code !== "42703") {
+    return false;
+  }
+
+  return (
+    (message.includes("listings.organization_id") && message.includes("does not exist")) ||
+    (message.includes("listings.created_by_user_id") && message.includes("does not exist")) ||
+    (message.includes("listings.assigned_agent_user_id") && message.includes("does not exist")) ||
+    (message.includes("listings.published_by_user_id") && message.includes("does not exist"))
+  );
+}
+
 function isMissingContactMethodsColumnError(message: string | undefined) {
   if (!message) {
     return false;
@@ -317,6 +334,43 @@ async function ensureDraftAccess(
     .limit(1);
 
   const { data, error } = await query.maybeSingle();
+  if (!error && data) {
+    return {
+      ok: true as const,
+      listing: data as {
+        id: string;
+        owner_id: string;
+        organization_id: string | null;
+        listing_status: string;
+      },
+    };
+  }
+
+  if (error && isMissingListingOwnershipColumnsError({ code: error.code ?? null, message: error.message ?? null })) {
+    const legacyResult = await supabase
+      .from("listings")
+      .select("id, owner_id, listing_status")
+      .eq("id", draftId)
+      .eq("owner_id", userId)
+      .limit(1)
+      .maybeSingle();
+
+    if (!legacyResult.error && legacyResult.data) {
+      console.warn(
+        "[ProviderWizard] listings ownership columns are missing; falling back to legacy draft access projection."
+      );
+      return {
+        ok: true as const,
+        listing: {
+          id: legacyResult.data.id,
+          owner_id: legacyResult.data.owner_id,
+          organization_id: null,
+          listing_status: legacyResult.data.listing_status,
+        },
+      };
+    }
+  }
+
   if (error || !data) {
     return {
       ok: false as const,
@@ -331,13 +385,14 @@ async function ensureDraftAccess(
   }
 
   return {
-    ok: true as const,
-    listing: data as {
+    ok: false as const,
+    message: "Draft listing not found or inaccessible.",
+    listing: null as {
       id: string;
       owner_id: string;
       organization_id: string | null;
       listing_status: string;
-    },
+    } | null,
   };
 }
 
@@ -507,7 +562,7 @@ export async function saveProviderWizardStepAction(
 
       const listingCreationContext = listingCreationContextResult.context;
 
-      const { error } = await supabase.from("listings").insert({
+      const primaryInsertPayload = {
         id: draftId,
         owner_id: profile.id,
         organization_id: listingCreationContext.organizationId,
@@ -518,7 +573,36 @@ export async function saveProviderWizardStepAction(
         title: basicsValidation.payload.title,
         description: basicsValidation.payload.description,
         ...DRAFT_DEFAULTS,
-      });
+      };
+
+      let { error } = await supabase.from("listings").insert(primaryInsertPayload);
+      let usedLegacyInsertProjection = false;
+
+      if (
+        error &&
+        isMissingListingOwnershipColumnsError({
+          code: error.code ?? null,
+          message: error.message ?? null,
+        })
+      ) {
+        usedLegacyInsertProjection = true;
+        console.warn(
+          "[ProviderWizard] listings ownership columns are missing; falling back to legacy draft insert projection."
+        );
+
+        const legacyInsertPayload = {
+          id: draftId,
+          owner_id: profile.id,
+          slug,
+          title: basicsValidation.payload.title,
+          description: basicsValidation.payload.description,
+          ...DRAFT_DEFAULTS,
+        } as unknown as Database["public"]["Tables"]["listings"]["Insert"];
+
+        const legacyInsertResult = await supabase.from("listings").insert(legacyInsertPayload);
+
+        error = legacyInsertResult.error;
+      }
 
       if (error) {
         if (error.code === "23505") {
@@ -563,7 +647,10 @@ export async function saveProviderWizardStepAction(
         },
       });
 
-      if (listingCreationContext.ownershipMode === "company") {
+      if (
+        listingCreationContext.ownershipMode === "company" &&
+        !usedLegacyInsertProjection
+      ) {
         await recordCompanyListingCreatedWorkflowEvent({
           listingId: draftId,
           actorUserId: profile.id,

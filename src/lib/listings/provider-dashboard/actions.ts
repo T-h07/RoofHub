@@ -73,6 +73,23 @@ function normalizeSupabaseError(message: string) {
   return "Listing status update failed. Please retry.";
 }
 
+function isMissingOwnershipColumnsError(input: {
+  code?: string | null;
+  message?: string | null;
+}) {
+  const message = (input.message ?? "").toLowerCase();
+  if (input.code !== "42703") {
+    return false;
+  }
+
+  return (
+    (message.includes("listings.organization_id") && message.includes("does not exist")) ||
+    (message.includes("listings.created_by_user_id") && message.includes("does not exist")) ||
+    (message.includes("listings.assigned_agent_user_id") && message.includes("does not exist")) ||
+    (message.includes("listings.published_by_user_id") && message.includes("does not exist"))
+  );
+}
+
 function getLifecycleStatusSuccessMessage(nextStatus: ProviderListingStatus) {
   switch (nextStatus) {
     case "draft":
@@ -172,6 +189,42 @@ async function loadProviderOwnedListing(
 
   const { data, error } = await query.maybeSingle();
 
+  if (!error && data) {
+    return {
+      ok: true as const,
+      listing: data as ProviderOwnedListingStatus,
+    };
+  }
+
+  if (error && isMissingOwnershipColumnsError({ code: error.code ?? null, message: error.message ?? null })) {
+    const legacyResult = await supabase
+      .from("listings")
+      .select("id, owner_id, listing_status, published_at")
+      .eq("id", input.listingId)
+      .eq("owner_id", input.userId)
+      .limit(1)
+      .maybeSingle();
+
+    if (!legacyResult.error && legacyResult.data) {
+      console.warn(
+        "[ProviderDashboard] listings ownership columns are missing; falling back to legacy listing status projection."
+      );
+      return {
+        ok: true as const,
+        listing: {
+          id: legacyResult.data.id,
+          owner_id: legacyResult.data.owner_id,
+          organization_id: null,
+          created_by_user_id: legacyResult.data.owner_id,
+          assigned_agent_user_id: null,
+          published_by_user_id: null,
+          listing_status: legacyResult.data.listing_status,
+          published_at: legacyResult.data.published_at,
+        } satisfies ProviderOwnedListingStatus,
+      };
+    }
+  }
+
   if (error || !data) {
     return {
       ok: false as const,
@@ -181,8 +234,9 @@ async function loadProviderOwnedListing(
   }
 
   return {
-    ok: true as const,
-    listing: data as ProviderOwnedListingStatus,
+    ok: false as const,
+    message: "Listing not found or inaccessible.",
+    listing: null as ProviderOwnedListingStatus | null,
   };
 }
 
