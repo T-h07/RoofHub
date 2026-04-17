@@ -5,6 +5,12 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createListingImageSignedUrl } from "@/lib/supabase/storage/listing-images";
 import { createServerSupabaseClient } from "@/lib/supabase";
 import type { Database, Tables } from "@/types/database";
+import {
+  normalizePublicListingCompanyAttribution,
+  PUBLIC_LISTING_COMPANY_RELATION_SELECT,
+  type PublicListingCompanyAttribution,
+  type PublicListingCompanyRow,
+} from "./public-company-attribution";
 import { PUBLIC_DISCOVERY_STATUS } from "./visibility";
 
 type ExploreListingSummaryRow = Pick<
@@ -27,13 +33,18 @@ type ExploreListingSummaryRow = Pick<
   listing_images:
     | Array<Pick<Tables<"listing_images">, "storage_path" | "is_cover" | "sort_order">>
     | null;
+  organization: PublicListingCompanyRow | null;
 };
 
-export type FavoriteListingSummary = Omit<ExploreListingSummaryRow, "listing_images"> & {
+export type FavoriteListingSummary = Omit<
+  ExploreListingSummaryRow,
+  "listing_images" | "organization"
+> & {
   coverImageUrl: string | null;
   coverImagePath: string | null;
   isFavorited: true;
   favoritedAt: string;
+  company: PublicListingCompanyAttribution | null;
 };
 
 type FavoriteListingJoinRow = {
@@ -157,7 +168,8 @@ export async function loadViewerFavoriteListings(
               storage_path,
               is_cover,
               sort_order
-            )
+            ),
+            ${PUBLIC_LISTING_COMPANY_RELATION_SELECT}
           )
         `
         )
@@ -211,6 +223,10 @@ export async function loadViewerFavoriteListings(
           coverImageUrl: coverEntry?.signedUrl ?? null,
           isFavorited: true,
           favoritedAt: row.created_at,
+          company: normalizePublicListingCompanyAttribution(
+            supabase,
+            listing.organization
+          ),
         };
       });
 

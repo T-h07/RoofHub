@@ -6,6 +6,12 @@ import type { Tables } from "@/types/database";
 
 import { EXPLORE_PAGE_SIZE, type ExploreSearchState } from "./explore-search-params";
 import { loadFavoriteListingIdsForUser } from "./favorites";
+import {
+  normalizePublicListingCompanyAttribution,
+  PUBLIC_LISTING_COMPANY_RELATION_SELECT,
+  type PublicListingCompanyAttribution,
+  type PublicListingCompanyRow,
+} from "./public-company-attribution";
 import { applyPublicListingFilters } from "./public-listing-filters";
 import { PUBLIC_DISCOVERY_STATUS } from "./visibility";
 
@@ -29,12 +35,17 @@ type PublicExploreListingRow = Pick<
   listing_images:
     | Array<Pick<Tables<"listing_images">, "storage_path" | "is_cover" | "sort_order">>
     | null;
+  organization: PublicListingCompanyRow | null;
 };
 
-export type PublicExploreListing = Omit<PublicExploreListingRow, "listing_images"> & {
+export type PublicExploreListing = Omit<
+  PublicExploreListingRow,
+  "listing_images" | "organization"
+> & {
   coverImageUrl: string | null;
   coverImagePath: string | null;
   isFavorited: boolean;
+  company: PublicListingCompanyAttribution | null;
 };
 
 type PublicExploreSuccessResult = {
@@ -77,7 +88,8 @@ const PUBLIC_EXPLORE_LISTINGS_SELECT = `
     storage_path,
     is_cover,
     sort_order
-  )
+  ),
+  ${PUBLIC_LISTING_COMPANY_RELATION_SELECT}
 `;
 
 function getCoverImagePath(
@@ -238,6 +250,7 @@ export async function loadPublicExploreListings(state: ExploreSearchState): Prom
         coverImagePath: coverEntry?.coverImagePath ?? null,
         coverImageUrl: coverEntry?.signedUrl ?? null,
         isFavorited: favoriteListingIds.has(listing.id),
+        company: normalizePublicListingCompanyAttribution(supabase, listing.organization),
       };
     });
 

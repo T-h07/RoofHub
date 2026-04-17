@@ -4,6 +4,7 @@ import { createServerSupabaseClient } from "@/lib/supabase";
 import { createListingImageSignedUrl } from "@/lib/supabase/storage/listing-images";
 import type { Tables } from "@/types/database";
 import { loadFavoriteListingIdsForUser } from "@/lib/listings/favorites";
+import type { PublicListingCompanyAttribution } from "@/lib/listings/public-company-attribution";
 import { PUBLIC_DISCOVERY_STATUS } from "@/lib/listings/visibility";
 import { toCompanyLogoPublicUrl } from "@/lib/company/logo";
 
@@ -50,6 +51,7 @@ export type PublicCompanyListingPreview = Omit<PublicCompanyListingRow, "listing
   coverImageUrl: string | null;
   coverImagePath: string | null;
   isFavorited: boolean;
+  company: PublicListingCompanyAttribution | null;
 };
 
 export type PublicCompanyProfile = Omit<
@@ -260,6 +262,14 @@ export async function loadPublicCompanyProfileBySlug(
       ])
     );
 
+    const companyLogoUrl = toCompanyLogoPublicUrl(supabase, companyProfileRow.logo_path);
+    const companyAttribution: PublicListingCompanyAttribution = {
+      id: companyProfileRow.id,
+      name: companyProfileRow.name,
+      slug: companyProfileRow.slug,
+      logoUrl: companyLogoUrl,
+    };
+
     const listingPreviews: PublicCompanyListingPreview[] = listings.map((listing) => {
       const coverEntry = coverImageMap.get(listing.id);
 
@@ -281,14 +291,13 @@ export async function loadPublicCompanyProfileBySlug(
         coverImagePath: coverEntry?.coverImagePath ?? null,
         coverImageUrl: coverEntry?.signedUrl ?? null,
         isFavorited: favoriteListingIds.has(listing.id),
+        company: companyAttribution,
       };
     });
 
-    const logoUrl = toCompanyLogoPublicUrl(supabase, companyProfileRow.logo_path);
-
     return {
       ok: true,
-      company: normalizePublicCompanyProfile(companyProfileRow, logoUrl),
+      company: normalizePublicCompanyProfile(companyProfileRow, companyLogoUrl),
       listings: listingPreviews,
       totalListings: listingCount ?? listingPreviews.length,
       viewerUserId: user?.id ?? null,
