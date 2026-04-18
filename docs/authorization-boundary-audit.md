@@ -111,13 +111,13 @@ Route protection improves UX but is not an authorization substitute.
 ### Company dashboard and approval queue (NM-PT36)
 
 - Company dashboard data is resolved from trusted server membership context (`getCurrentUserCompanyContext`) and not client-supplied organization identifiers.
-- Dashboard metrics, pending-review queue, and activity feed use dedicated security-definer RPCs:
+- Dashboard metrics, pending-review queue, and activity feed use dedicated internal read-model RPCs:
   - `get_company_dashboard_overview(...)`
   - `get_company_dashboard_pending_queue(...)`
   - `get_company_dashboard_activity_feed(...)`
-- These RPCs require active organization membership (or admin role) before returning company-internal data.
+- These RPCs are now service-role-only primitives behind trusted server loaders; authenticated clients no longer have direct execute access.
 - Pending-review queue actions remain reviewer-scoped in UI and server workflows (`owner`/`admin`/`manager`).
-- Company workflow listing reads now use trusted RPC access (`get_company_listing_workflow_listing(...)`) so reviewer-capable members can access review surfaces without broadening generic listing read policies.
+- Company workflow listing reads now resolve through trusted server loaders, with any internal RPC usage restricted to service-role execution only.
 - Team-invite activity in dashboard feed is constrained to owner/admin membership visibility.
 
 ### Company permissions hardening (NM-PT40)
@@ -133,6 +133,17 @@ Route protection improves UX but is not an authorization substitute.
 - Invite-email visibility policy now uses server-trusted primary email resolution (`current_user_primary_email()`), avoiding JWT-claim trust assumptions.
 - Listing update RLS now preserves immutable attribution fields (`owner_id`, `organization_id`, `created_by_user_id`, `published_by_user_id`) while allowing legitimate owner edits after reviewer publish actions.
 - Organization-member RLS policies use helper-based owner/admin checks (`is_organization_owner_or_admin`) instead of self-referential policy subqueries, preventing company-context resolution failures.
+
+### PT-FIX02 authority consolidation
+
+- Broadly callable company security-definer RPCs are no longer part of the authenticated product surface.
+- Workspace bootstrap, invite/member mutations, and listing workflow transitions now run through trusted server actions/helpers instead of dual-path RPC-plus-fallback behavior.
+- Internal company read-model RPCs remain only as service-role-only server primitives where keeping SQL aggregation/query composition is justified.
+- Security audit writes no longer depend on a broadly callable RPC; trusted server code writes directly to `security_audit_events`.
+- Rate limiting remains a DB-backed primitive, but `consume_rate_limit_token(...)` is now service-role-only and callable only through the server-side traffic-control helper.
+- Last-owner protection is enforced at both layers:
+  - app-layer permission and mutation checks
+  - table-layer trigger (`prevent_last_active_owner_loss()`)
 
 ### Favorites
 

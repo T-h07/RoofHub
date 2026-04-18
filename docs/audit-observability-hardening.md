@@ -17,7 +17,7 @@ Audit trail storage is now implemented with:
 Design goals:
 
 - durable history for security-relevant actions (not console-only)
-- append-focused event writing through a bounded RPC function
+- append-focused event writing through a narrow trusted server path
 - strict metadata size/type checks at DB level
 - explicit access boundaries via RLS
 
@@ -26,7 +26,8 @@ Design goals:
 - `security_audit_events` is RLS-enabled.
 - direct table access is revoked from `anon` and `authenticated`.
 - only admin users can read audit rows (`security_audit_events_select_admin` policy).
-- writes are performed through `log_security_audit_event(...)`, which enforces normalized input and actor consistency when authenticated.
+- writes are performed by trusted server code through the shared audit helper.
+- `log_security_audit_event(...)` is no longer exposed as a broadly callable authenticated RPC surface.
 
 No public routes expose audit history.
 

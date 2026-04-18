@@ -22,6 +22,7 @@ Key model:
 - actor fingerprints are hashed (user/email/ip/scope combinations), so raw identifiers are not stored in limiter rows
 - throttled requests return bounded user-safe messages with retry guidance
 - unavailable limiter state fails closed for protected actions with bounded retry messaging
+- limiter RPC execution is restricted to server-only service-role callers; authenticated clients do not have direct execute access
 
 ## Abuse-surface map and guarded flows
 

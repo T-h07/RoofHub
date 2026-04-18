@@ -52,16 +52,21 @@ Audit and observability execution details are defined in `docs/audit-observabili
 - Restrict company listing review/publish actions to reviewer-capable membership roles (`owner`/`admin`/`manager`) with creator or assigned-agent submit constraints.
 - Restrict company pending-review queue visibility to reviewer-capable membership roles (`owner`/`admin`/`manager`) on trusted server paths.
 - Restrict listing workflow timeline visibility to reviewer roles or listing-responsible actors (creator/assigned agent), not broad active-member reads.
-- For company operational dashboards, use trusted server-side organization resolution and membership-gated query paths (RLS-compatible or security-definer RPCs with explicit membership checks); do not trust client-selected company scope.
+- For company operational dashboards, use trusted server-side organization resolution and membership-gated query paths. Any company-internal read-model RPCs must be server-only primitives, not broadly callable authenticated APIs.
 - Company invite acceptance must be bound to authenticated user identity (target user id match or invite-email match), never client-asserted claims.
 - Invite-email identity matching must use server-trusted email resolution (`auth.users` / trusted helper), not mutable client metadata assumptions.
 - Protect owner continuity for company membership mutations (at least one active owner must remain).
+- Keep critical ownership invariants enforceable at the table layer as well as in server code; service-role paths must not be able to remove the last active owner.
 - Suspended/removed company members must lose private company listing and listing-media access, even when historical owner ids match.
 - Never use client-supplied owner/provider/admin ids as authority.
 - Preserve RLS assumptions; app code must not "re-authorize" by weak client filters.
 - Admin-only behavior must have explicit role checks in server code.
 - Provider-only behavior must derive provider identity from authenticated profile context.
 - Company workspace creation must be transactional: organization record + owner membership bootstrap succeed/fail together.
+- Prefer one of two authority sources for sensitive company behavior:
+  - RLS/table constraints for direct table access
+  - trusted server actions/loaders with narrow server-only primitives
+- Do not leave security-definer RPCs exposed as alternate authenticated product APIs when the same action is already guarded in trusted server code.
 - Keep the role/ownership/participant contract aligned with `docs/authorization-boundary-audit.md`.
 
 ### 3) Route handlers and server actions

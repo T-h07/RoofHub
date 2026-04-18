@@ -140,3 +140,12 @@ For dependency/lockfile/scanner specifics, also follow `docs/supply-chain-guardr
 - Listing update RLS now keeps ownership/attribution fields immutable while allowing legitimate owner edits after reviewer publish actions.
 - Dependency audit high finding resolved by bumping `next` from `16.2.2` to `16.2.4` (GHSA-q4gf-8mx6-v5v3 remediation).
 - Organization membership policies now use helper-based owner/admin checks to avoid self-referential RLS recursion failures during company-context/profile flows.
+
+## PT-FIX02 validation notes
+
+- Authenticated clients no longer have direct execute access to company bootstrap, invite/member mutation, workflow mutation, or company-internal dashboard/activity RPCs.
+- Trusted server actions now form the primary authority path for company bootstrap, invite/member lifecycle, and company workflow mutations.
+- Internal company dashboard/activity read-model RPCs are service-role-only and always receive organization scope from trusted server context.
+- Audit writes run through the shared server helper and no longer depend on a broadly callable audit RPC.
+- Traffic-control RPC execution is service-role-only and remains enforced at server action / route-handler boundaries.
+- A table-level trigger now blocks update/delete paths that would remove the last active owner, including service-role initiated mutations.
