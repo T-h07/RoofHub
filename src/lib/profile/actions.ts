@@ -220,20 +220,22 @@ export async function updateProfileAction(
     supabase,
     currentProfile.id
   );
-
-  if (!companyContextResult.ok) {
-    return {
-      status: "error",
-      message: companyContextResult.message,
-    };
-  }
-
-  const ownsCompanyWorkspace = companyContextResult.ownsWorkspace;
   const input = readProfileFormInput(formData, currentProfile.role);
   const validationErrors = validateProfileFormInput(input);
 
   if (Object.keys(validationErrors).length > 0) {
     return toValidationErrorState(validationErrors);
+  }
+
+  const canResolveCompanyContext = companyContextResult.ok;
+  const ownsCompanyWorkspace = canResolveCompanyContext
+    ? companyContextResult.ownsWorkspace
+    : currentProfile.provider_account_type === "company";
+
+  if (!canResolveCompanyContext && input.role !== currentProfile.role) {
+    return toValidationErrorState({
+      role: "Role updates are temporarily unavailable while company context reloads. Retry shortly.",
+    });
   }
 
   if (ownsCompanyWorkspace && input.role !== "provider") {

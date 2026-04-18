@@ -82,9 +82,8 @@ type CurrentUserCompanyContextResult =
       message: string;
     };
 
-type OrganizationMembershipQueryRow = Omit<CompanyMembershipSummary, "organization"> & {
-  organization: Partial<CompanyWorkspaceSummary> | null;
-};
+type OrganizationMembershipQueryRow = Omit<CompanyMembershipSummary, "organization">;
+type OrganizationProfileQueryRow = Partial<CompanyWorkspaceSummary>;
 
 const ORGANIZATION_PROFILE_SELECT_FULL =
   "id, name, slug, description, logo_path, contact_email, contact_phone, website_url, coverage_area, status, created_at, updated_at";
@@ -109,7 +108,7 @@ function isMissingOrganizationProfileColumnsError(message: string | undefined) {
 }
 
 function normalizeOrganizationSummary(
-  organization: OrganizationMembershipQueryRow["organization"]
+  organization: OrganizationProfileQueryRow | null
 ): CompanyWorkspaceSummary | null {
   if (!organization) {
     return null;
@@ -142,11 +141,14 @@ function normalizeOrganizationSummary(
   };
 }
 
-function normalizeCompanyMembershipRows(rows: OrganizationMembershipQueryRow[]) {
+function normalizeCompanyMembershipRows(
+  rows: OrganizationMembershipQueryRow[],
+  organizationsById: Map<string, CompanyWorkspaceSummary>
+) {
   return rows.map((row) => ({
     ...row,
     invited_by_user_id: row.invited_by_user_id ?? null,
-    organization: normalizeOrganizationSummary(row.organization),
+    organization: organizationsById.get(row.organization_id) ?? null,
   }));
 }
 
@@ -154,42 +156,68 @@ export async function getCompanyMembershipContextForUser(
   supabase: SupabaseClient<Database>,
   userId: string
 ): Promise<CompanyMembershipContext> {
-  const fullQuery = await supabase
+  const membershipQuery = await supabase
     .from("organization_members")
-    .select(
-      `${MEMBERSHIP_SELECT_BASE}, organization:organizations(${ORGANIZATION_PROFILE_SELECT_FULL})`
-    )
+    .select(`${MEMBERSHIP_SELECT_BASE}, invited_by_user_id`)
     .eq("user_id", userId)
     .order("created_at", { ascending: true });
 
-  let selectedRows = (fullQuery.data ?? []) as OrganizationMembershipQueryRow[];
-  let error = fullQuery.error;
-
-  if (error && isMissingOrganizationProfileColumnsError(error.message)) {
-    const legacyQuery = await supabase
-      .from("organization_members")
-      .select(
-        `${MEMBERSHIP_SELECT_BASE}, organization:organizations(${ORGANIZATION_PROFILE_SELECT_LEGACY})`
-      )
-      .eq("user_id", userId)
-      .order("created_at", { ascending: true });
-
-    selectedRows = (legacyQuery.data ?? []) as unknown as OrganizationMembershipQueryRow[];
-    error = legacyQuery.error;
+  if (membershipQuery.error) {
+    return {
+      ok: false,
+      message: "Company workspace context could not be loaded.",
+    };
   }
 
-  if (error) {
+  const selectedRows = (membershipQuery.data ?? []) as OrganizationMembershipQueryRow[];
+  const organizationIds = [...new Set(selectedRows.map((row) => row.organization_id))];
+  let organizationRows: OrganizationProfileQueryRow[] = [];
+  let organizationError: { message?: string } | null = null;
+
+  if (organizationIds.length > 0) {
+    const fullQuery = await supabase
+      .from("organizations")
+      .select(ORGANIZATION_PROFILE_SELECT_FULL)
+      .in("id", organizationIds);
+
+    organizationRows = (fullQuery.data ?? []) as OrganizationProfileQueryRow[];
+    organizationError = fullQuery.error;
+  }
+
+  if (
+    organizationError &&
+    isMissingOrganizationProfileColumnsError(organizationError.message)
+  ) {
+    const legacyQuery = await supabase
+      .from("organizations")
+      .select(ORGANIZATION_PROFILE_SELECT_LEGACY)
+      .in("id", organizationIds);
+
+    organizationRows = (legacyQuery.data ?? []) as OrganizationProfileQueryRow[];
+    organizationError = legacyQuery.error;
+  }
+
+  if (organizationError) {
     return {
       ok: false,
       message:
-        isMissingOrganizationProfileColumnsError(error.message)
+        isMissingOrganizationProfileColumnsError(organizationError.message)
           ? "Company workspace schema is out of date. Apply the latest Supabase migrations and retry."
           : "Company workspace context could not be loaded.",
     };
   }
 
+  const organizationsById = new Map<string, CompanyWorkspaceSummary>();
+  for (const organizationRow of organizationRows) {
+    const organization = normalizeOrganizationSummary(organizationRow);
+    if (organization) {
+      organizationsById.set(organization.id, organization);
+    }
+  }
+
   const memberships = normalizeCompanyMembershipRows(
-    selectedRows
+    selectedRows,
+    organizationsById
   );
   const activeMemberships = memberships.filter(
     (membership) =>
