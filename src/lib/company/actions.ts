@@ -102,6 +102,15 @@ function toCreateWorkspaceError(message: string) {
     return "Company workspace schema is out of date. Apply the latest Supabase migrations and retry.";
   }
 
+  if (
+    normalized.includes("could not find the function public.create_organization_workspace") ||
+    normalized.includes("could not find the table 'public.organizations' in the schema cache") ||
+    normalized.includes("could not find the table 'public.organization_members' in the schema cache") ||
+    normalized.includes("column profiles.provider_account_type does not exist")
+  ) {
+    return "Company workspace schema is out of date. Apply the latest Supabase migrations and retry.";
+  }
+
   return "Company workspace creation failed. Please retry.";
 }
 
@@ -348,6 +357,9 @@ export async function createCompanyWorkspaceAction(
     .single<CreateOrganizationWorkspaceRpcRow>();
   let workspaceData = data ?? null;
   let workspaceError = error;
+  let fallbackAttempted = false;
+  const primaryErrorCode: string | null = workspaceError?.code ?? null;
+  const primaryErrorMessage: string | null = workspaceError?.message ?? null;
 
   if (workspaceError || !workspaceData) {
     if (workspaceError && workspaceError.message.toLowerCase().includes("already own")) {
@@ -358,6 +370,8 @@ export async function createCompanyWorkspaceAction(
       };
     }
 
+    fallbackAttempted = true;
+
     try {
       workspaceData = await createCompanyWorkspaceWithAdminBootstrap({
         userId: profileResult.profile.id,
@@ -367,12 +381,17 @@ export async function createCompanyWorkspaceAction(
       });
       workspaceError = null;
     } catch (fallbackError) {
+      const fallbackMessage =
+        fallbackError instanceof Error
+          ? fallbackError.message
+          : "Unknown create workspace fallback failure.";
+      const combinedMessage = primaryErrorMessage
+        ? `${primaryErrorMessage} | Fallback failed: ${fallbackMessage}`
+        : fallbackMessage;
+
       workspaceError = {
-        code: workspaceError?.code ?? null,
-        message:
-          fallbackError instanceof Error
-            ? fallbackError.message
-            : workspaceError?.message ?? "Unknown create workspace failure.",
+        code: primaryErrorCode ?? workspaceError?.code ?? null,
+        message: combinedMessage,
       } as typeof workspaceError;
     }
   }
@@ -382,7 +401,9 @@ export async function createCompanyWorkspaceAction(
       user_id: profileResult.profile.id,
       error_code: workspaceError?.code ?? null,
       error_message: workspaceError?.message ?? "unknown",
-      fallback_attempted: true,
+      primary_error_code: primaryErrorCode,
+      primary_error_message: primaryErrorMessage,
+      fallback_attempted: fallbackAttempted,
     });
 
     await recordSecurityAuditEvent({
