@@ -5,11 +5,11 @@ import { cookies } from "next/headers";
 
 import { getCurrentUserProfile } from "@/lib/auth/profile";
 import {
+  type AppRole,
   isAdminRole,
   type PreferredContactMethod,
   type ProviderAccountType,
 } from "@/lib/auth/roles";
-import { getCompanyMembershipContextForUser } from "@/lib/company/context";
 import { AUDIT_EVENT_TYPES, recordSecurityAuditEvent } from "@/lib/security/audit";
 import { createServerSupabaseClient } from "@/lib/supabase";
 import {
@@ -32,6 +32,19 @@ import type {
 } from "./types";
 import { readProfileFormInput, validateProfileFormInput } from "./validation";
 
+type ProfileUpdatePayload = {
+  display_name: string;
+  bio: string | null;
+  phone: string | null;
+  preferred_contact_method: PreferredContactMethod | null;
+  role: AppRole;
+  provider_account_type?: ProviderAccountType;
+  contact_methods?: PreferredContactMethod[];
+  contact_email?: string | null;
+  whatsapp_phone?: string | null;
+  viber_phone?: string | null;
+};
+
 function toValidationErrorState(errors: ProfileActionState["errors"]): ProfileActionState {
   return {
     status: "error",
@@ -53,6 +66,14 @@ function toProfileSaveError(message: string) {
 
   if (isMissingContactColumnsError(message)) {
     return "Profile schema is out of date. Apply the latest Supabase migrations and retry.";
+  }
+
+  if (isMissingProviderAccountTypeColumnError(message)) {
+    return "Profile schema is out of date. Apply the latest Supabase migrations and retry.";
+  }
+
+  if (isUnsupportedExtendedContactMethodEnumError(message)) {
+    return "Profile schema is out of date for WhatsApp/Viber contact options. Apply latest Supabase migrations and retry.";
   }
 
   return "Profile update failed. Please try again.";
@@ -201,6 +222,109 @@ function isMissingContactColumnsError(message: string | undefined) {
   );
 }
 
+function isMissingProviderAccountTypeColumnError(message: string | undefined) {
+  if (!message) {
+    return false;
+  }
+
+  const normalized = message.toLowerCase();
+  return (
+    normalized.includes("provider_account_type") &&
+    (normalized.includes("does not exist") || normalized.includes("column"))
+  );
+}
+
+function isMissingColumnError(message: string | undefined, columnName: string) {
+  if (!message) {
+    return false;
+  }
+
+  const normalized = message.toLowerCase();
+  return normalized.includes("column") && normalized.includes(columnName.toLowerCase());
+}
+
+function isUnsupportedExtendedContactMethodEnumError(message: string | undefined) {
+  if (!message) {
+    return false;
+  }
+
+  const normalized = message.toLowerCase();
+  return (
+    normalized.includes("invalid input value for enum preferred_contact_method") &&
+    (normalized.includes("whatsapp") || normalized.includes("viber"))
+  );
+}
+
+function buildCompatibilityRetryPayload(
+  currentPayload: ProfileUpdatePayload,
+  errorMessage: string | undefined
+) {
+  let changed = false;
+  const nextPayload: ProfileUpdatePayload = { ...currentPayload };
+
+  if (isMissingProviderAccountTypeColumnError(errorMessage) && "provider_account_type" in nextPayload) {
+    delete nextPayload.provider_account_type;
+    changed = true;
+  }
+
+  if (isMissingColumnError(errorMessage, "contact_methods") && "contact_methods" in nextPayload) {
+    delete nextPayload.contact_methods;
+    changed = true;
+  }
+
+  if (isMissingColumnError(errorMessage, "contact_email") && "contact_email" in nextPayload) {
+    delete nextPayload.contact_email;
+    changed = true;
+  }
+
+  if (isMissingColumnError(errorMessage, "whatsapp_phone") && "whatsapp_phone" in nextPayload) {
+    delete nextPayload.whatsapp_phone;
+    changed = true;
+  }
+
+  if (isMissingColumnError(errorMessage, "viber_phone") && "viber_phone" in nextPayload) {
+    delete nextPayload.viber_phone;
+    changed = true;
+  }
+
+  if (isUnsupportedExtendedContactMethodEnumError(errorMessage)) {
+    const currentMethods = nextPayload.contact_methods ?? [];
+    const supportedMethods = currentMethods.filter(
+      (method) => method !== "whatsapp" && method !== "viber"
+    );
+    const normalizedMethods: PreferredContactMethod[] =
+      supportedMethods.length > 0 ? supportedMethods : ["in_app"];
+
+    if (
+      currentMethods.length !== normalizedMethods.length ||
+      currentMethods.some((method, index) => method !== normalizedMethods[index])
+    ) {
+      nextPayload.contact_methods = normalizedMethods;
+      changed = true;
+    }
+
+    if (
+      nextPayload.preferred_contact_method === "whatsapp" ||
+      nextPayload.preferred_contact_method === "viber"
+    ) {
+      nextPayload.preferred_contact_method = normalizedMethods[0] ?? null;
+      changed = true;
+    }
+
+    if ("whatsapp_phone" in nextPayload) {
+      delete nextPayload.whatsapp_phone;
+      changed = true;
+    }
+
+    if ("viber_phone" in nextPayload) {
+      delete nextPayload.viber_phone;
+      changed = true;
+    }
+  }
+
+  return changed ? nextPayload : null;
+}
+
 export async function updateProfileAction(
   _: ProfileActionState,
   formData: FormData
@@ -216,10 +340,6 @@ export async function updateProfileAction(
   }
 
   const currentProfile = profileResult.profile;
-  const companyContextResult = await getCompanyMembershipContextForUser(
-    supabase,
-    currentProfile.id
-  );
   const input = readProfileFormInput(formData, currentProfile.role);
   const validationErrors = validateProfileFormInput(input);
 
@@ -227,16 +347,7 @@ export async function updateProfileAction(
     return toValidationErrorState(validationErrors);
   }
 
-  const canResolveCompanyContext = companyContextResult.ok;
-  const ownsCompanyWorkspace = canResolveCompanyContext
-    ? companyContextResult.ownsWorkspace
-    : currentProfile.provider_account_type === "company";
-
-  if (!canResolveCompanyContext && input.role !== currentProfile.role) {
-    return toValidationErrorState({
-      role: "Role updates are temporarily unavailable while company context reloads. Retry shortly.",
-    });
-  }
+  const ownsCompanyWorkspace = currentProfile.provider_account_type === "company";
 
   if (ownsCompanyWorkspace && input.role !== "provider") {
     return toValidationErrorState({
@@ -262,28 +373,64 @@ export async function updateProfileAction(
   const normalizedViberPhone =
     input.viberPhone ?? (normalizedContactMethods.includes("viber") ? input.phone : null);
 
-  const extendedUpdatePayload = {
+  const baseUpdatePayload = {
     display_name: input.displayName,
     bio: input.bio,
     phone: input.phone,
     preferred_contact_method: normalizedPreferredContactMethod,
-    provider_account_type: nextProviderAccountType,
     role: nextRole,
+  } satisfies ProfileUpdatePayload;
+  const extendedUpdatePayload = {
+    ...baseUpdatePayload,
+    provider_account_type: nextProviderAccountType,
     contact_methods: normalizedContactMethods,
     contact_email: input.contactEmail,
     whatsapp_phone: normalizedWhatsappPhone,
     viber_phone: normalizedViberPhone,
-  };
+  } satisfies ProfileUpdatePayload;
 
-  const { data: updatedProfile, error } = await supabase
-    .from("profiles")
-    .update(extendedUpdatePayload)
-    .eq("id", currentProfile.id)
-    .select("id")
-    .limit(1)
-    .maybeSingle();
+  let payloadForAttempt: ProfileUpdatePayload = extendedUpdatePayload;
+  let attemptCount = 0;
+  let usedCompatibilityFallback = false;
+  const compatibilityFallbackReasons: string[] = [];
+  let updatedProfile: { id: string } | null = null;
+  let error: { code?: string | null; message: string } | null = null;
+
+  while (attemptCount < 6) {
+    const attemptResult = await supabase
+      .from("profiles")
+      .update(payloadForAttempt)
+      .eq("id", currentProfile.id)
+      .select("id")
+      .limit(1)
+      .maybeSingle();
+
+    updatedProfile = attemptResult.data;
+    error = attemptResult.error;
+
+    if (!error) {
+      break;
+    }
+
+    const retryPayload = buildCompatibilityRetryPayload(payloadForAttempt, error.message);
+    if (!retryPayload) {
+      break;
+    }
+
+    usedCompatibilityFallback = true;
+    compatibilityFallbackReasons.push(error.message);
+    payloadForAttempt = retryPayload;
+    attemptCount += 1;
+  }
 
   if (error) {
+    console.error("[Profile] update failed", {
+      user_id: currentProfile.id,
+      error_code: error.code ?? null,
+      error_message: error.message,
+      used_compatibility_fallback: usedCompatibilityFallback,
+    });
+
     return {
       status: "error",
       message: toProfileSaveError(error.message),
@@ -295,6 +442,13 @@ export async function updateProfileAction(
       status: "error",
       message: "Profile update was rejected for this account. Refresh and retry.",
     };
+  }
+
+  if (usedCompatibilityFallback) {
+    console.warn("[Profile] update used compatibility fallback", {
+      user_id: currentProfile.id,
+      fallback_reasons: compatibilityFallbackReasons,
+    });
   }
 
   if (nextRole !== currentProfile.role) {
@@ -319,7 +473,9 @@ export async function updateProfileAction(
 
   return {
     status: "success",
-    message: "Profile saved successfully.",
+    message: usedCompatibilityFallback
+      ? "Profile saved. Some advanced fields may require latest Supabase migrations to persist everywhere."
+      : "Profile saved successfully.",
   };
 }
 

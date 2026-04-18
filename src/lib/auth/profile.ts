@@ -9,6 +9,8 @@ import type { Database, Tables } from "@/types/database";
 
 const PROFILE_SELECT =
   "id, role, provider_account_type, display_name, avatar_url, phone, bio, preferred_contact_method, contact_methods, contact_email, whatsapp_phone, viber_phone, created_at, updated_at";
+const PROVIDER_COMPATIBLE_PROFILE_SELECT =
+  "id, role, display_name, avatar_url, phone, bio, preferred_contact_method, contact_methods, contact_email, whatsapp_phone, viber_phone, created_at, updated_at";
 const LEGACY_PROFILE_SELECT =
   "id, role, display_name, avatar_url, phone, bio, preferred_contact_method, created_at, updated_at";
 
@@ -40,7 +42,7 @@ type EnsureProfileResult =
       };
     };
 
-type ProfileSelectVariant = "full" | "channel_compatible" | "legacy";
+type ProfileSelectVariant = "full" | "provider_compatible" | "channel_compatible" | "legacy";
 type ProfileFetchFailureDetails = {
   variant: ProfileSelectVariant;
   errorCode: string | null;
@@ -187,6 +189,15 @@ async function fetchProfileByUserId(
       id: "full",
       select: PROFILE_SELECT,
       normalize: (row) => normalizeProfileRow(row as CompatibleAppProfileRow),
+    },
+    {
+      id: "provider_compatible",
+      select: PROVIDER_COMPATIBLE_PROFILE_SELECT,
+      normalize: (row) =>
+        normalizeProfileRow({
+          ...(row as CompatibleAppProfileRow),
+          provider_account_type: "individual",
+        }),
     },
     {
       id: "channel_compatible",
