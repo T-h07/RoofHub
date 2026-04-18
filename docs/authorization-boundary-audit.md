@@ -132,6 +132,7 @@ Route protection improves UX but is not an authorization substitute.
 - Listing image storage object read/write/delete owner paths now require active company membership for company-owned listings, closing suspended-owner residual media access.
 - Invite-email visibility policy now uses server-trusted primary email resolution (`current_user_primary_email()`), avoiding JWT-claim trust assumptions.
 - Listing update RLS now preserves immutable attribution fields (`owner_id`, `organization_id`, `created_by_user_id`, `published_by_user_id`) while allowing legitimate owner edits after reviewer publish actions.
+- Organization-member RLS policies use helper-based owner/admin checks (`is_organization_owner_or_admin`) instead of self-referential policy subqueries, preventing company-context resolution failures.
 
 ### Favorites
 

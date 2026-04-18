@@ -139,3 +139,4 @@ For dependency/lockfile/scanner specifics, also follow `docs/supply-chain-guardr
 - Invite-email access checks now use server-trusted primary email resolution (`current_user_primary_email()`), not JWT claim assumptions.
 - Listing update RLS now keeps ownership/attribution fields immutable while allowing legitimate owner edits after reviewer publish actions.
 - Dependency audit high finding resolved by bumping `next` from `16.2.2` to `16.2.4` (GHSA-q4gf-8mx6-v5v3 remediation).
+- Organization membership policies now use helper-based owner/admin checks to avoid self-referential RLS recursion failures during company-context/profile flows.
