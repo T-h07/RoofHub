@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { redirect } from "next/navigation";
 import { Building2, TriangleAlert, UserRound } from "lucide-react";
 
+import { CompanyWorkspaceSwitcher } from "@/components/company/company-workspace-switcher";
 import { MainContainer } from "@/components/layout/main-container";
 import { ProfileForm, type ProfileExperience } from "@/components/profile/profile-form";
 import { buttonVariants } from "@/components/ui/button";
@@ -10,7 +11,8 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { toSignInPath } from "@/lib/auth/routing";
 import { getCurrentUserProfile } from "@/lib/auth/profile";
 import { isProviderRole, type PreferredContactMethod } from "@/lib/auth/roles";
-import { getCompanyMembershipContextForUser } from "@/lib/company/context";
+import { getCurrentUserCompanyContext } from "@/lib/company/context";
+import { ORGANIZATION_MEMBER_ROLE_LABELS } from "@/lib/company/team-types";
 import { resolveProviderListingCreationContext } from "@/lib/listings/ownership";
 import { loadProviderListingOverviewMetrics } from "@/lib/listings/provider-dashboard/queries";
 import { createServerSupabaseClient } from "@/lib/supabase";
@@ -236,8 +238,7 @@ export default async function ProfilePage() {
   }
 
   const profile = profileResult.profile;
-  const companyContextResult = await getCompanyMembershipContextForUser(supabase, profile.id);
-  const ownerOrganization = companyContextResult.ok ? companyContextResult.ownerOrganization : null;
+  const companyContextResult = await getCurrentUserCompanyContext(supabase);
   const listingCreationContextResult = isProviderRole(profile.role)
     ? await resolveProviderListingCreationContext(supabase, profile)
     : null;
@@ -283,7 +284,15 @@ export default async function ProfilePage() {
       />
 
       {companyContextResult.ok ? (
-        ownerOrganization ? (
+        companyContextResult.company.workspaceState === "selection_required" ? (
+          <CompanyWorkspaceSwitcher
+            workspaceOptions={companyContextResult.company.workspaceOptions}
+            activeOrganizationId={companyContextResult.company.activeOrganizationId}
+            redirectTo="/profile/company"
+            title="Choose your active company workspace"
+            description="This account belongs to more than one RoofHub company workspace. Select the workspace you want profile, dashboard, and listing flows to use."
+          />
+        ) : companyContextResult.company.activeOrganization ? (
           <section className="border-border bg-card relative overflow-hidden rounded-2xl border p-5 sm:p-6">
             <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(118deg,color-mix(in_oklch,var(--primary)_10%,transparent)_0%,transparent_56%),linear-gradient(334deg,color-mix(in_oklch,var(--accent)_10%,transparent)_0%,transparent_72%)] opacity-52" />
             <div className="relative space-y-3">
@@ -291,23 +300,28 @@ export default async function ProfilePage() {
                 <Building2 className="text-primary size-4" />
                 Company workspace active
               </div>
-              <h2 className="type-section-title">{ownerOrganization.name}</h2>
+              <h2 className="type-section-title">{companyContextResult.company.activeOrganization.name}</h2>
               <p className="type-body-muted max-w-3xl">
-                This account owns your RoofHub company workspace. Continue in the workspace to
-                manage branding, contact details, and public company profile presence.
+                Active role:{" "}
+                {companyContextResult.company.activeMembership
+                  ? ORGANIZATION_MEMBER_ROLE_LABELS[companyContextResult.company.activeMembership.role]
+                  : "Company member"}
+                . Continue in the workspace to manage the company context this account is currently operating in.
               </p>
               <div className="flex flex-wrap gap-2">
                 <Link href="/profile/company" className={buttonVariants({ size: "sm" })}>
                   Open company workspace
                 </Link>
+                {companyContextResult.company.canManageTeam ? (
+                  <Link
+                    href="/profile/company/team"
+                    className={buttonVariants({ variant: "outline", size: "sm" })}
+                  >
+                    Manage team members
+                  </Link>
+                ) : null}
                 <Link
-                  href="/profile/company/team"
-                  className={buttonVariants({ variant: "outline", size: "sm" })}
-                >
-                  Manage team members
-                </Link>
-                <Link
-                  href={`/companies/${ownerOrganization.slug}`}
+                  href={`/companies/${companyContextResult.company.activeOrganization.slug}`}
                   className={buttonVariants({ variant: "ghost", size: "sm" })}
                 >
                   View public company page

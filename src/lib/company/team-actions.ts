@@ -253,11 +253,14 @@ async function loadTeamManagerContext(
     };
   }
 
-  const managementMembership = companyContextResult.company.managementMembership;
+  const managementMembership = companyContextResult.company.activeMembership;
   if (!managementMembership?.organization) {
     return {
       ok: false,
-      message: "Only owner or admin members can manage team access.",
+      message:
+        companyContextResult.company.workspaceState === "selection_required"
+          ? "Select an active company workspace before managing team access."
+          : "Only owner or admin members can manage team access.",
     };
   }
 

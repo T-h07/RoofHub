@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ListFilter, PlusSquare, Rows3, TriangleAlert } from "lucide-react";
 
+import { CompanyWorkspaceSwitcher } from "@/components/company/company-workspace-switcher";
 import { ProviderManagedListingsList } from "@/components/dashboard/provider-managed-listings-list";
 import { ProviderOverviewMetrics } from "@/components/dashboard/provider-overview-metrics";
 import { ProviderAccessRequired } from "@/components/dashboard/provider-access-required";
@@ -121,6 +122,43 @@ export default async function DashboardListingsPage({ searchParams }: DashboardL
     context.supabase,
     context.profile
   );
+
+  if (
+    !listingCreationContext.ok &&
+    listingCreationContext.reason === "company_workspace_selection_required" &&
+    listingCreationContext.company
+  ) {
+    return (
+      <MainContainer size="content" className="space-y-5">
+        <CompanyWorkspaceSwitcher
+          workspaceOptions={listingCreationContext.company.workspaceOptions}
+          activeOrganizationId={listingCreationContext.company.activeOrganizationId}
+          redirectTo="/dashboard/listings"
+          title="Choose the company workspace for listing operations"
+          description="Listing inventory is scoped to one active RoofHub company workspace. Select the workspace before filtering or managing company-owned listings."
+          submitLabel="Open selected inventory"
+        />
+      </MainContainer>
+    );
+  }
+
+  if (!listingCreationContext.ok && context.profile.provider_account_type === "company") {
+    return (
+      <MainContainer size="content">
+        <EmptyState
+          icon={Rows3}
+          title="Company listing inventory requires an active workspace"
+          description={listingCreationContext.message}
+          action={
+            <Link href="/profile/company" className={buttonVariants({ size: "sm" })}>
+              Open company workspace
+            </Link>
+          }
+        />
+      </MainContainer>
+    );
+  }
+
   const organizationId =
     listingCreationContext.ok && listingCreationContext.context.ownershipMode === "company"
       ? listingCreationContext.context.organizationId

@@ -3,6 +3,7 @@ import { Activity, ShieldAlert } from "lucide-react";
 
 import { CompanyActivityFeed } from "@/components/company/company-activity-feed";
 import { CompanyIdentityHeader } from "@/components/company/company-identity-header";
+import { CompanyWorkspaceSwitcher } from "@/components/company/company-workspace-switcher";
 import { ProviderAccessRequired } from "@/components/dashboard/provider-access-required";
 import { MainContainer } from "@/components/layout/main-container";
 import { Badge } from "@/components/ui/badge";
@@ -34,15 +35,34 @@ export default async function DashboardActivityPage() {
     context.profile
   );
 
+  if (
+    !listingCreationContext.ok &&
+    listingCreationContext.reason === "company_workspace_selection_required" &&
+    listingCreationContext.company
+  ) {
+    return (
+      <MainContainer size="content" className="space-y-5">
+        <CompanyWorkspaceSwitcher
+          workspaceOptions={listingCreationContext.company.workspaceOptions}
+          activeOrganizationId={listingCreationContext.company.activeOrganizationId}
+          redirectTo="/dashboard/activity"
+          title="Choose the company workspace for activity history"
+          description="Activity history is company-scoped. Select the active RoofHub workspace before opening the internal operational timeline."
+          submitLabel="Open selected activity log"
+        />
+      </MainContainer>
+    );
+  }
+
   if (!listingCreationContext.ok || listingCreationContext.context.ownershipMode !== "company") {
     return (
       <MainContainer size="content">
         <EmptyState
           icon={ShieldAlert}
-          title="Company activity log requires company provider mode"
+          title="Company activity log requires an active company workspace"
           description={
             listingCreationContext.ok
-              ? "Switch to a company provider workspace to view internal operational history."
+              ? "Switch to an active company workspace to view internal operational history."
               : listingCreationContext.message
           }
           action={

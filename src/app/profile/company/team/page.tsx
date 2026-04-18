@@ -3,12 +3,14 @@ import { redirect } from "next/navigation";
 import { ShieldAlert, UsersRound } from "lucide-react";
 
 import { CompanyIdentityHeader } from "@/components/company/company-identity-header";
+import { CompanyWorkspaceSwitcher } from "@/components/company/company-workspace-switcher";
 import { CompanyTeamManagement } from "@/components/company/company-team-management";
 import { MainContainer } from "@/components/layout/main-container";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { toSignInPath } from "@/lib/auth/routing";
+import { getCurrentUserCompanyContext } from "@/lib/company/context";
 import { toCompanyLogoPublicUrl } from "@/lib/company/logo";
 import { loadCompanyTeamWorkspaceDataForCurrentUser } from "@/lib/company/team-queries";
 import { createServerSupabaseClient } from "@/lib/supabase";
@@ -21,6 +23,21 @@ export default async function CompanyTeamPage() {
 
   if (!user) {
     redirect(toSignInPath("/profile/company/team"));
+  }
+
+  const companyContextResult = await getCurrentUserCompanyContext(supabase);
+  if (companyContextResult.ok && companyContextResult.company.workspaceState === "selection_required") {
+    return (
+      <MainContainer size="content" className="space-y-5">
+        <CompanyWorkspaceSwitcher
+          workspaceOptions={companyContextResult.company.workspaceOptions}
+          activeOrganizationId={companyContextResult.company.activeOrganizationId}
+          redirectTo="/profile/company/team"
+          title="Choose the workspace you want to manage"
+          description="Team management is always scoped to one active RoofHub company workspace. Select the workspace before editing invites or membership."
+        />
+      </MainContainer>
+    );
   }
 
   const workspaceResult = await loadCompanyTeamWorkspaceDataForCurrentUser();

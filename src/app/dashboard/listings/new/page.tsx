@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { PlusSquare } from "lucide-react";
 
+import { CompanyWorkspaceSwitcher } from "@/components/company/company-workspace-switcher";
 import { ProviderAccessRequired } from "@/components/dashboard/provider-access-required";
 import { MainContainer } from "@/components/layout/main-container";
 import { ProviderListingWizard } from "@/components/listings/provider-listing-wizard";
@@ -33,12 +34,31 @@ export default async function NewDashboardListingPage() {
     context.profile
   );
 
+  if (
+    !listingCreationContextResult.ok &&
+    listingCreationContextResult.reason === "company_workspace_selection_required" &&
+    listingCreationContextResult.company
+  ) {
+    return (
+      <MainContainer size="content" className="space-y-5">
+        <CompanyWorkspaceSwitcher
+          workspaceOptions={listingCreationContextResult.company.workspaceOptions}
+          activeOrganizationId={listingCreationContextResult.company.activeOrganizationId}
+          redirectTo="/dashboard/listings/new"
+          title="Choose the company workspace for new listings"
+          description="New company-owned listings must be created inside one explicit active RoofHub workspace. Select it first so draft ownership and routing are deterministic."
+          submitLabel="Start listing in selected workspace"
+        />
+      </MainContainer>
+    );
+  }
+
   if (!listingCreationContextResult.ok) {
     return (
       <MainContainer size="content">
         <EmptyState
           icon={PlusSquare}
-          title="Listing creation context unavailable"
+          title="Listing creation workspace unavailable"
           description={listingCreationContextResult.message}
         />
       </MainContainer>

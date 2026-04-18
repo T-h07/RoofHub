@@ -125,13 +125,16 @@ export async function loadCompanyDashboardWorkspace(
     };
   }
 
-  const membership = companyContextResult.company.primaryMembership;
-  const organization = companyContextResult.company.primaryOrganization;
+  const membership = companyContextResult.company.activeMembership;
+  const organization = companyContextResult.company.activeOrganization;
   if (!membership || !organization) {
     return {
       ok: false,
       reason: "company_membership_required",
-      message: "An active company membership is required to open the company dashboard.",
+      message:
+        companyContextResult.company.workspaceState === "selection_required"
+          ? "Select an active company workspace before opening the company dashboard."
+          : "An active company membership is required to open the company dashboard.",
     };
   }
 

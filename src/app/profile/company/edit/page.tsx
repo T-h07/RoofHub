@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { ArrowLeft, Building2 } from "lucide-react";
 
 import { CompanyIdentityHeader } from "@/components/company/company-identity-header";
+import { CompanyWorkspaceSwitcher } from "@/components/company/company-workspace-switcher";
 import { CompanyProfileForm } from "@/components/company/company-profile-form";
 import { AuthStatusMessage } from "@/components/auth/auth-status-message";
 import { MainContainer } from "@/components/layout/main-container";
@@ -54,9 +55,41 @@ export default async function CompanyProfileEditPage({
     );
   }
 
-  const ownerOrganization = companyContextResult.company.ownerOrganization;
-  if (!ownerOrganization) {
-    redirect("/profile/company");
+  if (companyContextResult.company.workspaceState === "selection_required") {
+    return (
+      <MainContainer size="content" className="space-y-5">
+        <Link href="/profile/company" className={buttonVariants({ variant: "ghost", size: "sm" })}>
+          <ArrowLeft className="size-4" />
+          Back to company workspace
+        </Link>
+
+        <CompanyWorkspaceSwitcher
+          workspaceOptions={companyContextResult.company.workspaceOptions}
+          activeOrganizationId={companyContextResult.company.activeOrganizationId}
+          redirectTo="/profile/company/edit"
+          title="Choose the workspace you want to edit"
+          description="Company profile editing is owner-scoped. Select the active owner workspace you want RoofHub to use for company profile updates."
+        />
+      </MainContainer>
+    );
+  }
+
+  const ownerOrganization = companyContextResult.company.activeOrganization;
+  if (!ownerOrganization || !companyContextResult.company.canEditProfile) {
+    return (
+      <MainContainer size="content">
+        <EmptyState
+          icon={Building2}
+          title="Company profile editing requires an owner workspace"
+          description="Select an owner-managed company workspace before editing company profile details."
+          action={
+            <Link href="/profile/company" className={buttonVariants({ size: "sm" })}>
+              Back to company workspace
+            </Link>
+          }
+        />
+      </MainContainer>
+    );
   }
 
   const logoUrl = toCompanyLogoPublicUrl(supabase, ownerOrganization.logo_path);

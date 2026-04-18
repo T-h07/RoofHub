@@ -4,12 +4,13 @@ import { ArrowLeft, Building2 } from "lucide-react";
 
 import { AuthStatusMessage } from "@/components/auth/auth-status-message";
 import { CompanyWorkspaceCreateForm } from "@/components/company/company-workspace-create-form";
+import { CompanyWorkspaceSwitcher } from "@/components/company/company-workspace-switcher";
 import { MainContainer } from "@/components/layout/main-container";
 import { buttonVariants } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { getCurrentUserProfile } from "@/lib/auth/profile";
 import { toSignInPath } from "@/lib/auth/routing";
-import { getCompanyMembershipContextForUser } from "@/lib/company/context";
+import { getCurrentUserCompanyContext } from "@/lib/company/context";
 import { createServerSupabaseClient } from "@/lib/supabase";
 
 export default async function CompanyWorkspaceCreatePage() {
@@ -35,12 +36,9 @@ export default async function CompanyWorkspaceCreatePage() {
     );
   }
 
-  const companyContextResult = await getCompanyMembershipContextForUser(
-    supabase,
-    profileResult.profile.id
-  );
+  const companyContextResult = await getCurrentUserCompanyContext(supabase);
 
-  if (companyContextResult.ok && companyContextResult.ownsWorkspace) {
+  if (companyContextResult.ok && companyContextResult.company.hasOwnedWorkspace) {
     redirect("/profile/company");
   }
 
@@ -62,7 +60,22 @@ export default async function CompanyWorkspaceCreatePage() {
         />
       ) : null}
 
-      <CompanyWorkspaceCreateForm />
+      {companyContextResult.ok &&
+      companyContextResult.company.workspaceState === "selection_required" ? (
+        <CompanyWorkspaceSwitcher
+          workspaceOptions={companyContextResult.company.workspaceOptions}
+          activeOrganizationId={companyContextResult.company.activeOrganizationId}
+          redirectTo="/profile/company"
+          title="Choose the workspace you are operating in now"
+          description="This account already belongs to more than one RoofHub company workspace. Pick the active one before continuing with company onboarding or workspace operations."
+          submitLabel="Open selected workspace"
+        />
+      ) : null}
+
+      {companyContextResult.ok &&
+      companyContextResult.company.workspaceState === "selection_required" ? null : (
+        <CompanyWorkspaceCreateForm />
+      )}
     </MainContainer>
   );
 }

@@ -150,8 +150,8 @@ async function loadCurrentOwnerOrganization(
     };
   }
 
-  const ownerMembership = companyContextResult.company.ownerMembership;
-  const ownerOrganization = companyContextResult.company.ownerOrganization;
+  const ownerMembership = companyContextResult.company.activeMembership;
+  const ownerOrganization = companyContextResult.company.activeOrganization;
   if (
     !ownerMembership ||
     !ownerOrganization ||
@@ -160,7 +160,9 @@ async function loadCurrentOwnerOrganization(
     return {
       ok: false as const,
       message:
-        "You must create and own a company workspace before editing company profile details.",
+        companyContextResult.company.workspaceState === "selection_required"
+          ? "Select an active owner workspace before editing company profile details."
+          : "You must create and own a company workspace before editing company profile details.",
     };
   }
 

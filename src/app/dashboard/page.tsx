@@ -2,6 +2,7 @@ import Link from "next/link";
 import { LayoutDashboard, PlusSquare, Rows3, TriangleAlert } from "lucide-react";
 
 import { CompanyDashboardWorkspace } from "@/components/company/company-dashboard-workspace";
+import { CompanyWorkspaceSwitcher } from "@/components/company/company-workspace-switcher";
 import { ProviderAccessRequired } from "@/components/dashboard/provider-access-required";
 import { ProviderInventoryMap } from "@/components/dashboard/provider-inventory-map";
 import { ProviderManagedListingsList } from "@/components/dashboard/provider-managed-listings-list";
@@ -47,6 +48,42 @@ export default async function DashboardPage() {
     context.supabase,
     context.profile
   );
+
+  if (
+    !listingCreationContext.ok &&
+    listingCreationContext.reason === "company_workspace_selection_required" &&
+    listingCreationContext.company
+  ) {
+    return (
+      <MainContainer size="content" className="space-y-5">
+        <CompanyWorkspaceSwitcher
+          workspaceOptions={listingCreationContext.company.workspaceOptions}
+          activeOrganizationId={listingCreationContext.company.activeOrganizationId}
+          redirectTo="/dashboard"
+          title="Choose the company workspace for dashboard operations"
+          description="RoofHub needs one explicit active company workspace before it can load company dashboard, listing, and activity surfaces."
+          submitLabel="Open selected dashboard"
+        />
+      </MainContainer>
+    );
+  }
+
+  if (!listingCreationContext.ok && context.profile.provider_account_type === "company") {
+    return (
+      <MainContainer size="content">
+        <EmptyState
+          icon={LayoutDashboard}
+          title="Company dashboard requires an active workspace"
+          description={listingCreationContext.message}
+          action={
+            <Link href="/profile/company" className={buttonVariants({ size: "sm" })}>
+              Open company workspace
+            </Link>
+          }
+        />
+      </MainContainer>
+    );
+  }
 
   if (
     listingCreationContext.ok &&
@@ -122,19 +159,6 @@ export default async function DashboardPage() {
 
   return (
     <MainContainer size="wide" className="space-y-5">
-      {!listingCreationContext.ok && context.profile.provider_account_type === "company" ? (
-        <EmptyState
-          icon={TriangleAlert}
-          title="Company context is temporarily unavailable"
-          description={`${listingCreationContext.message} Your provider inventory is still available below.`}
-          action={
-            <Link href="/profile/company" className={buttonVariants({ size: "sm" })}>
-              Open company workspace
-            </Link>
-          }
-        />
-      ) : null}
-
       <section className="border-border/75 bg-card/60 space-y-3 rounded-xl border p-5 sm:p-6">
         <Badge variant="primary">Provider workspace</Badge>
         <h1 className="type-page-title max-w-4xl">Control your property inventory and lifecycle states.</h1>

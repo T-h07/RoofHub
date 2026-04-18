@@ -66,7 +66,7 @@ export async function loadCompanyTeamWorkspaceDataForCurrentUser() {
     };
   }
 
-  const managementMembership = companyContextResult.company.managementMembership;
+  const managementMembership = companyContextResult.company.activeMembership;
   if (
     !managementMembership?.organization ||
     !canManageCompanyTeam(
@@ -77,7 +77,10 @@ export async function loadCompanyTeamWorkspaceDataForCurrentUser() {
     return {
       ok: false as const,
       reason: "management_access_required" as const,
-      message: "Only owner or admin members can access team management.",
+      message:
+        companyContextResult.company.workspaceState === "selection_required"
+          ? "Select an active company workspace before opening team management."
+          : "Only owner or admin members can access team management.",
       profile: companyContextResult.profile,
       company: companyContextResult.company,
     };
