@@ -3,6 +3,10 @@
 import { revalidatePath } from "next/cache";
 
 import { getCurrentUserProfile } from "@/lib/auth/profile";
+import {
+  getCompanyAdminClient,
+  requireCurrentUserScopedCompanyAccess,
+} from "@/lib/company/server-authorization";
 import { buildWizardValuesFromDraft } from "@/lib/listings/provider-wizard/mapping";
 import {
   evaluateProviderPublishReadiness,
@@ -11,9 +15,13 @@ import {
 import { AUDIT_EVENT_TYPES, recordSecurityAuditEvent } from "@/lib/security/audit";
 import { enforceTrafficControl, TRAFFIC_CONTROL_RULES } from "@/lib/security/traffic-control";
 import { createServerSupabaseClient } from "@/lib/supabase";
-import type { Enums } from "@/types/database";
+import type { Enums, Json } from "@/types/database";
 
-import type { CompanyListingWorkflowAction } from "./types";
+import type {
+  CompanyListingWorkflowAction,
+  CompanyListingWorkflowEventType,
+  CompanyListingWorkflowStatus,
+} from "./types";
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -40,14 +48,15 @@ export type TransitionCompanyListingWorkflowResult = {
   blockers?: ProviderPublishBlocker[];
 };
 
-type TransitionRpcRow = {
-  listing_id: string;
+type WorkflowTransitionListingRow = {
+  id: string;
   organization_id: string;
-  previous_status: Enums<"listing_status">;
-  next_status: Enums<"listing_status">;
-  event_type: Enums<"listing_workflow_event_type">;
+  created_by_user_id: string;
+  assigned_agent_user_id: string | null;
+  listing_status: CompanyListingWorkflowStatus;
   published_at: string | null;
   published_by_user_id: string | null;
+  slug: string | null;
 };
 
 const WORKFLOW_REVIEW_READINESS_LISTING_SELECT = `
@@ -175,7 +184,7 @@ function toSuccessMessage(action: CompanyListingWorkflowAction) {
 }
 
 async function ensureSubmitForReviewReadiness(input: {
-  supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>;
+  supabase: ReturnType<typeof getCompanyAdminClient>;
   listingId: string;
 }): Promise<{ ok: true } | { ok: false; message: string; blockers?: ProviderPublishBlocker[] }> {
   const { data: listingDraft, error: listingDraftError } = await input.supabase
@@ -231,6 +240,159 @@ async function ensureSubmitForReviewReadiness(input: {
       : "Listing is not review-ready yet.",
     blockers: reviewReadiness.blockers,
   };
+}
+
+function canRunWorkflowAction(input: {
+  action: CompanyListingWorkflowAction;
+  actorUserId: string;
+  membershipRole: Enums<"organization_member_role">;
+  listing: WorkflowTransitionListingRow;
+}) {
+  const isReviewer =
+    input.membershipRole === "owner" ||
+    input.membershipRole === "admin" ||
+    input.membershipRole === "manager";
+  const isResponsibleActor =
+    input.actorUserId === input.listing.created_by_user_id ||
+    input.actorUserId === input.listing.assigned_agent_user_id;
+
+  switch (input.action) {
+    case "submit_for_review":
+      return {
+        allowed: isReviewer || isResponsibleActor,
+        message: "Only the assigned agent or original creator can submit this listing for review.",
+      };
+    case "needs_changes":
+    case "approve":
+      return {
+        allowed: isReviewer,
+        message: "Only owner, admin, or manager members can run this workflow action.",
+      };
+    case "publish":
+    case "unpublish":
+      return {
+        allowed: isReviewer,
+        message: "Only owner, admin, or manager members can publish or unpublish listings.",
+      };
+    default:
+      return {
+        allowed: false,
+        message: "Workflow action is invalid.",
+      };
+  }
+}
+
+function resolveWorkflowTransition(input: {
+  action: CompanyListingWorkflowAction;
+  currentStatus: CompanyListingWorkflowStatus;
+  note: string;
+}) {
+  switch (input.action) {
+    case "submit_for_review":
+      if (input.currentStatus !== "draft" && input.currentStatus !== "needs_changes") {
+        return {
+          ok: false as const,
+          message: "Only draft or needs-changes listings can be submitted for review.",
+        };
+      }
+
+      return {
+        ok: true as const,
+        nextStatus: "submitted_for_review" as CompanyListingWorkflowStatus,
+        eventType: "submitted_for_review" as CompanyListingWorkflowEventType,
+      };
+    case "needs_changes":
+      if (input.currentStatus !== "submitted_for_review") {
+        return {
+          ok: false as const,
+          message: "Only submitted listings can be marked needs changes.",
+        };
+      }
+
+      if (!input.note) {
+        return {
+          ok: false as const,
+          message: "Review note is required when requesting changes.",
+        };
+      }
+
+      return {
+        ok: true as const,
+        nextStatus: "needs_changes" as CompanyListingWorkflowStatus,
+        eventType: "needs_changes" as CompanyListingWorkflowEventType,
+      };
+    case "approve":
+      if (input.currentStatus !== "submitted_for_review") {
+        return {
+          ok: false as const,
+          message: "Only submitted listings can be approved.",
+        };
+      }
+
+      return {
+        ok: true as const,
+        nextStatus: "approved" as CompanyListingWorkflowStatus,
+        eventType: "approved" as CompanyListingWorkflowEventType,
+      };
+    case "publish":
+      if (input.currentStatus !== "approved" && input.currentStatus !== "unpublished") {
+        return {
+          ok: false as const,
+          message: "Only approved or unpublished listings can be published.",
+        };
+      }
+
+      return {
+        ok: true as const,
+        nextStatus: "published" as CompanyListingWorkflowStatus,
+        eventType: "published" as CompanyListingWorkflowEventType,
+      };
+    case "unpublish":
+      if (input.currentStatus !== "published") {
+        return {
+          ok: false as const,
+          message: "Only published listings can be unpublished.",
+        };
+      }
+
+      return {
+        ok: true as const,
+        nextStatus: "unpublished" as CompanyListingWorkflowStatus,
+        eventType: "unpublished" as CompanyListingWorkflowEventType,
+      };
+    default:
+      return {
+        ok: false as const,
+        message: "Workflow action is invalid.",
+      };
+  }
+}
+
+async function appendListingWorkflowEvent(input: {
+  listingId: string;
+  organizationId: string;
+  actorUserId: string;
+  eventType: CompanyListingWorkflowEventType;
+  fromStatus: Enums<"listing_status"> | null;
+  toStatus: Enums<"listing_status"> | null;
+  note?: string;
+  metadata?: Record<string, unknown>;
+}) {
+  const adminSupabase = getCompanyAdminClient();
+  const { error } = await adminSupabase.from("listing_workflow_events").insert({
+    listing_id: input.listingId,
+    organization_id: input.organizationId,
+    actor_user_id: input.actorUserId,
+    event_type: input.eventType,
+    from_status: input.fromStatus,
+    to_status: input.toStatus,
+    note: input.note?.trim() ? input.note.trim() : null,
+    metadata: (input.metadata ?? {}) as Json,
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
 }
 
 async function revalidateListingWorkflowPaths(input: {
@@ -320,9 +482,63 @@ export async function transitionCompanyListingWorkflowAction(
     };
   }
 
+  const scopedAccess = await requireCurrentUserScopedCompanyAccess(supabase, {
+    permission:
+      input.action === "publish" || input.action === "unpublish"
+        ? "workflow_publish"
+        : "workspace",
+    selectionRequiredMessage:
+      "Select an active company workspace before managing listing workflow.",
+    membershipRequiredMessage:
+      "An active company membership is required to manage company listing workflow.",
+    forbiddenMessage:
+      input.action === "publish" || input.action === "unpublish"
+        ? "You do not have permission to publish or unpublish this company listing."
+        : "You do not have permission to manage this company listing workflow.",
+  });
+
+  if (!scopedAccess.ok) {
+    return {
+      ok: false,
+      message: scopedAccess.message,
+    };
+  }
+
+  const adminSupabase = getCompanyAdminClient();
+  const { data: listingData, error: listingError } = await adminSupabase
+    .from("listings")
+    .select(
+      "id, organization_id, created_by_user_id, assigned_agent_user_id, listing_status, published_at, published_by_user_id, slug"
+    )
+    .eq("id", input.listingId)
+    .eq("organization_id", scopedAccess.organization.id)
+    .maybeSingle();
+
+  if (listingError || !listingData) {
+    return {
+      ok: false,
+      message: "Listing workflow is unavailable for the selected company workspace.",
+    };
+  }
+
+  const listing = listingData as WorkflowTransitionListingRow;
+  const permissionCheck = canRunWorkflowAction({
+    action: input.action,
+    actorUserId: profileResult.profile.id,
+    membershipRole: scopedAccess.membership.role,
+    listing,
+  });
+
+  if (!permissionCheck.allowed) {
+    return {
+      ok: false,
+      message: permissionCheck.message,
+    };
+  }
+
   if (input.action === "submit_for_review") {
     const readiness = await ensureSubmitForReviewReadiness({
-      supabase,
+      supabase: adminSupabase,
       listingId: input.listingId,
     });
 
@@ -335,15 +551,13 @@ export async function transitionCompanyListingWorkflowAction(
     }
   }
 
-  const { data, error } = await supabase
-    .rpc("transition_company_listing_workflow", {
-      p_listing_id: input.listingId,
-      p_action: input.action,
-      p_note: normalizedNote.length > 0 ? normalizedNote : undefined,
-    })
-    .single<TransitionRpcRow>();
+  const transition = resolveWorkflowTransition({
+    action: input.action,
+    currentStatus: listing.listing_status,
+    note: normalizedNote,
+  });
 
-  if (error || !data) {
+  if (!transition.ok) {
     await recordSecurityAuditEvent({
       supabase,
       event: {
@@ -357,23 +571,122 @@ export async function transitionCompanyListingWorkflowAction(
           source: "company_workflow",
           action: input.action,
           note_present: normalizedNote.length > 0,
-          error_code: error?.code ?? null,
-          error_message: error?.message ?? "unknown_workflow_error",
+          error_code: null,
+          error_message: transition.message,
         },
       },
     });
 
     return {
       ok: false,
-      message: mapWorkflowActionError(error?.message ?? ""),
+      message: mapWorkflowActionError(transition.message),
     };
   }
 
-  const { data: listingRow } = await supabase
+  const nextPublishedAt =
+    input.action === "publish"
+      ? new Date().toISOString()
+      : input.action === "unpublish"
+        ? null
+        : listing.published_at;
+  const nextPublishedByUserId =
+    input.action === "publish" ? profileResult.profile.id : listing.published_by_user_id;
+
+  const { data: updatedListingRow, error: updateError } = await adminSupabase
     .from("listings")
-    .select("slug")
-    .eq("id", data.listing_id)
+    .update({
+      listing_status: transition.nextStatus,
+      published_at: nextPublishedAt,
+      published_by_user_id: nextPublishedByUserId,
+      archived_at: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", listing.id)
+    .eq("organization_id", scopedAccess.organization.id)
+    .select("id, organization_id, slug")
     .maybeSingle();
+
+  if (updateError || !updatedListingRow) {
+    await recordSecurityAuditEvent({
+      supabase,
+      event: {
+        eventType: AUDIT_EVENT_TYPES.listingStatusChangeFailed,
+        actorUserId: profileResult.profile.id,
+        actorRole: profileResult.profile.role,
+        targetType: "listing",
+        targetId: input.listingId,
+        listingId: input.listingId,
+        metadata: {
+          source: "company_workflow",
+          action: input.action,
+          note_present: normalizedNote.length > 0,
+          error_code: updateError?.code ?? null,
+          error_message: updateError?.message ?? "unknown_workflow_error",
+        },
+      },
+    });
+
+    return {
+      ok: false,
+      message: mapWorkflowActionError(updateError?.message ?? ""),
+    };
+  }
+
+  try {
+    await appendListingWorkflowEvent({
+      listingId: listing.id,
+      organizationId: scopedAccess.organization.id,
+      actorUserId: profileResult.profile.id,
+      eventType: transition.eventType,
+      fromStatus: listing.listing_status,
+      toStatus: transition.nextStatus,
+      note: normalizedNote,
+      metadata: {
+        action: input.action,
+        actor_role: scopedAccess.membership.role,
+      },
+    });
+  } catch (workflowEventError) {
+    await adminSupabase
+      .from("listings")
+      .update({
+        listing_status: listing.listing_status,
+        published_at: listing.published_at,
+        published_by_user_id: listing.published_by_user_id,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", listing.id)
+      .eq("organization_id", scopedAccess.organization.id);
+
+    await recordSecurityAuditEvent({
+      supabase,
+      event: {
+        eventType: AUDIT_EVENT_TYPES.listingStatusChangeFailed,
+        actorUserId: profileResult.profile.id,
+        actorRole: profileResult.profile.role,
+        targetType: "listing",
+        targetId: input.listingId,
+        listingId: input.listingId,
+        metadata: {
+          source: "company_workflow",
+          action: input.action,
+          note_present: normalizedNote.length > 0,
+          error_code: null,
+          error_message:
+            workflowEventError instanceof Error
+              ? workflowEventError.message
+              : "workflow_event_persist_failed",
+        },
+      },
+    });
+
+    return {
+      ok: false,
+      message: "Workflow action failed. Please retry.",
+    };
+  }
+
+  const updatedListing = updatedListingRow as Pick<WorkflowTransitionListingRow, "id" | "organization_id" | "slug">;
 
   await recordSecurityAuditEvent({
     supabase,
@@ -382,30 +695,30 @@ export async function transitionCompanyListingWorkflowAction(
       actorUserId: profileResult.profile.id,
       actorRole: profileResult.profile.role,
       targetType: "listing",
-      targetId: data.listing_id,
-      listingId: data.listing_id,
-      fromStatus: data.previous_status,
-      toStatus: data.next_status,
+      targetId: listing.id,
+      listingId: listing.id,
+      fromStatus: listing.listing_status,
+      toStatus: transition.nextStatus,
       metadata: {
         source: "company_workflow",
         action: input.action,
-        organization_id: data.organization_id,
+        organization_id: scopedAccess.organization.id,
         note_present: normalizedNote.length > 0,
       },
     },
   });
 
   await revalidateListingWorkflowPaths({
-    listingId: data.listing_id,
-    listingSlug: listingRow?.slug ?? null,
-    organizationId: data.organization_id,
+    listingId: listing.id,
+    listingSlug: updatedListing.slug ?? listing.slug ?? null,
+    organizationId: scopedAccess.organization.id,
   });
 
   return {
     ok: true,
     message: toSuccessMessage(input.action),
-    previousStatus: data.previous_status,
-    nextStatus: data.next_status,
+    previousStatus: listing.listing_status,
+    nextStatus: transition.nextStatus,
   };
 }
 
@@ -419,7 +732,8 @@ export async function recordCompanyListingCreatedWorkflowEvent(input: {
   }
 
   const supabase = await createServerSupabaseClient();
-  const { data: listingRow, error: listingError } = await supabase
+  const adminSupabase = getCompanyAdminClient();
+  const { data: listingRow, error: listingError } = await adminSupabase
     .from("listings")
     .select("id, organization_id, listing_status")
     .eq("id", input.listingId)
@@ -429,14 +743,16 @@ export async function recordCompanyListingCreatedWorkflowEvent(input: {
     return;
   }
 
-  await supabase.rpc("log_listing_workflow_event", {
-    p_listing_id: listingRow.id,
-    p_event_type: "created",
-    p_to_status: listingRow.listing_status,
-    p_metadata: {
+  await appendListingWorkflowEvent({
+    listingId: listingRow.id,
+    organizationId: listingRow.organization_id,
+    actorUserId: input.actorUserId,
+    eventType: "created",
+    fromStatus: null,
+    toStatus: listingRow.listing_status,
+    metadata: {
       source: "provider_wizard",
     },
-    p_actor_user_id: input.actorUserId,
   });
 
   await recordSecurityAuditEvent({

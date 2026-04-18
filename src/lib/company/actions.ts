@@ -452,20 +452,23 @@ export async function createCompanyWorkspaceAction(
     return toTrafficErrorState(userControl);
   }
 
-  const { data, error } = await supabase
-    .rpc("create_organization_workspace", {
-      p_name: input.name,
-      p_description: input.description ?? undefined,
-    })
-    .single<CreateOrganizationWorkspaceRpcRow>();
-  let workspaceData = data ?? null;
-  let workspaceError = error;
-  let fallbackAttempted = false;
-  const primaryErrorCode: string | null = workspaceError?.code ?? null;
-  const primaryErrorMessage: string | null = workspaceError?.message ?? null;
+  let workspaceData: CreateOrganizationWorkspaceRpcRow | null = null;
+  let workspaceError: { code: string | null; message: string } | null = null;
 
-  if (workspaceError || !workspaceData) {
-    if (workspaceError && workspaceError.message.toLowerCase().includes("already own")) {
+  try {
+    workspaceData = await createCompanyWorkspaceWithAdminBootstrap({
+      userId: profileResult.profile.id,
+      currentRole: profileResult.profile.role,
+      name: input.name,
+      description: input.description,
+    });
+  } catch (bootstrapError) {
+    const errorMessage =
+      bootstrapError instanceof Error
+        ? bootstrapError.message
+        : "Unknown create workspace failure.";
+
+    if (errorMessage.toLowerCase().includes("already own")) {
       return {
         status: "success",
         message: "This account already owns a company workspace.",
@@ -473,30 +476,10 @@ export async function createCompanyWorkspaceAction(
       };
     }
 
-    fallbackAttempted = true;
-
-    try {
-      workspaceData = await createCompanyWorkspaceWithAdminBootstrap({
-        userId: profileResult.profile.id,
-        currentRole: profileResult.profile.role,
-        name: input.name,
-        description: input.description,
-      });
-      workspaceError = null;
-    } catch (fallbackError) {
-      const fallbackMessage =
-        fallbackError instanceof Error
-          ? fallbackError.message
-          : "Unknown create workspace fallback failure.";
-      const combinedMessage = primaryErrorMessage
-        ? `${primaryErrorMessage} | Fallback failed: ${fallbackMessage}`
-        : fallbackMessage;
-
-      workspaceError = {
-        code: primaryErrorCode ?? workspaceError?.code ?? null,
-        message: combinedMessage,
-      } as typeof workspaceError;
-    }
+    workspaceError = {
+      code: null,
+      message: errorMessage,
+    };
   }
 
   if (workspaceError || !workspaceData) {
@@ -504,9 +487,9 @@ export async function createCompanyWorkspaceAction(
       user_id: profileResult.profile.id,
       error_code: workspaceError?.code ?? null,
       error_message: workspaceError?.message ?? "unknown",
-      primary_error_code: primaryErrorCode,
-      primary_error_message: primaryErrorMessage,
-      fallback_attempted: fallbackAttempted,
+      primary_error_code: null,
+      primary_error_message: null,
+      fallback_attempted: false,
     });
 
     await recordSecurityAuditEvent({

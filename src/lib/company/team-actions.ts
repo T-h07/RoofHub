@@ -3,14 +3,16 @@
 import { revalidatePath } from "next/cache";
 
 import { getCurrentUserProfile } from "@/lib/auth/profile";
-import { getCurrentUserCompanyContext } from "@/lib/company/context";
 import {
   canInviteOrganizationRole,
-  canManageCompanyTeam,
   canMutateOrganizationMemberRole,
   canMutateOrganizationMemberStatus,
   canRemoveOrganizationMember,
 } from "@/lib/company/permissions";
+import {
+  getCompanyAdminClient,
+  requireCurrentUserScopedCompanyAccess,
+} from "@/lib/company/server-authorization";
 import type { CompanyWorkspaceSummary } from "@/lib/company/context";
 import {
   COMPANY_TEAM_INVITE_IDLE_STATE,
@@ -40,20 +42,7 @@ import {
 } from "@/lib/security/audit";
 import { enforceTrafficControl, TRAFFIC_CONTROL_RULES } from "@/lib/security/traffic-control";
 import { createServerSupabaseClient } from "@/lib/supabase";
-import type { Database, Tables } from "@/types/database";
-
-type CreateInviteRpcRow =
-  Database["public"]["Functions"]["create_organization_member_invite"]["Returns"][number];
-type AcceptInviteRpcRow =
-  Database["public"]["Functions"]["accept_organization_member_invite"]["Returns"][number];
-type RevokeInviteRpcRow =
-  Database["public"]["Functions"]["revoke_organization_member_invite"]["Returns"][number];
-type UpdateRoleRpcRow =
-  Database["public"]["Functions"]["update_organization_member_role"]["Returns"][number];
-type UpdateStatusRpcRow =
-  Database["public"]["Functions"]["update_organization_member_status"]["Returns"][number];
-type RemoveMemberRpcRow =
-  Database["public"]["Functions"]["remove_organization_member"]["Returns"][number];
+import type { Tables } from "@/types/database";
 
 type TeamMutationMembershipRow = Pick<
   Tables<"organization_members">,
@@ -62,7 +51,22 @@ type TeamMutationMembershipRow = Pick<
 
 type TeamMutationInviteRow = Pick<
   Tables<"organization_member_invites">,
-  "id" | "organization_id" | "role" | "invite_status"
+  "id" | "organization_id" | "role" | "invite_status" | "invite_email" | "target_user_id"
+>;
+
+type TeamInviteMutationResult = Pick<
+  Tables<"organization_member_invites">,
+  "id" | "organization_id" | "role" | "invite_status" | "invite_token" | "invite_email" | "target_user_id"
+>;
+
+type TeamMembershipRoleMutationResult = Pick<
+  Tables<"organization_members">,
+  "id" | "organization_id" | "user_id" | "role"
+>;
+
+type TeamMembershipStatusMutationResult = Pick<
+  Tables<"organization_members">,
+  "id" | "organization_id" | "user_id" | "role" | "member_status"
 >;
 
 type TeamManagerContextResult =
@@ -106,6 +110,14 @@ function mapInviteCreateError(message: string) {
     return "An active invite already exists for this user.";
   }
 
+  if (
+    normalized.includes("organization_member_invites_pending_user_unique_idx") ||
+    normalized.includes("organization_member_invites_pending_email_unique_idx") ||
+    normalized.includes("duplicate key")
+  ) {
+    return "An active invite already exists for this user.";
+  }
+
   if (normalized.includes("cannot invite owner or admin roles")) {
     return "Admin members can only invite manager or agent roles.";
   }
@@ -123,6 +135,13 @@ function mapInviteCreateError(message: string) {
   }
 
   if (normalized.includes("roofhub user id is invalid")) {
+    return "RoofHub user ID was not found.";
+  }
+
+  if (
+    normalized.includes("organization_member_invites_target_user_id_fkey") ||
+    normalized.includes("foreign key constraint")
+  ) {
     return "RoofHub user ID was not found.";
   }
 
@@ -244,45 +263,28 @@ function revalidateCompanyTeamPaths(input: { organizationSlug: string }) {
 async function loadTeamManagerContext(
   supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>
 ): Promise<TeamManagerContextResult> {
-  const companyContextResult = await getCurrentUserCompanyContext(supabase);
+  const companyAccess = await requireCurrentUserScopedCompanyAccess(supabase, {
+    permission: "team_management",
+    selectionRequiredMessage:
+      "Select an active company workspace before managing team access.",
+    membershipRequiredMessage: "Only owner or admin members can manage team access.",
+    forbiddenMessage: "Only owner or admin members can manage team access.",
+  });
 
-  if (!companyContextResult.ok) {
+  if (!companyAccess.ok) {
     return {
       ok: false,
-      message: companyContextResult.message,
-    };
-  }
-
-  const managementMembership = companyContextResult.company.activeMembership;
-  if (!managementMembership?.organization) {
-    return {
-      ok: false,
-      message:
-        companyContextResult.company.workspaceState === "selection_required"
-          ? "Select an active company workspace before managing team access."
-          : "Only owner or admin members can manage team access.",
-    };
-  }
-
-  if (
-    !canManageCompanyTeam(
-      managementMembership.role,
-      managementMembership.member_status
-    )
-    || (managementMembership.role !== "owner" && managementMembership.role !== "admin")
-  ) {
-    return {
-      ok: false,
-      message: "Only owner or admin members can manage team access.",
+      message: companyAccess.message,
     };
   }
 
   return {
     ok: true,
-    profile: companyContextResult.profile,
-    organization: managementMembership.organization,
-    membershipRole: managementMembership.role,
-    membershipStatus: managementMembership.member_status,
+    profile: companyAccess.profile,
+    organization: companyAccess.organization,
+    membershipRole:
+      companyAccess.membership.role === "owner" ? "owner" : "admin",
+    membershipStatus: companyAccess.membership.member_status,
   };
 }
 
@@ -337,6 +339,253 @@ async function loadScopedInviteForTeamMutation(
   return {
     ok: true as const,
     row: data as TeamMutationInviteRow,
+  };
+}
+
+async function countActiveOrganizationOwners(input: {
+  supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>;
+  organizationId: string;
+  excludeMembershipId?: string;
+}) {
+  let query = input.supabase
+    .from("organization_members")
+    .select("id", { count: "exact", head: true })
+    .eq("organization_id", input.organizationId)
+    .eq("role", "owner")
+    .eq("member_status", "active");
+
+  if (input.excludeMembershipId) {
+    query = query.neq("id", input.excludeMembershipId);
+  }
+
+  const { count, error } = await query;
+
+  if (error) {
+    return null;
+  }
+
+  return count ?? 0;
+}
+
+async function acceptCompanyInviteWithTrustedServerPath(input: {
+  inviteToken: string;
+  user: Tables<"profiles">;
+  supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>;
+}) {
+  const adminSupabase = getCompanyAdminClient();
+  const {
+    data: { user: authUser },
+    error: authUserError,
+  } = await input.supabase.auth.getUser();
+
+  if (authUserError || !authUser) {
+    return {
+      ok: false as const,
+      errorMessage: "Authentication is required to accept an invite.",
+    };
+  }
+
+  const { data: invite, error: inviteError } = await adminSupabase
+    .from("organization_member_invites")
+    .select(
+      "id, organization_id, invite_email, target_user_id, invite_status, role, invited_by_user_id, accepted_by_user_id, accepted_at, expires_at"
+    )
+    .eq("invite_token", input.inviteToken)
+    .maybeSingle();
+
+  if (inviteError || !invite) {
+    return {
+      ok: false as const,
+      errorMessage: "Invite is invalid or unavailable.",
+    };
+  }
+
+  if (invite.target_user_id && invite.target_user_id !== input.user.id) {
+    return {
+      ok: false as const,
+      errorMessage: "This invite was issued for a different RoofHub user account.",
+    };
+  }
+
+  const normalizedUserEmail = authUser.email?.trim().toLowerCase() ?? null;
+  const normalizedInviteEmail = invite.invite_email?.trim().toLowerCase() ?? null;
+
+  if (
+    invite.target_user_id === null &&
+    (!normalizedInviteEmail || normalizedInviteEmail !== normalizedUserEmail)
+  ) {
+    return {
+      ok: false as const,
+      errorMessage: "This invite email does not match your signed-in account.",
+    };
+  }
+
+  if (invite.invite_status === "accepted") {
+    if (invite.accepted_by_user_id === input.user.id) {
+      const { data: acceptedMembership } = await adminSupabase
+        .from("organization_members")
+        .select("id, organization_id, user_id, role, member_status")
+        .eq("organization_id", invite.organization_id)
+        .eq("user_id", input.user.id)
+        .maybeSingle();
+
+      return acceptedMembership
+        ? {
+            ok: true as const,
+            inviteId: invite.id,
+            organizationId: invite.organization_id,
+            memberId: acceptedMembership.id,
+            membershipRole: acceptedMembership.role,
+            acceptanceOutcome: "already_accepted",
+          }
+        : {
+            ok: false as const,
+            errorMessage: "Invite has already been accepted.",
+          };
+    }
+
+    return {
+      ok: false as const,
+      errorMessage: "Invite has already been accepted.",
+    };
+  }
+
+  if (invite.invite_status === "revoked") {
+    return {
+      ok: false as const,
+      errorMessage: "Invite has been revoked.",
+    };
+  }
+
+  const expiresAt = invite.expires_at ? new Date(invite.expires_at) : null;
+  if (invite.invite_status === "expired" || (expiresAt && expiresAt.getTime() <= Date.now())) {
+    await adminSupabase
+      .from("organization_member_invites")
+      .update({ invite_status: "expired" })
+      .eq("id", invite.id)
+      .eq("invite_status", "pending");
+
+    return {
+      ok: false as const,
+      errorMessage: "Invite has expired.",
+    };
+  }
+
+  const { data: existingMembership, error: existingMembershipError } = await adminSupabase
+    .from("organization_members")
+    .select("id, organization_id, user_id, role, member_status, invited_by_user_id")
+    .eq("organization_id", invite.organization_id)
+    .eq("user_id", input.user.id)
+    .maybeSingle();
+
+  if (existingMembershipError) {
+    return {
+      ok: false as const,
+      errorMessage: existingMembershipError.message,
+    };
+  }
+
+  let memberId: string;
+  let membershipRole: Tables<"organization_members">["role"];
+  let acceptanceOutcome = "joined";
+
+  if (existingMembership) {
+    memberId = existingMembership.id;
+    membershipRole = existingMembership.role;
+
+    if (existingMembership.member_status === "active") {
+      acceptanceOutcome = "already_active_member";
+    } else {
+      const { data: reactivatedMembership, error: reactivatedMembershipError } = await adminSupabase
+        .from("organization_members")
+        .update({
+          role: invite.role,
+          member_status: "active",
+          invited_by_user_id: invite.invited_by_user_id ?? existingMembership.invited_by_user_id,
+          joined_at: new Date().toISOString(),
+        })
+        .eq("id", existingMembership.id)
+        .select("id, role")
+        .maybeSingle();
+
+      if (reactivatedMembershipError || !reactivatedMembership) {
+        return {
+          ok: false as const,
+          errorMessage:
+            reactivatedMembershipError?.message ?? "Invite could not be accepted right now.",
+        };
+      }
+
+      memberId = reactivatedMembership.id;
+      membershipRole = reactivatedMembership.role;
+      acceptanceOutcome = "reactivated_member";
+    }
+  } else {
+    const { data: insertedMembership, error: insertedMembershipError } = await adminSupabase
+      .from("organization_members")
+      .insert({
+        organization_id: invite.organization_id,
+        user_id: input.user.id,
+        role: invite.role,
+        member_status: "active",
+        invited_by_user_id: invite.invited_by_user_id,
+      })
+      .select("id, role")
+      .maybeSingle();
+
+    if (insertedMembershipError || !insertedMembership) {
+      return {
+        ok: false as const,
+        errorMessage:
+          insertedMembershipError?.message ?? "Invite could not be accepted right now.",
+      };
+    }
+
+    memberId = insertedMembership.id;
+    membershipRole = insertedMembership.role;
+  }
+
+  const { error: inviteUpdateError } = await adminSupabase
+    .from("organization_member_invites")
+    .update({
+      target_user_id: invite.target_user_id ?? input.user.id,
+      invite_status: "accepted",
+      accepted_at: new Date().toISOString(),
+      accepted_by_user_id: input.user.id,
+    })
+    .eq("id", invite.id)
+    .eq("invite_status", "pending");
+
+  if (inviteUpdateError) {
+    return {
+      ok: false as const,
+      errorMessage: inviteUpdateError.message,
+    };
+  }
+
+  const { error: profileUpdateError } = await adminSupabase
+    .from("profiles")
+    .update({
+      role: input.user.role === "admin" ? "admin" : "provider",
+      provider_account_type: "company",
+      active_organization_id: invite.organization_id,
+    })
+    .eq("id", input.user.id);
+
+  if (profileUpdateError) {
+    return {
+      ok: false as const,
+      errorMessage: profileUpdateError.message,
+    };
+  }
+
+  return {
+    ok: true as const,
+    inviteId: invite.id,
+    organizationId: invite.organization_id,
+    memberId,
+    membershipRole,
+    acceptanceOutcome,
   };
 }
 
@@ -454,13 +703,19 @@ export async function createCompanyTeamInviteAction(
   }
 
   const { data, error } = await supabase
-    .rpc("create_organization_member_invite", {
-      p_organization_id: managerContext.organization.id,
-      p_role: input.role,
-      p_invite_email: input.inviteMethod === "email" ? (input.inviteEmail ?? undefined) : undefined,
-      p_target_user_id: input.inviteMethod === "userId" ? (input.targetUserId ?? undefined) : undefined,
+    .from("organization_member_invites")
+    .insert({
+      organization_id: managerContext.organization.id,
+      invited_by_user_id: managerContext.profile.id,
+      invite_email: input.inviteMethod === "email" ? input.inviteEmail : null,
+      target_user_id: input.inviteMethod === "userId" ? input.targetUserId : null,
+      role: input.role,
+      invite_status: "pending",
     })
-    .single<CreateInviteRpcRow>();
+    .select(
+      "id, organization_id, role, invite_status, invite_token, invite_email, target_user_id"
+    )
+    .maybeSingle();
 
   if (error || !data) {
     await recordSecurityAuditEvent({
@@ -489,6 +744,8 @@ export async function createCompanyTeamInviteAction(
     };
   }
 
+  const createdInvite = data as TeamInviteMutationResult;
+
   await recordSecurityAuditEvent({
     supabase,
     event: {
@@ -496,15 +753,15 @@ export async function createCompanyTeamInviteAction(
       actorUserId: managerContext.profile.id,
       actorRole: managerContext.profile.role,
       targetType: "organization_invite",
-      targetId: data.invite_id,
+      targetId: createdInvite.id,
       metadata: {
         organization_id: managerContext.organization.id,
         organization_slug: managerContext.organization.slug,
         membership_role: managerContext.membershipRole,
         invite_method: input.inviteMethod,
-        invite_role: data.invite_role,
-        invite_target_user_id: data.target_user_id,
-        invite_target_email: data.invite_email,
+        invite_role: createdInvite.role,
+        invite_target_user_id: createdInvite.target_user_id,
+        invite_target_email: createdInvite.invite_email,
         ...requestFingerprint,
       },
     },
@@ -515,7 +772,7 @@ export async function createCompanyTeamInviteAction(
   return {
     status: "success",
     message: "Team invite created. Share the secure link with the invited user.",
-    inviteLinkPath: `/profile/company/invites/${data.invite_token}`,
+    inviteLinkPath: `/profile/company/invites/${createdInvite.invite_token}`,
   };
 }
 
@@ -571,10 +828,15 @@ export async function revokeCompanyTeamInviteAction(
   }
 
   const { data, error } = await supabase
-    .rpc("revoke_organization_member_invite", {
-      p_invite_id: inviteId,
+    .from("organization_member_invites")
+    .update({
+      invite_status: "revoked",
     })
-    .single<RevokeInviteRpcRow>();
+    .eq("id", inviteId)
+    .eq("organization_id", managerContext.organization.id)
+    .eq("invite_status", "pending")
+    .select("id, organization_id, role, invite_status, invite_email, target_user_id")
+    .maybeSingle();
 
   if (error || !data) {
     await recordSecurityAuditEvent({
@@ -598,6 +860,8 @@ export async function revokeCompanyTeamInviteAction(
     return toGenericErrorState(mapInviteRevokeError(error?.message ?? ""));
   }
 
+  const revokedInvite = data as TeamMutationInviteRow;
+
   await recordSecurityAuditEvent({
     supabase,
     event: {
@@ -605,11 +869,11 @@ export async function revokeCompanyTeamInviteAction(
       actorUserId: managerContext.profile.id,
       actorRole: managerContext.profile.role,
       targetType: "organization_invite",
-      targetId: data.invite_id,
+      targetId: revokedInvite.id,
       metadata: {
-        organization_id: data.organization_id,
+        organization_id: revokedInvite.organization_id,
         membership_role: managerContext.membershipRole,
-        invite_role: data.invite_role,
+        invite_role: revokedInvite.role,
         ...requestFingerprint,
       },
     },
@@ -666,6 +930,24 @@ export async function updateCompanyTeamMemberRoleAction(
     );
   }
 
+  if (
+    scopedMembership.row.role === "owner" &&
+    input.newRole !== "owner" &&
+    scopedMembership.row.member_status === "active"
+  ) {
+    const remainingOwnerCount = await countActiveOrganizationOwners({
+      supabase,
+      organizationId: managerContext.organization.id,
+      excludeMembershipId: membershipId,
+    });
+
+    if (remainingOwnerCount !== null && remainingOwnerCount < 1) {
+      return toGenericErrorState(
+        "Role update blocked because at least one active owner must remain."
+      );
+    }
+  }
+
   const requestFingerprint = await getAuditRequestFingerprint();
   const trafficResult = await enforceMemberMutationTrafficControl({
     supabase,
@@ -677,12 +959,16 @@ export async function updateCompanyTeamMemberRoleAction(
     return toGenericErrorState(trafficResult.message);
   }
 
+  const previousRole = scopedMembership.row.role;
   const { data, error } = await supabase
-    .rpc("update_organization_member_role", {
-      p_membership_id: membershipId,
-      p_new_role: input.newRole,
+    .from("organization_members")
+    .update({
+      role: input.newRole,
     })
-    .single<UpdateRoleRpcRow>();
+    .eq("id", membershipId)
+    .eq("organization_id", managerContext.organization.id)
+    .select("id, organization_id, user_id, role")
+    .maybeSingle();
 
   if (error || !data) {
     await recordSecurityAuditEvent({
@@ -707,6 +993,8 @@ export async function updateCompanyTeamMemberRoleAction(
     return toGenericErrorState(mapMemberRoleError(error?.message ?? ""));
   }
 
+  const updatedMembershipRole = data as TeamMembershipRoleMutationResult;
+
   await recordSecurityAuditEvent({
     supabase,
     event: {
@@ -714,13 +1002,13 @@ export async function updateCompanyTeamMemberRoleAction(
       actorUserId: managerContext.profile.id,
       actorRole: managerContext.profile.role,
       targetType: "organization_member",
-      targetId: data.membership_id,
+      targetId: updatedMembershipRole.id,
       metadata: {
-        organization_id: data.organization_id,
-        target_user_id: data.user_id,
+        organization_id: updatedMembershipRole.organization_id,
+        target_user_id: updatedMembershipRole.user_id,
         membership_role: managerContext.membershipRole,
-        previous_role: data.previous_role,
-        new_role: data.new_role,
+        previous_role: previousRole,
+        new_role: updatedMembershipRole.role,
         ...requestFingerprint,
       },
     },
@@ -776,6 +1064,24 @@ export async function updateCompanyTeamMemberStatusAction(
     );
   }
 
+  if (
+    scopedMembership.row.role === "owner" &&
+    scopedMembership.row.member_status === "active" &&
+    input.nextStatus !== "active"
+  ) {
+    const remainingOwnerCount = await countActiveOrganizationOwners({
+      supabase,
+      organizationId: managerContext.organization.id,
+      excludeMembershipId: membershipId,
+    });
+
+    if (remainingOwnerCount !== null && remainingOwnerCount < 1) {
+      return toGenericErrorState(
+        "Status update blocked because at least one active owner must remain."
+      );
+    }
+  }
+
   const requestFingerprint = await getAuditRequestFingerprint();
   const trafficResult = await enforceMemberMutationTrafficControl({
     supabase,
@@ -787,12 +1093,16 @@ export async function updateCompanyTeamMemberStatusAction(
     return toGenericErrorState(trafficResult.message);
   }
 
+  const previousStatus = scopedMembership.row.member_status;
   const { data, error } = await supabase
-    .rpc("update_organization_member_status", {
-      p_membership_id: membershipId,
-      p_new_status: input.nextStatus,
+    .from("organization_members")
+    .update({
+      member_status: input.nextStatus,
     })
-    .single<UpdateStatusRpcRow>();
+    .eq("id", membershipId)
+    .eq("organization_id", managerContext.organization.id)
+    .select("id, organization_id, user_id, role, member_status")
+    .maybeSingle();
 
   if (error || !data) {
     await recordSecurityAuditEvent({
@@ -817,8 +1127,10 @@ export async function updateCompanyTeamMemberStatusAction(
     return toGenericErrorState(mapMemberStatusError(error?.message ?? ""));
   }
 
+  const updatedMembershipStatus = data as TeamMembershipStatusMutationResult;
+
   const eventType =
-    data.new_status === "active"
+    updatedMembershipStatus.member_status === "active"
       ? AUDIT_EVENT_TYPES.organizationMemberReactivated
       : AUDIT_EVENT_TYPES.organizationMemberSuspended;
 
@@ -829,14 +1141,14 @@ export async function updateCompanyTeamMemberStatusAction(
       actorUserId: managerContext.profile.id,
       actorRole: managerContext.profile.role,
       targetType: "organization_member",
-      targetId: data.membership_id,
+      targetId: updatedMembershipStatus.id,
       metadata: {
-        organization_id: data.organization_id,
-        target_user_id: data.user_id,
+        organization_id: updatedMembershipStatus.organization_id,
+        target_user_id: updatedMembershipStatus.user_id,
         membership_role: managerContext.membershipRole,
-        previous_status: data.previous_status,
-        new_status: data.new_status,
-        target_role: data.role,
+        previous_status: previousStatus,
+        new_status: updatedMembershipStatus.member_status,
+        target_role: updatedMembershipStatus.role,
         ...requestFingerprint,
       },
     },
@@ -846,7 +1158,10 @@ export async function updateCompanyTeamMemberStatusAction(
 
   return {
     status: "success",
-    message: data.new_status === "active" ? "Member reactivated." : "Member suspended.",
+    message:
+      updatedMembershipStatus.member_status === "active"
+        ? "Member reactivated."
+        : "Member suspended.",
   };
 }
 
@@ -890,6 +1205,23 @@ export async function removeCompanyTeamMemberAction(
     return toGenericErrorState("You do not have permission to remove this member.");
   }
 
+  if (
+    scopedMembership.row.role === "owner" &&
+    scopedMembership.row.member_status === "active"
+  ) {
+    const remainingOwnerCount = await countActiveOrganizationOwners({
+      supabase,
+      organizationId: managerContext.organization.id,
+      excludeMembershipId: membershipId,
+    });
+
+    if (remainingOwnerCount !== null && remainingOwnerCount < 1) {
+      return toGenericErrorState(
+        "Removal blocked because at least one active owner must remain."
+      );
+    }
+  }
+
   const requestFingerprint = await getAuditRequestFingerprint();
   const trafficResult = await enforceMemberMutationTrafficControl({
     supabase,
@@ -901,11 +1233,16 @@ export async function removeCompanyTeamMemberAction(
     return toGenericErrorState(trafficResult.message);
   }
 
+  const removedRole = scopedMembership.row.role;
+  const removedStatus = scopedMembership.row.member_status;
+  const removedUserId = scopedMembership.row.user_id;
   const { data, error } = await supabase
-    .rpc("remove_organization_member", {
-      p_membership_id: membershipId,
-    })
-    .single<RemoveMemberRpcRow>();
+    .from("organization_members")
+    .delete()
+    .eq("id", membershipId)
+    .eq("organization_id", managerContext.organization.id)
+    .select("id")
+    .maybeSingle();
 
   if (error || !data) {
     await recordSecurityAuditEvent({
@@ -936,13 +1273,13 @@ export async function removeCompanyTeamMemberAction(
       actorUserId: managerContext.profile.id,
       actorRole: managerContext.profile.role,
       targetType: "organization_member",
-      targetId: data.membership_id,
+      targetId: membershipId,
       metadata: {
-        organization_id: data.organization_id,
-        target_user_id: data.user_id,
+        organization_id: managerContext.organization.id,
+        target_user_id: removedUserId,
         membership_role: managerContext.membershipRole,
-        removed_role: data.removed_role,
-        removed_status: data.removed_status,
+        removed_role: removedRole,
+        removed_status: removedStatus,
         ...requestFingerprint,
       },
     },
@@ -1001,13 +1338,13 @@ export async function acceptCompanyTeamInviteAction(
     return toGenericErrorState(trafficResult.message);
   }
 
-  const { data, error } = await supabase
-    .rpc("accept_organization_member_invite", {
-      p_invite_token: inviteToken,
-    })
-    .single<AcceptInviteRpcRow>();
+  const acceptedInvite = await acceptCompanyInviteWithTrustedServerPath({
+    inviteToken,
+    user: profileResult.profile,
+    supabase,
+  });
 
-  if (error || !data) {
+  if (!acceptedInvite.ok) {
     await recordSecurityAuditEvent({
       supabase,
       event: {
@@ -1018,20 +1355,20 @@ export async function acceptCompanyTeamInviteAction(
         targetId: inviteToken,
         metadata: {
           outcome: "failed",
-          error_code: error?.code ?? null,
-          error_message: error?.message ?? "unknown_invite_accept_error",
+          error_code: null,
+          error_message: acceptedInvite.errorMessage,
           ...requestFingerprint,
         },
       },
     });
 
-    return toGenericErrorState(mapInviteAcceptError(error?.message ?? ""));
+    return toGenericErrorState(mapInviteAcceptError(acceptedInvite.errorMessage));
   }
 
   const { data: organizationRow } = await supabase
     .from("organizations")
     .select("slug")
-    .eq("id", data.organization_id)
+    .eq("id", acceptedInvite.organizationId)
     .maybeSingle();
 
   await recordSecurityAuditEvent({
@@ -1041,12 +1378,12 @@ export async function acceptCompanyTeamInviteAction(
       actorUserId: profileResult.profile.id,
       actorRole: profileResult.profile.role,
       targetType: "organization_invite",
-      targetId: data.invite_id,
+      targetId: acceptedInvite.inviteId,
       metadata: {
-        organization_id: data.organization_id,
-        member_id: data.member_id,
-        membership_role: data.membership_role,
-        acceptance_outcome: data.acceptance_outcome,
+        organization_id: acceptedInvite.organizationId,
+        member_id: acceptedInvite.memberId,
+        membership_role: acceptedInvite.membershipRole,
+        acceptance_outcome: acceptedInvite.acceptanceOutcome,
         ...requestFingerprint,
       },
     },

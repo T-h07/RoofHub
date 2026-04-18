@@ -2,6 +2,7 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+import { getCompanyAdminClient } from "@/lib/company/server-authorization";
 import type { Database, Tables } from "@/types/database";
 import { canReviewCompanyListingWorkflow } from "@/lib/company/permissions";
 
@@ -105,16 +106,19 @@ async function resolveViewerWorkflowRole(input: {
     return "admin";
   }
 
-  const { data, error } = await input.supabase.rpc("organization_active_member_role", {
-    p_organization_id: input.organizationId,
-    p_user_id: input.viewerId,
-  });
+  const { data, error } = await input.supabase
+    .from("organization_members")
+    .select("role, member_status")
+    .eq("organization_id", input.organizationId)
+    .eq("user_id", input.viewerId)
+    .eq("member_status", "active")
+    .maybeSingle();
 
   if (error || !data) {
     return null;
   }
 
-  return data;
+  return data.role;
 }
 
 export type CompanyListingWorkflowContextResult =
@@ -145,23 +149,16 @@ export async function loadCompanyListingWorkflowContextForViewer(
       ? Math.max(1, Math.min(64, Math.trunc(input.timelineLimit)))
       : 24;
 
-  const { data: listingRows, error: listingError } = await supabase.rpc(
-    "get_company_listing_workflow_listing",
-    {
-      p_listing_id: input.listingId,
-      p_viewer_user_id: input.viewerId,
-    }
-  );
+  const adminSupabase = getCompanyAdminClient();
+  const { data: listingRow, error: listingError } = await adminSupabase
+    .from("listings")
+    .select(
+      "id, owner_id, organization_id, created_by_user_id, assigned_agent_user_id, published_by_user_id, listing_status, title, slug, updated_at"
+    )
+    .eq("id", input.listingId)
+    .maybeSingle();
 
   if (listingError) {
-    if (listingError.code === "42501") {
-      return {
-        ok: false,
-        reason: "forbidden",
-        message: "Active company membership is required to access listing workflow.",
-      };
-    }
-
     return {
       ok: false,
       reason: "error",
@@ -169,7 +166,6 @@ export async function loadCompanyListingWorkflowContextForViewer(
     };
   }
 
-  const listingRow = (listingRows?.[0] ?? null) as WorkflowListingRow | null;
   if (!listingRow) {
     return {
       ok: false,
@@ -209,6 +205,19 @@ export async function loadCompanyListingWorkflowContextForViewer(
     };
   }
 
+  if (
+    !isCompanyWorkflowReviewer(viewerRole) &&
+    input.viewerId !== listingRow.created_by_user_id &&
+    input.viewerId !== listingRow.assigned_agent_user_id
+  ) {
+    return {
+      ok: false,
+      reason: "forbidden",
+      message:
+        "Listing workflow access is limited to reviewers, the listing creator, or the assigned agent.",
+    };
+  }
+
   const capabilities = resolveWorkflowCapabilities({
     status: listingRow.listing_status,
     role: viewerRole,
@@ -217,7 +226,7 @@ export async function loadCompanyListingWorkflowContextForViewer(
     assignedAgentUserId: listingRow.assigned_agent_user_id,
   });
 
-  const { data: timelineRows, error: timelineError } = await supabase
+  const { data: timelineRows, error: timelineError } = await adminSupabase
     .from("listing_workflow_events")
     .select(WORKFLOW_TIMELINE_SELECT)
     .eq("listing_id", listingRow.id)
@@ -234,7 +243,7 @@ export async function loadCompanyListingWorkflowContextForViewer(
 
   return {
     ok: true,
-    listing: listingRow,
+    listing: listingRow as WorkflowListingRow,
     viewerRole,
     capabilities,
     timeline: (timelineRows ?? []) as CompanyListingWorkflowTimelineEvent[],

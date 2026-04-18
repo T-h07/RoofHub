@@ -3,6 +3,60 @@ import type {
   OrganizationMemberStatus,
 } from "@/lib/company/team-types";
 
+export const COMPANY_PERMISSION_MATRIX = {
+  workspaceAccess: {
+    owner: true,
+    admin: true,
+    manager: true,
+    agent: true,
+  },
+  dashboardAccess: {
+    owner: true,
+    admin: true,
+    manager: true,
+    agent: true,
+  },
+  pendingQueueAccess: {
+    owner: true,
+    admin: true,
+    manager: true,
+    agent: false,
+  },
+  activityFeedAccess: {
+    owner: true,
+    admin: true,
+    manager: true,
+    agent: false,
+  },
+  profileEdit: {
+    owner: true,
+    admin: false,
+    manager: false,
+    agent: false,
+  },
+  listingWorkflowReview: {
+    owner: true,
+    admin: true,
+    manager: true,
+    agent: false,
+  },
+  listingWorkflowPublish: {
+    owner: true,
+    admin: true,
+    manager: true,
+    agent: false,
+  },
+  teamManagement: {
+    owner: true,
+    admin: true,
+    manager: false,
+    agent: false,
+  },
+} as const satisfies Record<
+  string,
+  Record<OrganizationMemberRole, boolean>
+>;
+
 const OWNER_ROLE_OPTIONS: ReadonlyArray<OrganizationMemberRole> = [
   "owner",
   "admin",
@@ -41,6 +95,17 @@ export function isActiveCompanyMemberStatus(status: OrganizationMemberStatus) {
   return status === "active";
 }
 
+function hasActiveCompanyPermission(
+  permission: keyof typeof COMPANY_PERMISSION_MATRIX,
+  role: OrganizationMemberRole,
+  status: OrganizationMemberStatus
+) {
+  return (
+    isActiveCompanyMemberStatus(status) &&
+    COMPANY_PERMISSION_MATRIX[permission][role]
+  );
+}
+
 export function isCompanyReviewerRole(role: OrganizationMemberRole) {
   return REVIEWER_ROLES.has(role);
 }
@@ -53,28 +118,56 @@ export function canManageCompanyTeam(
   role: OrganizationMemberRole,
   status: OrganizationMemberStatus
 ) {
-  return isActiveCompanyMemberStatus(status) && isCompanyTeamManagerRole(role);
+  return hasActiveCompanyPermission("teamManagement", role, status);
+}
+
+export function canAccessCompanyWorkspace(
+  role: OrganizationMemberRole,
+  status: OrganizationMemberStatus
+) {
+  return hasActiveCompanyPermission("workspaceAccess", role, status);
+}
+
+export function canAccessCompanyDashboard(
+  role: OrganizationMemberRole,
+  status: OrganizationMemberStatus
+) {
+  return hasActiveCompanyPermission("dashboardAccess", role, status);
 }
 
 export function canEditCompanyProfile(
   role: OrganizationMemberRole,
   status: OrganizationMemberStatus
 ) {
-  return isActiveCompanyMemberStatus(status) && role === "owner";
+  return hasActiveCompanyPermission("profileEdit", role, status);
 }
 
 export function canReviewCompanyListingWorkflow(
   role: OrganizationMemberRole,
   status: OrganizationMemberStatus
 ) {
-  return isActiveCompanyMemberStatus(status) && isCompanyReviewerRole(role);
+  return hasActiveCompanyPermission("listingWorkflowReview", role, status);
+}
+
+export function canPublishCompanyListingWorkflow(
+  role: OrganizationMemberRole,
+  status: OrganizationMemberStatus
+) {
+  return hasActiveCompanyPermission("listingWorkflowPublish", role, status);
+}
+
+export function canViewCompanyPendingQueue(
+  role: OrganizationMemberRole,
+  status: OrganizationMemberStatus
+) {
+  return hasActiveCompanyPermission("pendingQueueAccess", role, status);
 }
 
 export function canViewCompanyActivityFeed(
   role: OrganizationMemberRole,
   status: OrganizationMemberStatus
 ) {
-  return canReviewCompanyListingWorkflow(role, status);
+  return hasActiveCompanyPermission("activityFeedAccess", role, status);
 }
 
 export function canInviteOrganizationRole(

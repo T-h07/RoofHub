@@ -5,7 +5,7 @@ import { createHash } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { headers } from "next/headers";
 
-import { createServerSupabaseClient } from "@/lib/supabase";
+import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import type { Database, Enums, Json } from "@/types/database";
 
 const SENSITIVE_METADATA_KEY_PATTERN =
@@ -216,21 +216,21 @@ export function logSecurityDiagnostic(
 }
 
 export async function recordSecurityAuditEvent(input: RecordSecurityAuditEventInput) {
-  const supabase = input.supabase ?? (await createServerSupabaseClient());
+  const adminSupabase = createAdminSupabaseClient();
   const metadata = sanitizeSecurityMetadata(input.event.metadata);
 
-  const { error } = await supabase.rpc("log_security_audit_event", {
-    p_event_type: input.event.eventType,
-    p_target_type: input.event.targetType ?? undefined,
-    p_target_id: input.event.targetId ?? undefined,
-    p_listing_id: input.event.listingId ?? undefined,
-    p_conversation_id: input.event.conversationId ?? undefined,
-    p_report_id: input.event.reportId ?? undefined,
-    p_from_status: input.event.fromStatus ?? undefined,
-    p_to_status: input.event.toStatus ?? undefined,
-    p_actor_role: input.event.actorRole ?? undefined,
-    p_metadata: metadata,
-    p_actor_user_id: input.event.actorUserId ?? undefined,
+  const { error } = await adminSupabase.from("security_audit_events").insert({
+    event_type: input.event.eventType,
+    actor_user_id: input.event.actorUserId ?? undefined,
+    actor_role: input.event.actorRole ?? undefined,
+    target_type: input.event.targetType ?? undefined,
+    target_id: input.event.targetId ?? undefined,
+    listing_id: input.event.listingId ?? undefined,
+    conversation_id: input.event.conversationId ?? undefined,
+    report_id: input.event.reportId ?? undefined,
+    from_status: input.event.fromStatus ?? undefined,
+    to_status: input.event.toStatus ?? undefined,
+    metadata,
   });
 
   if (!error) {

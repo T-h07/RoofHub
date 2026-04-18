@@ -5,6 +5,7 @@ import { createHash } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { headers } from "next/headers";
 
+import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import type { Database } from "@/types/database";
 
 export type TrafficControlRule = {
@@ -314,8 +315,9 @@ export async function enforceTrafficControl(
 ): Promise<TrafficControlResult> {
   const actorKey = await buildActorFingerprint(input.identity);
   const bucket = normalizeBucket(input.rule.bucket);
+  const adminSupabase = createAdminSupabaseClient();
 
-  const { data, error } = await input.supabase.rpc("consume_rate_limit_token", {
+  const { data, error } = await adminSupabase.rpc("consume_rate_limit_token", {
     actor_key_input: actorKey,
     bucket_name: bucket,
     max_attempts: input.rule.maxAttempts,

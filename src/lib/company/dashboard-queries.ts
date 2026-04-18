@@ -8,14 +8,19 @@ import {
   canManageCompanyTeam,
   canReviewCompanyListingWorkflow,
   canViewCompanyActivityFeed,
+  canViewCompanyPendingQueue,
 } from "@/lib/company/permissions";
+import {
+  getCompanyAdminClient,
+  requireCurrentUserScopedCompanyAccess,
+} from "@/lib/company/server-authorization";
 
 import {
   mapCompanyActivityRows,
   type CompanyActivityItem,
   type CompanyActivityRpcRow,
 } from "./activity-feed";
-import { getCurrentUserCompanyContext, type CompanyMembershipSummary, type CompanyWorkspaceSummary } from "./context";
+import type { CompanyMembershipSummary, CompanyWorkspaceSummary } from "./context";
 
 type CompanyDashboardOverviewRpcRow =
   Database["public"]["Functions"]["get_company_dashboard_overview"]["Returns"][number];
@@ -115,29 +120,24 @@ export async function loadCompanyDashboardWorkspace(
   supabase: SupabaseClient<Database>,
   options?: LoadCompanyDashboardWorkspaceOptions
 ): Promise<LoadCompanyDashboardWorkspaceResult> {
-  const companyContextResult = await getCurrentUserCompanyContext(supabase);
+  const scopedAccess = await requireCurrentUserScopedCompanyAccess(supabase, {
+    permission: "dashboard",
+    selectionRequiredMessage:
+      "Select an active company workspace before opening the company dashboard.",
+    membershipRequiredMessage:
+      "An active company membership is required to open the company dashboard.",
+    forbiddenMessage: "You do not have permission to open this company dashboard.",
+  });
 
-  if (!companyContextResult.ok) {
-    return {
-      ok: false,
-      reason: "context_unavailable",
-      message: companyContextResult.message,
-    };
-  }
-
-  const membership = companyContextResult.company.activeMembership;
-  const organization = companyContextResult.company.activeOrganization;
-  if (!membership || !organization) {
+  if (!scopedAccess.ok) {
     return {
       ok: false,
       reason: "company_membership_required",
-      message:
-        companyContextResult.company.workspaceState === "selection_required"
-          ? "Select an active company workspace before opening the company dashboard."
-          : "An active company membership is required to open the company dashboard.",
+      message: scopedAccess.message,
     };
   }
 
+  const { profile, membership, organization } = scopedAccess;
   const reviewer = canReviewCompanyListingWorkflow(
     membership.role,
     membership.member_status
@@ -152,23 +152,28 @@ export async function loadCompanyDashboardWorkspace(
     membership.role,
     membership.member_status
   );
+  const canViewPendingQueue = canViewCompanyPendingQueue(
+    membership.role,
+    membership.member_status
+  );
+  const adminSupabase = getCompanyAdminClient();
 
   const [overviewRpcResult, pendingQueueRpcResult, activityRpcResult] = await Promise.all([
-    supabase.rpc("get_company_dashboard_overview", {
+    adminSupabase.rpc("get_company_dashboard_overview", {
       p_organization_id: organization.id,
-      p_viewer_user_id: companyContextResult.profile.id,
+      p_viewer_user_id: profile.id,
     }),
-    reviewer && pendingQueueLimit > 0
-      ? supabase.rpc("get_company_dashboard_pending_queue", {
+    canViewPendingQueue && pendingQueueLimit > 0
+      ? adminSupabase.rpc("get_company_dashboard_pending_queue", {
           p_organization_id: organization.id,
-          p_viewer_user_id: companyContextResult.profile.id,
+          p_viewer_user_id: profile.id,
           p_limit: pendingQueueLimit,
         })
       : Promise.resolve({ data: [], error: null }),
     canViewActivityFeed
-      ? supabase.rpc("get_company_dashboard_activity_feed", {
+      ? adminSupabase.rpc("get_company_dashboard_activity_feed", {
           p_organization_id: organization.id,
-          p_viewer_user_id: companyContextResult.profile.id,
+          p_viewer_user_id: profile.id,
           p_limit: activityLimit,
         })
       : Promise.resolve({ data: [], error: null }),
@@ -195,12 +200,12 @@ export async function loadCompanyDashboardWorkspace(
   return {
     ok: true,
     workspace: {
-      profile: companyContextResult.profile,
+      profile,
       organization,
       membership,
       overview,
       pendingReviewQueue,
-      pendingQueueUnavailableMessage: pendingQueueRpcResult.error
+      pendingQueueUnavailableMessage: canViewPendingQueue && pendingQueueRpcResult.error
         ? "Pending queue is temporarily unavailable."
         : null,
       activity,
