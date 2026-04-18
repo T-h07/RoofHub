@@ -666,6 +666,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          active_organization_id: string | null
           avatar_url: string | null
           bio: string | null
           contact_email: string | null
@@ -684,6 +685,7 @@ export type Database = {
           whatsapp_phone: string | null
         }
         Insert: {
+          active_organization_id?: string | null
           avatar_url?: string | null
           bio?: string | null
           contact_email?: string | null
@@ -702,6 +704,7 @@ export type Database = {
           whatsapp_phone?: string | null
         }
         Update: {
+          active_organization_id?: string | null
           avatar_url?: string | null
           bio?: string | null
           contact_email?: string | null
@@ -719,7 +722,15 @@ export type Database = {
           viber_phone?: string | null
           whatsapp_phone?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_active_organization_id_fkey"
+            columns: ["active_organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       security_audit_events: {
         Row: {

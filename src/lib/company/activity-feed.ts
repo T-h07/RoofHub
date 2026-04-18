@@ -180,6 +180,8 @@ export function getCompanyActivityEventLabel(eventType: string) {
       return "Member removed";
     case "organization.profile.updated":
       return "Company profile updated";
+    case "organization.workspace.selected":
+      return "Workspace selected";
     case "organization.logo.updated":
       return "Company logo updated";
     case "organization.logo.removed":

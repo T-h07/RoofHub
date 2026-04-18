@@ -3,11 +3,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { getCurrentUserProfile } from "@/lib/auth/profile";
-import {
-  createAdminSupabaseClient,
-  isMissingSupabaseAdminUrlError,
-  isMissingSupabaseServiceRoleError,
-} from "@/lib/supabase/admin";
+import { canEditCompanyProfile, canManageCompanyTeam } from "@/lib/company/permissions";
 import type { Database, Tables } from "@/types/database";
 
 export type CompanyWorkspaceSummary = Pick<
@@ -41,46 +37,40 @@ export type CompanyMembershipSummary = Pick<
   organization: CompanyWorkspaceSummary | null;
 };
 
-const ROLE_PRIORITY: Record<Tables<"organization_members">["role"], number> = {
-  owner: 1,
-  admin: 2,
-  manager: 3,
-  agent: 4,
+export type CompanyWorkspaceOption = {
+  organization: CompanyWorkspaceSummary;
+  membership: CompanyMembershipSummary;
+  isActive: boolean;
+  isOwner: boolean;
+  canManageTeam: boolean;
+  canEditProfile: boolean;
 };
 
-function sortMembershipByRolePriority(left: CompanyMembershipSummary, right: CompanyMembershipSummary) {
-  const leftPriority = ROLE_PRIORITY[left.role] ?? 99;
-  const rightPriority = ROLE_PRIORITY[right.role] ?? 99;
-  return leftPriority - rightPriority;
-}
+export type CompanyWorkspaceState = "no_membership" | "selection_required" | "resolved";
 
-type CompanyMembershipContext =
-  | {
-      ok: true;
-      memberships: CompanyMembershipSummary[];
-      activeMemberships: CompanyMembershipSummary[];
-      primaryMembership: CompanyMembershipSummary | null;
-      primaryOrganization: CompanyWorkspaceSummary | null;
-      ownerMembership: CompanyMembershipSummary | null;
-      ownerOrganization: CompanyWorkspaceSummary | null;
-      managementMembership: CompanyMembershipSummary | null;
-      managementOrganization: CompanyWorkspaceSummary | null;
-      hasMembership: boolean;
-      ownsWorkspace: boolean;
-      activeRole: Tables<"organization_members">["role"] | null;
-      canManageTeam: boolean;
-    }
-  | {
-      ok: false;
-      message: string;
-    };
+export type CompanyMembershipContext = {
+  ok: true;
+  memberships: CompanyMembershipSummary[];
+  activeMemberships: CompanyMembershipSummary[];
+  workspaceOptions: CompanyWorkspaceOption[];
+  workspaceState: CompanyWorkspaceState;
+  activeOrganizationId: string | null;
+  activeOrganization: CompanyWorkspaceSummary | null;
+  activeMembership: CompanyMembershipSummary | null;
+  hasMembership: boolean;
+  hasOwnedWorkspace: boolean;
+  hasResolvedWorkspace: boolean;
+  activeRole: Tables<"organization_members">["role"] | null;
+  canManageTeam: boolean;
+  canEditProfile: boolean;
+};
 
-type CurrentUserCompanyContextResult =
+export type CurrentUserCompanyContextResult =
   | {
       ok: true;
       userId: string;
       profile: Tables<"profiles">;
-      company: Extract<CompanyMembershipContext, { ok: true }>;
+      company: CompanyMembershipContext;
     }
   | {
       ok: false;
@@ -88,18 +78,49 @@ type CurrentUserCompanyContextResult =
     };
 
 type OrganizationMembershipQueryRow = Omit<CompanyMembershipSummary, "organization">;
-type OrganizationProfileQueryRow = Partial<CompanyWorkspaceSummary>;
+type OrganizationProfileQueryRow = CompanyWorkspaceSummary;
 
-type QueryErrorLike = {
-  message?: string;
+const MEMBERSHIP_SELECT =
+  "id, organization_id, user_id, role, member_status, joined_at, created_at, updated_at, invited_by_user_id";
+const ORGANIZATION_SELECT =
+  "id, name, slug, description, logo_path, contact_email, contact_phone, website_url, coverage_area, status, created_at, updated_at";
+
+const ROLE_PRIORITY: Record<Tables<"organization_members">["role"], number> = {
+  owner: 1,
+  admin: 2,
+  manager: 3,
+  agent: 4,
 };
 
-const ORGANIZATION_PROFILE_SELECT_FULL =
-  "id, name, slug, description, logo_path, contact_email, contact_phone, website_url, coverage_area, status, created_at, updated_at";
-const ORGANIZATION_PROFILE_SELECT_LEGACY =
-  "id, name, slug, description, logo_path, status, created_at, updated_at";
-const MEMBERSHIP_SELECT_BASE =
-  "id, organization_id, user_id, role, member_status, joined_at, created_at, updated_at";
+function sortMemberships(left: CompanyMembershipSummary, right: CompanyMembershipSummary) {
+  const roleDelta = (ROLE_PRIORITY[left.role] ?? 99) - (ROLE_PRIORITY[right.role] ?? 99);
+  if (roleDelta !== 0) {
+    return roleDelta;
+  }
+
+  return left.organization?.name.localeCompare(right.organization?.name ?? "", undefined, {
+    sensitivity: "base",
+  }) ?? 0;
+}
+
+function buildEmptyCompanyMembershipContext(): CompanyMembershipContext {
+  return {
+    ok: true,
+    memberships: [],
+    activeMemberships: [],
+    workspaceOptions: [],
+    workspaceState: "no_membership",
+    activeOrganizationId: null,
+    activeOrganization: null,
+    activeMembership: null,
+    hasMembership: false,
+    hasOwnedWorkspace: false,
+    hasResolvedWorkspace: false,
+    activeRole: null,
+    canManageTeam: false,
+    canEditProfile: false,
+  };
+}
 
 function isMissingOrganizationProfileColumnsError(message: string | undefined) {
   if (!message) {
@@ -116,316 +137,139 @@ function isMissingOrganizationProfileColumnsError(message: string | undefined) {
   );
 }
 
-function normalizeOrganizationSummary(
-  organization: OrganizationProfileQueryRow | null
-): CompanyWorkspaceSummary | null {
-  if (!organization) {
-    return null;
-  }
+async function persistActiveOrganizationId(
+  supabase: SupabaseClient<Database>,
+  input: { userId: string; organizationId: string | null }
+) {
+  const { error } = await supabase
+    .from("profiles")
+    .update({ active_organization_id: input.organizationId })
+    .eq("id", input.userId);
 
-  if (
-    !organization.id ||
-    !organization.name ||
-    !organization.slug ||
-    !organization.status ||
-    !organization.created_at ||
-    !organization.updated_at
-  ) {
-    return null;
-  }
-
-  return {
-    id: organization.id,
-    name: organization.name,
-    slug: organization.slug,
-    description: organization.description ?? null,
-    logo_path: organization.logo_path ?? null,
-    contact_email: organization.contact_email ?? null,
-    contact_phone: organization.contact_phone ?? null,
-    website_url: organization.website_url ?? null,
-    coverage_area: organization.coverage_area ?? null,
-    status: organization.status,
-    created_at: organization.created_at,
-    updated_at: organization.updated_at,
-  };
+  return !error;
 }
 
-function normalizeCompanyMembershipRows(
-  rows: OrganizationMembershipQueryRow[],
-  organizationsById: Map<string, CompanyWorkspaceSummary>
-) {
-  return rows.map((row) => ({
+async function loadResolvedCompanyMembershipContext(
+  supabase: SupabaseClient<Database>,
+  profile: Tables<"profiles">
+): Promise<CompanyMembershipContext | { ok: false; message: string }> {
+  const membershipQuery = await supabase
+    .from("organization_members")
+    .select(MEMBERSHIP_SELECT)
+    .eq("user_id", profile.id)
+    .order("created_at", { ascending: true });
+
+  if (membershipQuery.error) {
+    return {
+      ok: false,
+      message: "Company workspace context could not be loaded.",
+    };
+  }
+
+  const membershipRows = (membershipQuery.data ?? []) as OrganizationMembershipQueryRow[];
+  const organizationIds = [...new Set(membershipRows.map((row) => row.organization_id))];
+
+  let organizationRows: OrganizationProfileQueryRow[] = [];
+  if (organizationIds.length > 0) {
+    const organizationQuery = await supabase
+      .from("organizations")
+      .select(ORGANIZATION_SELECT)
+      .in("id", organizationIds);
+
+    if (organizationQuery.error) {
+      return {
+        ok: false,
+        message: isMissingOrganizationProfileColumnsError(organizationQuery.error.message)
+          ? "Company workspace schema is out of date. Apply the latest Supabase migrations and retry."
+          : "Company workspace context could not be loaded.",
+      };
+    }
+
+    organizationRows = (organizationQuery.data ?? []) as OrganizationProfileQueryRow[];
+  }
+
+  const organizationsById = new Map<string, CompanyWorkspaceSummary>(
+    organizationRows.map((organization) => [organization.id, organization])
+  );
+
+  const memberships = membershipRows.map((row) => ({
     ...row,
     invited_by_user_id: row.invited_by_user_id ?? null,
     organization: organizationsById.get(row.organization_id) ?? null,
   }));
-}
 
-function buildEmptyCompanyMembershipContext(): Extract<CompanyMembershipContext, { ok: true }> {
-  return {
-    ok: true,
-    memberships: [],
-    activeMemberships: [],
-    primaryMembership: null,
-    primaryOrganization: null,
-    ownerMembership: null,
-    ownerOrganization: null,
-    managementMembership: null,
-    managementOrganization: null,
-    hasMembership: false,
-    ownsWorkspace: false,
-    activeRole: null,
-    canManageTeam: false,
-  };
-}
+  const activeMemberships = memberships
+    .filter(
+      (membership) =>
+        membership.member_status === "active" && membership.organization?.status === "active"
+    )
+    .sort(sortMemberships);
 
-function isRecoverableMembershipQueryError(message: string | undefined) {
-  if (!message) {
-    return false;
-  }
-
-  const normalized = message.toLowerCase();
-  return (
-    normalized.includes("row-level security") ||
-    normalized.includes("permission denied") ||
-    normalized.includes("policy") ||
-    normalized.includes("infinite recursion")
-  );
-}
-
-async function canUseAdminFallbackForUser(
-  supabase: SupabaseClient<Database>,
-  userId: string
-) {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  return user?.id === userId;
-}
-
-async function loadMembershipRowsWithAdminFallback(
-  userId: string
-): Promise<
-  | { ok: true; rows: OrganizationMembershipQueryRow[] }
-  | { ok: false }
-> {
-  try {
-    const adminSupabase = createAdminSupabaseClient();
-    const membershipQuery = await adminSupabase
-      .from("organization_members")
-      .select(`${MEMBERSHIP_SELECT_BASE}, invited_by_user_id`)
-      .eq("user_id", userId)
-      .order("created_at", { ascending: true });
-
-    if (membershipQuery.error) {
-      return { ok: false };
+  if (activeMemberships.length === 0) {
+    if (profile.active_organization_id !== null) {
+      await persistActiveOrganizationId(supabase, {
+        userId: profile.id,
+        organizationId: null,
+      });
     }
 
-    return {
-      ok: true,
-      rows: (membershipQuery.data ?? []) as OrganizationMembershipQueryRow[],
-    };
-  } catch (error) {
-    if (isMissingSupabaseServiceRoleError(error) || isMissingSupabaseAdminUrlError(error)) {
-      return { ok: false };
-    }
-
-    return { ok: false };
-  }
-}
-
-async function loadOrganizationRowsWithAdminFallback(
-  organizationIds: string[],
-  selectClause: string
-): Promise<
-  | { ok: true; rows: OrganizationProfileQueryRow[] }
-  | { ok: false; error: QueryErrorLike | null }
-> {
-  if (organizationIds.length === 0) {
-    return {
-      ok: true,
-      rows: [],
-    };
+    return buildEmptyCompanyMembershipContext();
   }
 
-  try {
-    const adminSupabase = createAdminSupabaseClient();
-    const query = await adminSupabase
-      .from("organizations")
-      .select(selectClause)
-      .in("id", organizationIds);
-
-    if (query.error) {
-      return {
-        ok: false,
-        error: query.error,
-      };
-    }
-
-    return {
-      ok: true,
-      rows: (query.data ?? []) as OrganizationProfileQueryRow[],
-    };
-  } catch (error) {
-    if (isMissingSupabaseServiceRoleError(error) || isMissingSupabaseAdminUrlError(error)) {
-      return {
-        ok: false,
-        error: null,
-      };
-    }
-
-    return {
-      ok: false,
-      error: null,
-    };
-  }
-}
-
-export async function getCompanyMembershipContextForUser(
-  supabase: SupabaseClient<Database>,
-  userId: string
-): Promise<CompanyMembershipContext> {
-  const directMembershipQuery = await supabase
-    .from("organization_members")
-    .select(`${MEMBERSHIP_SELECT_BASE}, invited_by_user_id`)
-    .eq("user_id", userId)
-    .order("created_at", { ascending: true });
-
-  let selectedRows = (directMembershipQuery.data ?? []) as OrganizationMembershipQueryRow[];
-
-  if (directMembershipQuery.error) {
-    const canUseAdminFallback =
-      isRecoverableMembershipQueryError(directMembershipQuery.error.message) &&
-      (await canUseAdminFallbackForUser(supabase, userId));
-
-    if (canUseAdminFallback) {
-      const adminFallback = await loadMembershipRowsWithAdminFallback(userId);
-      if (adminFallback.ok) {
-        selectedRows = adminFallback.rows;
-      } else {
-        return {
-          ok: false,
-          message: "Company workspace context could not be loaded.",
-        };
-      }
-    } else {
-      return {
-        ok: false,
-        message: "Company workspace context could not be loaded.",
-      };
-    }
-  }
-
-  const organizationIds = [...new Set(selectedRows.map((row) => row.organization_id))];
-  let organizationRows: OrganizationProfileQueryRow[] = [];
-  let organizationError: QueryErrorLike | null = null;
-
-  if (organizationIds.length > 0) {
-    const fullQuery = await supabase
-      .from("organizations")
-      .select(ORGANIZATION_PROFILE_SELECT_FULL)
-      .in("id", organizationIds);
-
-    organizationRows = (fullQuery.data ?? []) as OrganizationProfileQueryRow[];
-    organizationError = fullQuery.error;
-  }
-
-  if (
-    organizationError &&
-    isMissingOrganizationProfileColumnsError(organizationError.message)
-  ) {
-    const legacyQuery = await supabase
-      .from("organizations")
-      .select(ORGANIZATION_PROFILE_SELECT_LEGACY)
-      .in("id", organizationIds);
-
-    organizationRows = (legacyQuery.data ?? []) as OrganizationProfileQueryRow[];
-    organizationError = legacyQuery.error;
-  }
-
-  if (organizationError) {
-    const canUseAdminFallback = await canUseAdminFallbackForUser(supabase, userId);
-
-    if (canUseAdminFallback) {
-      const fullFallback = await loadOrganizationRowsWithAdminFallback(
-        organizationIds,
-        ORGANIZATION_PROFILE_SELECT_FULL
-      );
-
-      if (fullFallback.ok) {
-        organizationRows = fullFallback.rows;
-        organizationError = null;
-      } else if (
-        isMissingOrganizationProfileColumnsError(fullFallback.error?.message)
-      ) {
-        const legacyFallback = await loadOrganizationRowsWithAdminFallback(
-          organizationIds,
-          ORGANIZATION_PROFILE_SELECT_LEGACY
-        );
-
-        if (legacyFallback.ok) {
-          organizationRows = legacyFallback.rows;
-          organizationError = null;
-        } else {
-          organizationError = legacyFallback.error;
-        }
-      }
-    }
-  }
-
-  if (organizationError) {
-    return {
-      ok: false,
-      message:
-        isMissingOrganizationProfileColumnsError(organizationError.message)
-          ? "Company workspace schema is out of date. Apply the latest Supabase migrations and retry."
-          : "Company workspace context could not be loaded.",
-    };
-  }
-
-  const organizationsById = new Map<string, CompanyWorkspaceSummary>();
-  for (const organizationRow of organizationRows) {
-    const organization = normalizeOrganizationSummary(organizationRow);
-    if (organization) {
-      organizationsById.set(organization.id, organization);
-    }
-  }
-
-  const memberships = normalizeCompanyMembershipRows(
-    selectedRows,
-    organizationsById
-  );
-  const activeMemberships = memberships.filter(
-    (membership) =>
-      membership.member_status === "active" && membership.organization?.status === "active"
-  );
-  const sortedActiveMemberships = [...activeMemberships].sort(sortMembershipByRolePriority);
-  const primaryMembership = sortedActiveMemberships[0] ?? null;
-  const primaryOrganization = primaryMembership?.organization ?? null;
-  const ownerMembership =
-    activeMemberships.find((membership) => membership.role === "owner") ?? null;
-  const ownerOrganization = ownerMembership?.organization ?? null;
-  const managementMembership =
+  let activeMembership =
     activeMemberships.find(
-      (membership) => membership.role === "owner" || membership.role === "admin"
+      (membership) => membership.organization_id === profile.active_organization_id
     ) ?? null;
-  const managementOrganization = managementMembership?.organization ?? null;
+
+  if (!activeMembership && activeMemberships.length === 1) {
+    activeMembership = activeMemberships[0] ?? null;
+    if (profile.active_organization_id !== activeMembership.organization_id) {
+      await persistActiveOrganizationId(supabase, {
+        userId: profile.id,
+        organizationId: activeMembership.organization_id,
+      });
+    }
+  }
+
+  if (!activeMembership && profile.active_organization_id !== null) {
+    await persistActiveOrganizationId(supabase, {
+      userId: profile.id,
+      organizationId: null,
+    });
+  }
+
+  const workspaceOptions = activeMemberships
+    .filter((membership): membership is CompanyMembershipSummary & { organization: CompanyWorkspaceSummary } =>
+      membership.organization !== null
+    )
+    .map((membership) => ({
+      organization: membership.organization,
+      membership,
+      isActive: membership.organization_id === activeMembership?.organization_id,
+      isOwner: membership.role === "owner",
+      canManageTeam: canManageCompanyTeam(membership.role, membership.member_status),
+      canEditProfile: canEditCompanyProfile(membership.role, membership.member_status),
+    }));
 
   return {
     ok: true,
     memberships,
     activeMemberships,
-    primaryMembership,
-    primaryOrganization,
-    ownerMembership,
-    ownerOrganization,
-    managementMembership,
-    managementOrganization,
-    hasMembership: activeMemberships.length > 0,
-    ownsWorkspace: Boolean(ownerMembership),
-    activeRole: primaryMembership?.role ?? null,
-    canManageTeam: Boolean(managementMembership),
+    workspaceOptions,
+    workspaceState: activeMembership ? "resolved" : "selection_required",
+    activeOrganizationId: activeMembership?.organization_id ?? null,
+    activeOrganization: activeMembership?.organization ?? null,
+    activeMembership,
+    hasMembership: true,
+    hasOwnedWorkspace: activeMemberships.some((membership) => membership.role === "owner"),
+    hasResolvedWorkspace: Boolean(activeMembership),
+    activeRole: activeMembership?.role ?? null,
+    canManageTeam: activeMembership
+      ? canManageCompanyTeam(activeMembership.role, activeMembership.member_status)
+      : false,
+    canEditProfile: activeMembership
+      ? canEditCompanyProfile(activeMembership.role, activeMembership.member_status)
+      : false,
   };
 }
 
@@ -441,21 +285,9 @@ export async function getCurrentUserCompanyContext(
     };
   }
 
-  const companyContext = await getCompanyMembershipContextForUser(
-    supabase,
-    profileResult.profile.id
-  );
+  const companyContext = await loadResolvedCompanyMembershipContext(supabase, profileResult.profile);
 
   if (!companyContext.ok) {
-    if (profileResult.profile.provider_account_type !== "company") {
-      return {
-        ok: true,
-        userId: profileResult.profile.id,
-        profile: profileResult.profile,
-        company: buildEmptyCompanyMembershipContext(),
-      };
-    }
-
     return companyContext;
   }
 

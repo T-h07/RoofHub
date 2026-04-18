@@ -19,6 +19,16 @@ export const COMPANY_WORKSPACE_CREATE_IDLE_STATE: CompanyWorkspaceCreateActionSt
   status: "idle",
 };
 
+export type CompanyWorkspaceSelectionActionState = {
+  status: "idle" | "error" | "success";
+  message?: string;
+  redirectTo?: string;
+};
+
+export const COMPANY_WORKSPACE_SELECTION_IDLE_STATE: CompanyWorkspaceSelectionActionState = {
+  status: "idle",
+};
+
 export type CompanyProfileFieldName =
   | "name"
   | "description"

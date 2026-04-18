@@ -2,7 +2,7 @@ import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-import { getCompanyMembershipContextForUser } from "@/lib/company/context";
+import { getCurrentUserCompanyContext, type CompanyMembershipContext } from "@/lib/company/context";
 import type { Database, Tables } from "@/types/database";
 
 export type ListingOwnershipMode = "individual" | "company";
@@ -15,6 +15,11 @@ export type ProviderListingCreationContext = {
   organizationName: string | null;
   organizationSlug: string | null;
 };
+
+type ProviderListingCreationFailureReason =
+  | "company_context_unavailable"
+  | "company_workspace_required"
+  | "company_workspace_selection_required";
 
 export function getListingOwnershipMode(input: {
   organization_id: string | null;
@@ -35,10 +40,13 @@ export async function resolveProviderListingCreationContext(
   | {
       ok: true;
       context: ProviderListingCreationContext;
+      company: CompanyMembershipContext | null;
     }
   | {
       ok: false;
+      reason: ProviderListingCreationFailureReason;
       message: string;
+      company: CompanyMembershipContext | null;
     }
 > {
   if (profile.provider_account_type !== "company") {
@@ -50,31 +58,45 @@ export async function resolveProviderListingCreationContext(
         organizationName: null,
         organizationSlug: null,
       },
+      company: null,
     };
   }
 
-  const companyContextResult = await getCompanyMembershipContextForUser(supabase, profile.id);
+  const companyContextResult = await getCurrentUserCompanyContext(supabase);
 
   if (!companyContextResult.ok) {
     return {
       ok: false,
+      reason: "company_context_unavailable",
       message: companyContextResult.message,
+      company: null,
     };
   }
 
-  const primaryMembership = companyContextResult.primaryMembership;
-  const primaryOrganization = companyContextResult.primaryOrganization;
+  if (companyContextResult.company.workspaceState === "selection_required") {
+    return {
+      ok: false,
+      reason: "company_workspace_selection_required",
+      message: "Select an active company workspace before creating or managing company-owned listings.",
+      company: companyContextResult.company,
+    };
+  }
+
+  const activeMembership = companyContextResult.company.activeMembership;
+  const activeOrganization = companyContextResult.company.activeOrganization;
 
   if (
-    !primaryMembership ||
-    primaryMembership.member_status !== "active" ||
-    !primaryOrganization ||
-    primaryOrganization.status !== "active"
+    !activeMembership ||
+    activeMembership.member_status !== "active" ||
+    !activeOrganization ||
+    activeOrganization.status !== "active"
   ) {
     return {
       ok: false,
+      reason: "company_workspace_required",
       message:
-        "Company provider mode requires an active company membership before creating listings.",
+        "Company provider mode requires an active company workspace before creating listings.",
+      company: companyContextResult.company,
     };
   }
 
@@ -82,9 +104,10 @@ export async function resolveProviderListingCreationContext(
     ok: true,
     context: {
       ownershipMode: "company",
-      organizationId: primaryOrganization.id,
-      organizationName: primaryOrganization.name,
-      organizationSlug: primaryOrganization.slug,
+      organizationId: activeOrganization.id,
+      organizationName: activeOrganization.name,
+      organizationSlug: activeOrganization.slug,
     },
+    company: companyContextResult.company,
   };
 }

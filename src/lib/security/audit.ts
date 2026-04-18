@@ -35,6 +35,7 @@ export const AUDIT_EVENT_TYPES = {
   profileRoleChanged: "profile.role.changed",
   organizationWorkspaceCreated: "organization.workspace.created",
   organizationWorkspaceCreateFailed: "organization.workspace.create_failed",
+  organizationWorkspaceSelected: "organization.workspace.selected",
   organizationProfileUpdated: "organization.profile.updated",
   organizationProfileUpdateFailed: "organization.profile.update_failed",
   organizationLogoUpdated: "organization.logo.updated",

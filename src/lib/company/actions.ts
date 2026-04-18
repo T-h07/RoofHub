@@ -3,9 +3,13 @@
 import { revalidatePath } from "next/cache";
 
 import { getCurrentUserProfile } from "@/lib/auth/profile";
+import { getSafeRedirectPath } from "@/lib/auth/routing";
+import { getCurrentUserCompanyContext } from "@/lib/company/context";
 import {
   COMPANY_WORKSPACE_CREATE_IDLE_STATE,
+  COMPANY_WORKSPACE_SELECTION_IDLE_STATE,
   type CompanyWorkspaceCreateActionState,
+  type CompanyWorkspaceSelectionActionState,
 } from "@/lib/company/types";
 import { readCompanyWorkspaceInput, validateCompanyWorkspaceInput } from "@/lib/company/validation";
 import {
@@ -251,6 +255,7 @@ async function createCompanyWorkspaceWithAdminBootstrap(
     .update({
       role: "provider",
       provider_account_type: "company",
+      active_organization_id: createdOrganization.id,
     })
     .eq("id", context.userId);
 
@@ -264,6 +269,104 @@ async function createCompanyWorkspaceWithAdminBootstrap(
     organization_id: createdOrganization.id,
     organization_slug: createdOrganization.slug,
     owner_member_id: ownerMembership.id,
+  };
+}
+
+function revalidateCompanyWorkspacePaths(organizationSlug?: string | null) {
+  revalidatePath("/", "layout");
+  revalidatePath("/profile");
+  revalidatePath("/profile/company");
+  revalidatePath("/profile/company/edit");
+  revalidatePath("/profile/company/team");
+  revalidatePath("/dashboard");
+  revalidatePath("/dashboard/listings");
+  revalidatePath("/dashboard/listings/new");
+  revalidatePath("/dashboard/activity");
+
+  if (organizationSlug) {
+    revalidatePath(`/companies/${organizationSlug}`);
+  }
+
+  revalidatePath("/companies/[slug]", "page");
+}
+
+export async function setActiveCompanyWorkspaceAction(
+  previousState: CompanyWorkspaceSelectionActionState = COMPANY_WORKSPACE_SELECTION_IDLE_STATE,
+  formData: FormData
+): Promise<CompanyWorkspaceSelectionActionState> {
+  void previousState;
+
+  const organizationIdEntry = formData.get("organizationId");
+  const nextPathEntry = formData.get("nextPath");
+  const organizationId = typeof organizationIdEntry === "string" ? organizationIdEntry.trim() : "";
+  const nextPath = typeof nextPathEntry === "string" ? nextPathEntry : null;
+
+  if (!organizationId) {
+    return {
+      status: "error",
+      message: "Choose a company workspace before continuing.",
+    };
+  }
+
+  const supabase = await createServerSupabaseClient();
+  const companyContextResult = await getCurrentUserCompanyContext(supabase);
+
+  if (!companyContextResult.ok) {
+    return {
+      status: "error",
+      message: companyContextResult.message,
+    };
+  }
+
+  const selectedWorkspace = companyContextResult.company.workspaceOptions.find(
+    (option) => option.organization.id === organizationId
+  );
+
+  if (!selectedWorkspace) {
+    return {
+      status: "error",
+      message: "This workspace is not available for the current account.",
+    };
+  }
+
+  const { error } = await supabase
+    .from("profiles")
+    .update({
+      active_organization_id: selectedWorkspace.organization.id,
+    })
+    .eq("id", companyContextResult.profile.id);
+
+  if (error) {
+    return {
+      status: "error",
+      message:
+        error.message.toLowerCase().includes("active_organization_id")
+          ? "Company workspace schema is out of date. Apply the latest Supabase migrations and retry."
+          : "Active company workspace could not be updated. Please retry.",
+    };
+  }
+
+  await recordSecurityAuditEvent({
+    supabase,
+    event: {
+      eventType: AUDIT_EVENT_TYPES.organizationWorkspaceSelected,
+      actorUserId: companyContextResult.profile.id,
+      actorRole: companyContextResult.profile.role,
+      targetType: "organization",
+      targetId: selectedWorkspace.organization.id,
+      metadata: {
+        organization_slug: selectedWorkspace.organization.slug,
+        membership_role: selectedWorkspace.membership.role,
+      },
+    },
+  });
+
+  revalidateCompanyWorkspacePaths(selectedWorkspace.organization.slug);
+
+  return {
+    status: "success",
+    message: `${selectedWorkspace.organization.name} is now your active company workspace.`,
+    redirectTo: getSafeRedirectPath(nextPath, "/profile/company"),
   };
 }
 
@@ -446,14 +549,7 @@ export async function createCompanyWorkspaceAction(
     },
   });
 
-  revalidatePath("/", "layout");
-  revalidatePath("/profile");
-  revalidatePath("/profile/company");
-  revalidatePath("/profile/company/edit");
-  revalidatePath("/dashboard");
-  revalidatePath("/dashboard/listings");
-  revalidatePath(`/companies/${workspaceData.organization_slug}`);
-  revalidatePath("/companies/[slug]", "page");
+  revalidateCompanyWorkspacePaths(workspaceData.organization_slug);
 
   return {
     status: "success",

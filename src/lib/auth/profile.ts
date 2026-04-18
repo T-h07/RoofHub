@@ -8,7 +8,7 @@ import {
 import type { Database, Tables } from "@/types/database";
 
 const PROFILE_SELECT =
-  "id, role, provider_account_type, display_name, avatar_url, phone, bio, preferred_contact_method, contact_methods, contact_email, whatsapp_phone, viber_phone, created_at, updated_at";
+  "id, role, provider_account_type, active_organization_id, display_name, avatar_url, phone, bio, preferred_contact_method, contact_methods, contact_email, whatsapp_phone, viber_phone, created_at, updated_at";
 const PROVIDER_COMPATIBLE_PROFILE_SELECT =
   "id, role, display_name, avatar_url, phone, bio, preferred_contact_method, contact_methods, contact_email, whatsapp_phone, viber_phone, created_at, updated_at";
 const LEGACY_PROFILE_SELECT =
@@ -17,6 +17,7 @@ const LEGACY_PROFILE_SELECT =
 export type AppProfile = Tables<"profiles">;
 type LegacyAppProfileRow = Omit<AppProfile, "contact_methods">;
 type CompatibleAppProfileRow = LegacyAppProfileRow & {
+  active_organization_id?: string | null;
   contact_methods?: unknown;
   provider_account_type?: unknown;
 };
@@ -143,6 +144,10 @@ function normalizeProfileRow(row: CompatibleAppProfileRow): AppProfile {
 
   return {
     ...row,
+    active_organization_id:
+      typeof row.active_organization_id === "string" && row.active_organization_id.length > 0
+        ? row.active_organization_id
+        : null,
     provider_account_type: isProviderAccountType(row.provider_account_type)
       ? row.provider_account_type
       : "individual",
@@ -191,36 +196,39 @@ async function fetchProfileByUserId(
       normalize: (row) => normalizeProfileRow(row as CompatibleAppProfileRow),
     },
     {
-      id: "provider_compatible",
-      select: PROVIDER_COMPATIBLE_PROFILE_SELECT,
-      normalize: (row) =>
-        normalizeProfileRow({
-          ...(row as CompatibleAppProfileRow),
-          provider_account_type: "individual",
-        }),
+        id: "provider_compatible",
+        select: PROVIDER_COMPATIBLE_PROFILE_SELECT,
+        normalize: (row) =>
+          normalizeProfileRow({
+            ...(row as CompatibleAppProfileRow),
+            active_organization_id: null,
+            provider_account_type: "individual",
+          }),
     },
     {
       id: "channel_compatible",
       select:
         "id, role, display_name, avatar_url, phone, bio, preferred_contact_method, contact_methods, created_at, updated_at",
-      normalize: (row) =>
-        normalizeProfileRow({
-          ...(row as CompatibleAppProfileRow),
-          provider_account_type: "individual",
-          contact_email: null,
-          whatsapp_phone: null,
+        normalize: (row) =>
+          normalizeProfileRow({
+            ...(row as CompatibleAppProfileRow),
+            active_organization_id: null,
+            provider_account_type: "individual",
+            contact_email: null,
+            whatsapp_phone: null,
           viber_phone: null,
         }),
     },
     {
       id: "legacy",
       select: LEGACY_PROFILE_SELECT,
-      normalize: (row) =>
-        normalizeProfileRow({
-          ...(row as CompatibleAppProfileRow),
-          provider_account_type: "individual",
-          contact_email: null,
-          whatsapp_phone: null,
+        normalize: (row) =>
+          normalizeProfileRow({
+            ...(row as CompatibleAppProfileRow),
+            active_organization_id: null,
+            provider_account_type: "individual",
+            contact_email: null,
+            whatsapp_phone: null,
           viber_phone: null,
         }),
     },
