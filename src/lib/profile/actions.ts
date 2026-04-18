@@ -260,45 +260,26 @@ export async function updateProfileAction(
   const normalizedViberPhone =
     input.viberPhone ?? (normalizedContactMethods.includes("viber") ? input.phone : null);
 
-  const baseUpdatePayload = {
+  const extendedUpdatePayload = {
     display_name: input.displayName,
     bio: input.bio,
     phone: input.phone,
     preferred_contact_method: normalizedPreferredContactMethod,
     provider_account_type: nextProviderAccountType,
     role: nextRole,
-  };
-  const extendedUpdatePayload = {
-    ...baseUpdatePayload,
     contact_methods: normalizedContactMethods,
     contact_email: input.contactEmail,
     whatsapp_phone: normalizedWhatsappPhone,
     viber_phone: normalizedViberPhone,
   };
 
-  let { data: updatedProfile, error } = await supabase
+  const { data: updatedProfile, error } = await supabase
     .from("profiles")
     .update(extendedUpdatePayload)
     .eq("id", currentProfile.id)
     .select("id")
     .limit(1)
     .maybeSingle();
-
-  let usedLegacyContactFallback = false;
-
-  if (error && isMissingContactColumnsError(error.message)) {
-    const legacyUpdateResult = await supabase
-      .from("profiles")
-      .update(baseUpdatePayload)
-      .eq("id", currentProfile.id)
-      .select("id")
-      .limit(1)
-      .maybeSingle();
-
-    updatedProfile = legacyUpdateResult.data;
-    error = legacyUpdateResult.error;
-    usedLegacyContactFallback = !legacyUpdateResult.error;
-  }
 
   if (error) {
     return {
@@ -336,9 +317,7 @@ export async function updateProfileAction(
 
   return {
     status: "success",
-    message: usedLegacyContactFallback
-      ? "Profile basics saved. Apply latest migrations to persist extended contact channels."
-      : "Profile saved successfully.",
+    message: "Profile saved successfully.",
   };
 }
 

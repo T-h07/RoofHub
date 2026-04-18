@@ -217,41 +217,20 @@ export async function updateCompanyProfileAction(
     return toTrafficErrorState(trafficResult);
   }
 
-  const baseUpdatePayload = {
-    name: input.name,
-    description: input.description,
-  };
-  const extendedUpdatePayload = {
-    ...baseUpdatePayload,
+  const { data: updatedOrganization, error } = await supabase
+    .from("organizations")
+    .update({
+      name: input.name,
+      description: input.description,
     contact_email: input.contactEmail,
     contact_phone: input.contactPhone,
     website_url: input.websiteUrl,
     coverage_area: input.coverageArea,
-  };
-
-  let { data: updatedOrganization, error } = await supabase
-    .from("organizations")
-    .update(extendedUpdatePayload)
+    })
     .eq("id", ownerContext.organization.id)
     .select("id")
     .limit(1)
     .maybeSingle();
-
-  let usedLegacyContactFallback = false;
-
-  if (error && isMissingCompanyProfileColumnsError(error.message)) {
-    const legacyUpdateResult = await supabase
-      .from("organizations")
-      .update(baseUpdatePayload)
-      .eq("id", ownerContext.organization.id)
-      .select("id")
-      .limit(1)
-      .maybeSingle();
-
-    updatedOrganization = legacyUpdateResult.data;
-    error = legacyUpdateResult.error;
-    usedLegacyContactFallback = !legacyUpdateResult.error;
-  }
 
   if (error) {
     await recordSecurityAuditEvent({
@@ -319,9 +298,7 @@ export async function updateCompanyProfileAction(
 
   return {
     status: "success",
-    message: usedLegacyContactFallback
-      ? "Company basics saved. Apply latest migrations to persist extended contact fields."
-      : "Company profile saved successfully.",
+    message: "Company profile saved successfully.",
   };
 }
 
