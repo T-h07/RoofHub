@@ -28,11 +28,11 @@ export type CompanyMembershipSummary = Pick<
   | "user_id"
   | "role"
   | "member_status"
-  | "invited_by_user_id"
   | "joined_at"
   | "created_at"
   | "updated_at"
 > & {
+  invited_by_user_id: string | null;
   organization: CompanyWorkspaceSummary | null;
 };
 
@@ -83,13 +83,70 @@ type CurrentUserCompanyContextResult =
     };
 
 type OrganizationMembershipQueryRow = Omit<CompanyMembershipSummary, "organization"> & {
-  organization: CompanyWorkspaceSummary | null;
+  organization: Partial<CompanyWorkspaceSummary> | null;
 };
+
+const ORGANIZATION_PROFILE_SELECT_FULL =
+  "id, name, slug, description, logo_path, contact_email, contact_phone, website_url, coverage_area, status, created_at, updated_at";
+const ORGANIZATION_PROFILE_SELECT_LEGACY =
+  "id, name, slug, description, logo_path, status, created_at, updated_at";
+const MEMBERSHIP_SELECT_BASE =
+  "id, organization_id, user_id, role, member_status, joined_at, created_at, updated_at";
+
+function isMissingOrganizationProfileColumnsError(message: string | undefined) {
+  if (!message) {
+    return false;
+  }
+
+  const normalized = message.toLowerCase();
+  return (
+    normalized.includes("column") &&
+    (normalized.includes("contact_email") ||
+      normalized.includes("contact_phone") ||
+      normalized.includes("website_url") ||
+      normalized.includes("coverage_area"))
+  );
+}
+
+function normalizeOrganizationSummary(
+  organization: OrganizationMembershipQueryRow["organization"]
+): CompanyWorkspaceSummary | null {
+  if (!organization) {
+    return null;
+  }
+
+  if (
+    !organization.id ||
+    !organization.name ||
+    !organization.slug ||
+    !organization.status ||
+    !organization.created_at ||
+    !organization.updated_at
+  ) {
+    return null;
+  }
+
+  return {
+    id: organization.id,
+    name: organization.name,
+    slug: organization.slug,
+    description: organization.description ?? null,
+    logo_path: organization.logo_path ?? null,
+    contact_email: organization.contact_email ?? null,
+    contact_phone: organization.contact_phone ?? null,
+    website_url: organization.website_url ?? null,
+    coverage_area: organization.coverage_area ?? null,
+    status: organization.status,
+    created_at: organization.created_at,
+    updated_at: organization.updated_at,
+  };
+}
 
 function normalizeCompanyMembershipRows(rows: OrganizationMembershipQueryRow[]) {
   return rows.map((row) => ({
     ...row,
-    organization: row.organization,
+    invited_by_user_id: row.invited_by_user_id ?? null,
+    organization: normalizeOrganizationSummary(row.organization),
   }));
 }
 
@@ -97,23 +154,42 @@ export async function getCompanyMembershipContextForUser(
   supabase: SupabaseClient<Database>,
   userId: string
 ): Promise<CompanyMembershipContext> {
-  const { data, error } = await supabase
+  const fullQuery = await supabase
     .from("organization_members")
     .select(
-      "id, organization_id, user_id, role, member_status, invited_by_user_id, joined_at, created_at, updated_at, organization:organizations(id, name, slug, description, logo_path, contact_email, contact_phone, website_url, coverage_area, status, created_at, updated_at)"
+      `${MEMBERSHIP_SELECT_BASE}, organization:organizations(${ORGANIZATION_PROFILE_SELECT_FULL})`
     )
     .eq("user_id", userId)
     .order("created_at", { ascending: true });
 
+  let selectedRows = (fullQuery.data ?? []) as OrganizationMembershipQueryRow[];
+  let error = fullQuery.error;
+
+  if (error && isMissingOrganizationProfileColumnsError(error.message)) {
+    const legacyQuery = await supabase
+      .from("organization_members")
+      .select(
+        `${MEMBERSHIP_SELECT_BASE}, organization:organizations(${ORGANIZATION_PROFILE_SELECT_LEGACY})`
+      )
+      .eq("user_id", userId)
+      .order("created_at", { ascending: true });
+
+    selectedRows = (legacyQuery.data ?? []) as unknown as OrganizationMembershipQueryRow[];
+    error = legacyQuery.error;
+  }
+
   if (error) {
     return {
       ok: false,
-      message: "Company workspace context could not be loaded.",
+      message:
+        isMissingOrganizationProfileColumnsError(error.message)
+          ? "Company workspace schema is out of date. Apply the latest Supabase migrations and retry."
+          : "Company workspace context could not be loaded.",
     };
   }
 
   const memberships = normalizeCompanyMembershipRows(
-    (data ?? []) as OrganizationMembershipQueryRow[]
+    selectedRows
   );
   const activeMemberships = memberships.filter(
     (membership) =>
