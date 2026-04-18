@@ -88,12 +88,34 @@ export default async function CompanyWorkspacePage({ searchParams }: CompanyWork
   const companyContextResult = await getCurrentUserCompanyContext(supabase);
   if (!companyContextResult.ok) {
     return (
-      <MainContainer size="content">
-        <EmptyState
-          icon={Building2}
-          title="Company workspace is unavailable"
-          description={companyContextResult.message}
+      <MainContainer size="content" className="space-y-5">
+        <AuthStatusMessage
+          tone="error"
+          message={`${companyContextResult.message} You can continue through company onboarding while context checks recover.`}
         />
+        <section className="border-border bg-card relative overflow-hidden rounded-3xl border p-5 sm:p-7">
+          <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(120deg,color-mix(in_oklch,var(--primary)_8%,transparent)_0%,transparent_58%),linear-gradient(325deg,color-mix(in_oklch,var(--accent)_12%,transparent)_0%,transparent_68%)] opacity-55" />
+          <div className="relative space-y-3">
+            <Badge variant="outline">Company onboarding</Badge>
+            <h1 className="type-page-title">Become a company provider</h1>
+            <p className="type-body-muted max-w-3xl">
+              Start company onboarding to create your RoofHub company workspace, bootstrap owner
+              membership, and unlock company profile and team management paths.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Link href="/profile/company/new" className={buttonVariants({ size: "sm" })}>
+                <Building2 className="size-4" />
+                Start company onboarding
+              </Link>
+              <Link href="/profile/company" className={buttonVariants({ variant: "outline", size: "sm" })}>
+                Retry workspace context
+              </Link>
+              <Link href="/profile" className={buttonVariants({ variant: "ghost", size: "sm" })}>
+                Back to profile
+              </Link>
+            </div>
+          </div>
+        </section>
       </MainContainer>
     );
   }

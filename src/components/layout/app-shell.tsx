@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
 import { getCurrentUserProfile } from "@/lib/auth/profile";
-import type { AppRole } from "@/lib/auth/roles";
+import type { AppRole, ProviderAccountType } from "@/lib/auth/roles";
 import { createServerSupabaseClient } from "@/lib/supabase";
 
 import { SiteFooter } from "./site-footer";
@@ -16,6 +16,7 @@ type HeaderAuthState = {
   email: string | null;
   displayName: string | null;
   role: AppRole | null;
+  providerAccountType: ProviderAccountType | null;
   profileError: string | null;
 };
 
@@ -32,6 +33,7 @@ async function getHeaderAuthState(): Promise<HeaderAuthState> {
         email: null,
         displayName: null,
         role: null,
+        providerAccountType: null,
         profileError: null,
       };
     }
@@ -44,6 +46,7 @@ async function getHeaderAuthState(): Promise<HeaderAuthState> {
         email: user.email ?? null,
         displayName: null,
         role: null,
+        providerAccountType: null,
         profileError: profileResult.message,
       };
     }
@@ -53,6 +56,7 @@ async function getHeaderAuthState(): Promise<HeaderAuthState> {
       email: user?.email ?? null,
       displayName: profileResult.profile.display_name,
       role: profileResult.profile.role,
+      providerAccountType: profileResult.profile.provider_account_type,
       profileError: null,
     };
   } catch {
@@ -61,6 +65,7 @@ async function getHeaderAuthState(): Promise<HeaderAuthState> {
       email: null,
       displayName: null,
       role: null,
+      providerAccountType: null,
       profileError: "Profile state could not be loaded.",
     };
   }

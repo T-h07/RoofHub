@@ -2,12 +2,14 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowLeft, Building2 } from "lucide-react";
 
+import { AuthStatusMessage } from "@/components/auth/auth-status-message";
 import { CompanyWorkspaceCreateForm } from "@/components/company/company-workspace-create-form";
 import { MainContainer } from "@/components/layout/main-container";
 import { buttonVariants } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
+import { getCurrentUserProfile } from "@/lib/auth/profile";
 import { toSignInPath } from "@/lib/auth/routing";
-import { getCurrentUserCompanyContext } from "@/lib/company/context";
+import { getCompanyMembershipContextForUser } from "@/lib/company/context";
 import { createServerSupabaseClient } from "@/lib/supabase";
 
 export default async function CompanyWorkspaceCreatePage() {
@@ -20,22 +22,29 @@ export default async function CompanyWorkspaceCreatePage() {
     redirect(toSignInPath("/profile/company/new"));
   }
 
-  const companyContextResult = await getCurrentUserCompanyContext(supabase);
-  if (!companyContextResult.ok) {
+  const profileResult = await getCurrentUserProfile(supabase);
+  if (!profileResult.ok) {
     return (
       <MainContainer size="content">
         <EmptyState
           icon={Building2}
           title="Company setup is unavailable"
-          description={companyContextResult.message}
+          description={profileResult.message}
         />
       </MainContainer>
     );
   }
 
-  if (companyContextResult.company.ownsWorkspace) {
+  const companyContextResult = await getCompanyMembershipContextForUser(
+    supabase,
+    profileResult.profile.id
+  );
+
+  if (companyContextResult.ok && companyContextResult.ownsWorkspace) {
     redirect("/profile/company");
   }
+
+  const hasProviderCompanyMode = profileResult.profile.provider_account_type === "company";
 
   return (
     <MainContainer size="content" className="space-y-4">
@@ -43,6 +52,18 @@ export default async function CompanyWorkspaceCreatePage() {
         <ArrowLeft className="size-4" />
         Back to company workspace
       </Link>
+
+      {!companyContextResult.ok ? (
+        <AuthStatusMessage
+          tone="error"
+          message={
+            hasProviderCompanyMode
+              ? "Existing company membership could not be verified right now. You can continue setup; creation remains idempotent and will route to your workspace when context is available."
+              : "Company membership checks are temporarily degraded. You can still continue setup safely."
+          }
+        />
+      ) : null}
+
       <CompanyWorkspaceCreateForm />
     </MainContainer>
   );

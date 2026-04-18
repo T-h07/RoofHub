@@ -7,13 +7,19 @@ import { AlertTriangle, ChevronDown, Sparkles } from "lucide-react";
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import { buttonVariants } from "@/components/ui/button";
 import { signOutAction } from "@/lib/auth/actions";
-import { getRoleLabel, type AppRole } from "@/lib/auth/roles";
+import {
+  getProviderAccountTypeLabel,
+  getRoleLabel,
+  type AppRole,
+  type ProviderAccountType,
+} from "@/lib/auth/roles";
 import type { NavItem } from "@/types/navigation";
 import { cn } from "@/lib/utils";
 
 type HeaderAccountMenuProps = {
   accountLabel: string;
   role: AppRole | null;
+  providerAccountType: ProviderAccountType | null;
   profileError: string | null;
   cta: {
     label: string;
@@ -25,6 +31,7 @@ type HeaderAccountMenuProps = {
 export function HeaderAccountMenu({
   accountLabel,
   role,
+  providerAccountType,
   profileError,
   cta,
   links,
@@ -75,12 +82,16 @@ export function HeaderAccountMenu({
         aria-expanded={open}
         aria-haspopup="menu"
       >
-        <span className="min-w-0 text-left leading-none">
-          <span className="block truncate text-xs font-semibold">{accountLabel}</span>
-          <span className="text-nav-muted block truncate text-[11px]">
-            {role ? `${getRoleLabel(role)} account` : "Signed-in account"}
+          <span className="min-w-0 text-left leading-none">
+            <span className="block truncate text-xs font-semibold">{accountLabel}</span>
+            <span className="text-nav-muted block truncate text-[11px]">
+              {role
+                ? role === "provider" && providerAccountType
+                  ? `${getRoleLabel(role)} • ${getProviderAccountTypeLabel(providerAccountType)}`
+                  : `${getRoleLabel(role)} account`
+                : "Signed-in account"}
+            </span>
           </span>
-        </span>
         {profileError ? (
           <span className="text-destructive inline-flex size-4 items-center justify-center">
             <AlertTriangle className="size-3.5" />

@@ -1,9 +1,16 @@
-import { getRoleLabel, isAdminRole, isProviderRole, type AppRole } from "@/lib/auth/roles";
+import {
+  getRoleLabel,
+  isAdminRole,
+  isProviderRole,
+  type AppRole,
+  type ProviderAccountType,
+} from "@/lib/auth/roles";
 import type { NavItem } from "@/types/navigation";
 
 type NavViewer = {
   isAuthenticated: boolean;
   role: AppRole | null;
+  providerAccountType: ProviderAccountType | null;
 };
 
 const GUEST_PRIMARY_NAV: NavItem[] = [
@@ -17,7 +24,6 @@ const AUTH_SHARED_NAV: NavItem[] = [
   { title: "Map", href: "/map" },
   { title: "Favorites", href: "/favorites" },
   { title: "Messages", href: "/messages" },
-  { title: "Company Workspace", href: "/profile/company" },
   { title: "Profile", href: "/profile" },
 ];
 
@@ -33,7 +39,13 @@ export function getPrimaryNavForViewer(viewer: NavViewer): NavItem[] {
     return GUEST_PRIMARY_NAV;
   }
 
+  const companyNavItem: NavItem =
+    viewer.role === "provider" && viewer.providerAccountType === "company"
+      ? { title: "Company Workspace", href: "/profile/company" }
+      : { title: "Become a Company", href: "/profile/company/new" };
+
   const nav = [...AUTH_SHARED_NAV];
+  nav.splice(4, 0, companyNavItem);
   const workspaceNav: NavItem[] = [];
 
   if (isProviderRole(viewer.role)) {
@@ -69,6 +81,14 @@ export function getCtaForViewer(viewer: NavViewer) {
   }
 
   if (isProviderRole(viewer.role)) {
+    if (viewer.providerAccountType === "company") {
+      return {
+        label: "Company workspace",
+        href: "/profile/company",
+        detail: getRoleLabel(viewer.role ?? "seeker"),
+      };
+    }
+
     return {
       label: "List a property",
       href: "/dashboard/listings/new",

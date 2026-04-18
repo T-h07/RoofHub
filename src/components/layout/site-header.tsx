@@ -5,7 +5,7 @@ import { MapPinned, Sparkles } from "lucide-react";
 
 import { buttonVariants } from "@/components/ui/button";
 import { useActiveRoute } from "@/hooks/use-active-route";
-import type { AppRole } from "@/lib/auth/roles";
+import type { AppRole, ProviderAccountType } from "@/lib/auth/roles";
 import { siteConfig } from "@/lib/config/site";
 import { getCtaForViewer, getPrimaryNavForViewer } from "@/lib/navigation/role-navigation";
 import type { NavItem } from "@/types/navigation";
@@ -38,6 +38,7 @@ type SiteHeaderProps = {
     email: string | null;
     displayName: string | null;
     role: AppRole | null;
+    providerAccountType: ProviderAccountType | null;
     profileError: string | null;
   };
 };
@@ -58,10 +59,12 @@ export function SiteHeader({ authState }: SiteHeaderProps) {
   const primaryNav = getPrimaryNavForViewer({
     isAuthenticated,
     role: authState.role,
+    providerAccountType: authState.providerAccountType,
   });
   const cta = getCtaForViewer({
     isAuthenticated,
     role: authState.role,
+    providerAccountType: authState.providerAccountType,
   });
   const desktopPrimaryNav = getDesktopPrimaryNav(primaryNav);
   const accountMenuNav = getAccountMenuNav(primaryNav);
@@ -112,6 +115,7 @@ export function SiteHeader({ authState }: SiteHeaderProps) {
                 <HeaderAccountMenu
                   accountLabel={accountLabel}
                   role={authState.role}
+                  providerAccountType={authState.providerAccountType}
                   profileError={authState.profileError}
                   cta={cta}
                   links={accountMenuNav}

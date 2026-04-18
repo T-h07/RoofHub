@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/sheet";
 import { useActiveRoute } from "@/hooks/use-active-route";
 import { signOutAction } from "@/lib/auth/actions";
-import { getRoleLabel, type AppRole } from "@/lib/auth/roles";
+import { getRoleLabel, type AppRole, type ProviderAccountType } from "@/lib/auth/roles";
 import { siteConfig } from "@/lib/config/site";
 import { getCtaForViewer, getPrimaryNavForViewer } from "@/lib/navigation/role-navigation";
 import { cn } from "@/lib/utils";
@@ -63,6 +63,7 @@ type MobileNavSheetProps = {
     email: string | null;
     displayName: string | null;
     role: AppRole | null;
+    providerAccountType: ProviderAccountType | null;
     profileError: string | null;
   };
 };
@@ -73,10 +74,12 @@ export function MobileNavSheet({ authState }: MobileNavSheetProps) {
   const primaryNav = getPrimaryNavForViewer({
     isAuthenticated,
     role: authState.role,
+    providerAccountType: authState.providerAccountType,
   });
   const cta = getCtaForViewer({
     isAuthenticated,
     role: authState.role,
+    providerAccountType: authState.providerAccountType,
   });
 
   return (
