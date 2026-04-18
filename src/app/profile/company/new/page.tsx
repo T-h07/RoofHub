@@ -53,13 +53,11 @@ export default async function CompanyWorkspaceCreatePage() {
         Back to company workspace
       </Link>
 
-      {!companyContextResult.ok ? (
+      {!companyContextResult.ok && hasProviderCompanyMode ? (
         <AuthStatusMessage
           tone="error"
           message={
-            hasProviderCompanyMode
-              ? "Existing company membership could not be verified right now. You can continue setup; creation remains idempotent and will route to your workspace when context is available."
-              : "Company membership checks are temporarily degraded. You can still continue setup safely."
+            "Existing company membership could not be verified right now. You can continue setup; creation remains idempotent and will route to your workspace when context is available."
           }
         />
       ) : null}
