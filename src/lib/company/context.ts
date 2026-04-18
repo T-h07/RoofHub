@@ -3,6 +3,11 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { getCurrentUserProfile } from "@/lib/auth/profile";
+import {
+  createAdminSupabaseClient,
+  isMissingSupabaseAdminUrlError,
+  isMissingSupabaseServiceRoleError,
+} from "@/lib/supabase/admin";
 import type { Database, Tables } from "@/types/database";
 
 export type CompanyWorkspaceSummary = Pick<
@@ -85,6 +90,10 @@ type CurrentUserCompanyContextResult =
 type OrganizationMembershipQueryRow = Omit<CompanyMembershipSummary, "organization">;
 type OrganizationProfileQueryRow = Partial<CompanyWorkspaceSummary>;
 
+type QueryErrorLike = {
+  message?: string;
+};
+
 const ORGANIZATION_PROFILE_SELECT_FULL =
   "id, name, slug, description, logo_path, contact_email, contact_phone, website_url, coverage_area, status, created_at, updated_at";
 const ORGANIZATION_PROFILE_SELECT_LEGACY =
@@ -152,27 +161,165 @@ function normalizeCompanyMembershipRows(
   }));
 }
 
+function buildEmptyCompanyMembershipContext(): Extract<CompanyMembershipContext, { ok: true }> {
+  return {
+    ok: true,
+    memberships: [],
+    activeMemberships: [],
+    primaryMembership: null,
+    primaryOrganization: null,
+    ownerMembership: null,
+    ownerOrganization: null,
+    managementMembership: null,
+    managementOrganization: null,
+    hasMembership: false,
+    ownsWorkspace: false,
+    activeRole: null,
+    canManageTeam: false,
+  };
+}
+
+function isRecoverableMembershipQueryError(message: string | undefined) {
+  if (!message) {
+    return false;
+  }
+
+  const normalized = message.toLowerCase();
+  return (
+    normalized.includes("row-level security") ||
+    normalized.includes("permission denied") ||
+    normalized.includes("policy") ||
+    normalized.includes("infinite recursion")
+  );
+}
+
+async function canUseAdminFallbackForUser(
+  supabase: SupabaseClient<Database>,
+  userId: string
+) {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  return user?.id === userId;
+}
+
+async function loadMembershipRowsWithAdminFallback(
+  userId: string
+): Promise<
+  | { ok: true; rows: OrganizationMembershipQueryRow[] }
+  | { ok: false }
+> {
+  try {
+    const adminSupabase = createAdminSupabaseClient();
+    const membershipQuery = await adminSupabase
+      .from("organization_members")
+      .select(`${MEMBERSHIP_SELECT_BASE}, invited_by_user_id`)
+      .eq("user_id", userId)
+      .order("created_at", { ascending: true });
+
+    if (membershipQuery.error) {
+      return { ok: false };
+    }
+
+    return {
+      ok: true,
+      rows: (membershipQuery.data ?? []) as OrganizationMembershipQueryRow[],
+    };
+  } catch (error) {
+    if (isMissingSupabaseServiceRoleError(error) || isMissingSupabaseAdminUrlError(error)) {
+      return { ok: false };
+    }
+
+    return { ok: false };
+  }
+}
+
+async function loadOrganizationRowsWithAdminFallback(
+  organizationIds: string[],
+  selectClause: string
+): Promise<
+  | { ok: true; rows: OrganizationProfileQueryRow[] }
+  | { ok: false; error: QueryErrorLike | null }
+> {
+  if (organizationIds.length === 0) {
+    return {
+      ok: true,
+      rows: [],
+    };
+  }
+
+  try {
+    const adminSupabase = createAdminSupabaseClient();
+    const query = await adminSupabase
+      .from("organizations")
+      .select(selectClause)
+      .in("id", organizationIds);
+
+    if (query.error) {
+      return {
+        ok: false,
+        error: query.error,
+      };
+    }
+
+    return {
+      ok: true,
+      rows: (query.data ?? []) as OrganizationProfileQueryRow[],
+    };
+  } catch (error) {
+    if (isMissingSupabaseServiceRoleError(error) || isMissingSupabaseAdminUrlError(error)) {
+      return {
+        ok: false,
+        error: null,
+      };
+    }
+
+    return {
+      ok: false,
+      error: null,
+    };
+  }
+}
+
 export async function getCompanyMembershipContextForUser(
   supabase: SupabaseClient<Database>,
   userId: string
 ): Promise<CompanyMembershipContext> {
-  const membershipQuery = await supabase
+  const directMembershipQuery = await supabase
     .from("organization_members")
     .select(`${MEMBERSHIP_SELECT_BASE}, invited_by_user_id`)
     .eq("user_id", userId)
     .order("created_at", { ascending: true });
 
-  if (membershipQuery.error) {
-    return {
-      ok: false,
-      message: "Company workspace context could not be loaded.",
-    };
+  let selectedRows = (directMembershipQuery.data ?? []) as OrganizationMembershipQueryRow[];
+
+  if (directMembershipQuery.error) {
+    const canUseAdminFallback =
+      isRecoverableMembershipQueryError(directMembershipQuery.error.message) &&
+      (await canUseAdminFallbackForUser(supabase, userId));
+
+    if (canUseAdminFallback) {
+      const adminFallback = await loadMembershipRowsWithAdminFallback(userId);
+      if (adminFallback.ok) {
+        selectedRows = adminFallback.rows;
+      } else {
+        return {
+          ok: false,
+          message: "Company workspace context could not be loaded.",
+        };
+      }
+    } else {
+      return {
+        ok: false,
+        message: "Company workspace context could not be loaded.",
+      };
+    }
   }
 
-  const selectedRows = (membershipQuery.data ?? []) as OrganizationMembershipQueryRow[];
   const organizationIds = [...new Set(selectedRows.map((row) => row.organization_id))];
   let organizationRows: OrganizationProfileQueryRow[] = [];
-  let organizationError: { message?: string } | null = null;
+  let organizationError: QueryErrorLike | null = null;
 
   if (organizationIds.length > 0) {
     const fullQuery = await supabase
@@ -195,6 +342,36 @@ export async function getCompanyMembershipContextForUser(
 
     organizationRows = (legacyQuery.data ?? []) as OrganizationProfileQueryRow[];
     organizationError = legacyQuery.error;
+  }
+
+  if (organizationError) {
+    const canUseAdminFallback = await canUseAdminFallbackForUser(supabase, userId);
+
+    if (canUseAdminFallback) {
+      const fullFallback = await loadOrganizationRowsWithAdminFallback(
+        organizationIds,
+        ORGANIZATION_PROFILE_SELECT_FULL
+      );
+
+      if (fullFallback.ok) {
+        organizationRows = fullFallback.rows;
+        organizationError = null;
+      } else if (
+        isMissingOrganizationProfileColumnsError(fullFallback.error?.message)
+      ) {
+        const legacyFallback = await loadOrganizationRowsWithAdminFallback(
+          organizationIds,
+          ORGANIZATION_PROFILE_SELECT_LEGACY
+        );
+
+        if (legacyFallback.ok) {
+          organizationRows = legacyFallback.rows;
+          organizationError = null;
+        } else {
+          organizationError = legacyFallback.error;
+        }
+      }
+    }
   }
 
   if (organizationError) {
@@ -270,6 +447,15 @@ export async function getCurrentUserCompanyContext(
   );
 
   if (!companyContext.ok) {
+    if (profileResult.profile.provider_account_type !== "company") {
+      return {
+        ok: true,
+        userId: profileResult.profile.id,
+        profile: profileResult.profile,
+        company: buildEmptyCompanyMembershipContext(),
+      };
+    }
+
     return companyContext;
   }
 

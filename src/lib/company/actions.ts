@@ -3,7 +3,6 @@
 import { revalidatePath } from "next/cache";
 
 import { getCurrentUserProfile } from "@/lib/auth/profile";
-import { getCompanyMembershipContextForUser } from "@/lib/company/context";
 import {
   COMPANY_WORKSPACE_CREATE_IDLE_STATE,
   type CompanyWorkspaceCreateActionState,
@@ -152,26 +151,6 @@ export async function createCompanyWorkspaceAction(
     return toTrafficErrorState(userControl);
   }
 
-  const companyContextResult = await getCompanyMembershipContextForUser(
-    supabase,
-    profileResult.profile.id
-  );
-  if (!companyContextResult.ok) {
-    return {
-      status: "error",
-      message: companyContextResult.message,
-    };
-  }
-
-  if (companyContextResult.ownsWorkspace && companyContextResult.ownerOrganization) {
-    return {
-      status: "success",
-      message: "This account already owns a company workspace.",
-      redirectTo: "/profile/company",
-      organizationSlug: companyContextResult.ownerOrganization.slug,
-    };
-  }
-
   const { data, error } = await supabase
     .rpc("create_organization_workspace", {
       p_name: input.name,
@@ -180,6 +159,14 @@ export async function createCompanyWorkspaceAction(
     .single<CreateOrganizationWorkspaceRpcRow>();
 
   if (error || !data) {
+    if (error && error.message.toLowerCase().includes("already own")) {
+      return {
+        status: "success",
+        message: "This account already owns a company workspace.",
+        redirectTo: "/profile/company",
+      };
+    }
+
     await recordSecurityAuditEvent({
       supabase,
       event: {
