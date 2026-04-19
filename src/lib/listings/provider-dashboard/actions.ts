@@ -5,6 +5,7 @@ import { isProviderRole } from "@/lib/auth/roles";
 import { AUDIT_EVENT_TYPES, recordSecurityAuditEvent } from "@/lib/security/audit";
 import { enforceTrafficControl, TRAFFIC_CONTROL_RULES } from "@/lib/security/traffic-control";
 import { createServerSupabaseClient } from "@/lib/supabase";
+import { createSchemaDriftMessage, isSupabaseSchemaDriftError, logSupabaseSchemaDrift } from "@/lib/supabase/schema-drift";
 import { canTransitionProviderListingStatus } from "@/lib/listings/provider-wizard/status-transitions";
 import { isProviderListingStatus } from "./types";
 
@@ -71,23 +72,6 @@ function normalizeSupabaseError(message: string) {
   }
 
   return "Listing status update failed. Please retry.";
-}
-
-function isMissingOwnershipColumnsError(input: {
-  code?: string | null;
-  message?: string | null;
-}) {
-  const message = (input.message ?? "").toLowerCase();
-  if (input.code !== "42703") {
-    return false;
-  }
-
-  return (
-    (message.includes("listings.organization_id") && message.includes("does not exist")) ||
-    (message.includes("listings.created_by_user_id") && message.includes("does not exist")) ||
-    (message.includes("listings.assigned_agent_user_id") && message.includes("does not exist")) ||
-    (message.includes("listings.published_by_user_id") && message.includes("does not exist"))
-  );
 }
 
 function getLifecycleStatusSuccessMessage(nextStatus: ProviderListingStatus) {
@@ -196,33 +180,25 @@ async function loadProviderOwnedListing(
     };
   }
 
-  if (error && isMissingOwnershipColumnsError({ code: error.code ?? null, message: error.message ?? null })) {
-    const legacyResult = await supabase
-      .from("listings")
-      .select("id, owner_id, listing_status, published_at")
-      .eq("id", input.listingId)
-      .eq("owner_id", input.userId)
-      .limit(1)
-      .maybeSingle();
-
-    if (!legacyResult.error && legacyResult.data) {
-      console.warn(
-        "[ProviderDashboard] listings ownership columns are missing; falling back to legacy listing status projection."
-      );
-      return {
-        ok: true as const,
-        listing: {
-          id: legacyResult.data.id,
-          owner_id: legacyResult.data.owner_id,
-          organization_id: null,
-          created_by_user_id: legacyResult.data.owner_id,
-          assigned_agent_user_id: null,
-          published_by_user_id: null,
-          listing_status: legacyResult.data.listing_status,
-          published_at: legacyResult.data.published_at,
-        } satisfies ProviderOwnedListingStatus,
-      };
-    }
+  if (
+    error &&
+    isSupabaseSchemaDriftError(error, [
+      "listings",
+      "organization_id",
+      "created_by_user_id",
+      "assigned_agent_user_id",
+      "published_by_user_id",
+    ])
+  ) {
+    logSupabaseSchemaDrift("provider_dashboard_listing_status", error, {
+      user_id: input.userId,
+      listing_id: input.listingId,
+    });
+    return {
+      ok: false as const,
+      message: createSchemaDriftMessage("Listing workspace"),
+      listing: null as ProviderOwnedListingStatus | null,
+    };
   }
 
   if (error || !data) {

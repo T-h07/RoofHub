@@ -3,6 +3,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { isPreferredContactMethod } from "@/lib/auth/roles";
+import { createSchemaDriftMessage, isSupabaseSchemaDriftError, logSupabaseSchemaDrift } from "@/lib/supabase/schema-drift";
 import { createListingImageSignedUrl } from "@/lib/supabase/storage/listing-images";
 import type { Database } from "@/types/database";
 
@@ -19,20 +20,6 @@ const PROVIDER_DRAFT_SUMMARY_SELECT = `
   created_by_user_id,
   assigned_agent_user_id,
   published_by_user_id,
-  slug,
-  title,
-  listing_status,
-  listing_type,
-  property_type,
-  city,
-  price_amount,
-  updated_at,
-  created_at
-`;
-
-const PROVIDER_DRAFT_SUMMARY_LEGACY_SELECT = `
-  id,
-  owner_id,
   slug,
   title,
   listing_status,
@@ -84,154 +71,19 @@ const PROVIDER_DRAFT_EDITOR_SELECT = `
   created_at
 `;
 
-const PROVIDER_DRAFT_EDITOR_LEGACY_SELECT = `
-  id,
-  owner_id,
-  slug,
-  title,
-  description,
-  listing_type,
-  property_type,
-  listing_status,
-  price_amount,
-  currency_code,
-  deposit_amount,
-  area_m2,
-  bedrooms,
-  bathrooms,
-  floor_number,
-  total_floors,
-  city,
-  neighborhood,
-  address_text,
-  available_from,
-  furnished,
-  parking,
-  pets_allowed,
-  elevator,
-  balcony,
-  internet_included,
-  utilities_included,
-  heating_type,
-  public_location_mode,
-  latitude,
-  longitude,
-  updated_at,
-  created_at
-`;
-
 const PROVIDER_CONTACT_SELECT =
   "preferred_contact_method, contact_methods, phone, contact_email, whatsapp_phone, viber_phone";
-const PROVIDER_CONTACT_COMPAT_SELECT = "preferred_contact_method, contact_methods, phone";
-const PROVIDER_CONTACT_LEGACY_SELECT = "preferred_contact_method, phone";
-
-type ProviderDraftSummaryLegacyRow = Pick<
-  Database["public"]["Tables"]["listings"]["Row"],
-  | "id"
-  | "owner_id"
-  | "slug"
-  | "title"
-  | "listing_status"
-  | "listing_type"
-  | "property_type"
-  | "city"
-  | "price_amount"
-  | "updated_at"
-  | "created_at"
->;
-
-type ProviderDraftEditorLegacyRow = Pick<
-  Database["public"]["Tables"]["listings"]["Row"],
-  | "id"
-  | "owner_id"
-  | "slug"
-  | "title"
-  | "description"
-  | "listing_type"
-  | "property_type"
-  | "listing_status"
-  | "price_amount"
-  | "currency_code"
-  | "deposit_amount"
-  | "area_m2"
-  | "bedrooms"
-  | "bathrooms"
-  | "floor_number"
-  | "total_floors"
-  | "city"
-  | "neighborhood"
-  | "address_text"
-  | "available_from"
-  | "furnished"
-  | "parking"
-  | "pets_allowed"
-  | "elevator"
-  | "balcony"
-  | "internet_included"
-  | "utilities_included"
-  | "heating_type"
-  | "public_location_mode"
-  | "latitude"
-  | "longitude"
-  | "updated_at"
-  | "created_at"
->;
-
-function isMissingListingOwnershipColumnsError(input: {
-  code?: string | null;
-  message?: string | null;
-}) {
-  const message = (input.message ?? "").toLowerCase();
-  if (input.code !== "42703") {
-    return false;
-  }
-
-  return (
-    (message.includes("listings.organization_id") && message.includes("does not exist")) ||
-    (message.includes("listings.created_by_user_id") && message.includes("does not exist")) ||
-    (message.includes("listings.assigned_agent_user_id") && message.includes("does not exist")) ||
-    (message.includes("listings.published_by_user_id") && message.includes("does not exist"))
-  );
-}
-
-function isMissingContactMethodsColumnError(message: string | undefined) {
-  if (!message) {
-    return false;
-  }
-
-  const normalized = message.toLowerCase();
-  return (
-    normalized.includes("contact_methods") &&
-    (normalized.includes("does not exist") || normalized.includes("column"))
-  );
-}
-
-function isMissingContactChannelColumnError(message: string | undefined) {
-  if (!message) {
-    return false;
-  }
-
-  const normalized = message.toLowerCase();
-  return (
-    normalized.includes("column") &&
-    (normalized.includes("contact_email") ||
-      normalized.includes("whatsapp_phone") ||
-      normalized.includes("viber_phone"))
-  );
-}
 
 export async function loadProviderDraftSummaries(
   supabase: SupabaseClient<Database>,
   userId: string
 ) {
-  const query = supabase
+  const { data, error } = await supabase
     .from("listings")
     .select(PROVIDER_DRAFT_SUMMARY_SELECT)
     .eq("owner_id", userId)
     .order("updated_at", { ascending: false })
     .limit(24);
-
-  const { data, error } = await query;
 
   if (!error) {
     return {
@@ -240,54 +92,29 @@ export async function loadProviderDraftSummaries(
     };
   }
 
-  if (!isMissingListingOwnershipColumnsError({ code: error.code ?? null, message: error.message ?? null })) {
+  if (
+    isSupabaseSchemaDriftError(error, [
+      "listings",
+      "organization_id",
+      "created_by_user_id",
+      "assigned_agent_user_id",
+      "published_by_user_id",
+    ])
+  ) {
+    logSupabaseSchemaDrift("provider_draft_summaries", error, {
+      user_id: userId,
+    });
     return {
       ok: false as const,
-      message: "Draft listings could not be loaded right now.",
+      message: createSchemaDriftMessage("Draft listings"),
       drafts: [] as ProviderDraftSummary[],
     };
   }
-
-  const legacyResult = await supabase
-    .from("listings")
-    .select(PROVIDER_DRAFT_SUMMARY_LEGACY_SELECT)
-    .eq("owner_id", userId)
-    .order("updated_at", { ascending: false })
-    .limit(24);
-
-  if (legacyResult.error) {
-    return {
-      ok: false as const,
-      message: "Draft listings could not be loaded right now.",
-      drafts: [] as ProviderDraftSummary[],
-    };
-  }
-
-  console.warn(
-    "[ProviderWizard] listings ownership columns are missing; falling back to legacy draft summary projection."
-  );
-
-  const legacyRows = (legacyResult.data ?? []) as ProviderDraftSummaryLegacyRow[];
-  const drafts: ProviderDraftSummary[] = legacyRows.map((draft) => ({
-    id: draft.id,
-    organization_id: null,
-    created_by_user_id: draft.owner_id,
-    assigned_agent_user_id: null,
-    published_by_user_id: null,
-    slug: draft.slug,
-    title: draft.title,
-    listing_status: draft.listing_status,
-    listing_type: draft.listing_type,
-    property_type: draft.property_type,
-    city: draft.city,
-    price_amount: draft.price_amount,
-    updated_at: draft.updated_at,
-    created_at: draft.created_at,
-  }));
 
   return {
-    ok: true as const,
-    drafts,
+    ok: false as const,
+    message: "Draft listings could not be loaded right now.",
+    drafts: [] as ProviderDraftSummary[],
   };
 }
 
@@ -312,77 +139,31 @@ export async function loadProviderDraftForEditor(
     };
   }
 
-  if (error && !isMissingListingOwnershipColumnsError({ code: error.code ?? null, message: error.message ?? null })) {
+  if (
+    error &&
+    isSupabaseSchemaDriftError(error, [
+      "listings",
+      "organization_id",
+      "created_by_user_id",
+      "assigned_agent_user_id",
+      "published_by_user_id",
+    ])
+  ) {
+    logSupabaseSchemaDrift("provider_draft_editor", error, {
+      user_id: userId,
+      listing_id: draftId,
+    });
     return {
       ok: false as const,
-      message: "Listing not found or inaccessible.",
+      message: createSchemaDriftMessage("Listing draft"),
       draft: null as ProviderDraftEditorRecord | null,
     };
   }
-
-  const legacyResult = await supabase
-    .from("listings")
-    .select(PROVIDER_DRAFT_EDITOR_LEGACY_SELECT)
-    .eq("id", draftId)
-    .eq("owner_id", userId)
-    .limit(1)
-    .maybeSingle();
-
-  if (legacyResult.error || !legacyResult.data) {
-    return {
-      ok: false as const,
-      message: "Listing not found or inaccessible.",
-      draft: null as ProviderDraftEditorRecord | null,
-    };
-  }
-
-  console.warn(
-    "[ProviderWizard] listings ownership columns are missing; falling back to legacy draft editor projection."
-  );
-
-  const legacy = legacyResult.data as ProviderDraftEditorLegacyRow;
 
   return {
-    ok: true as const,
-    draft: {
-      id: legacy.id,
-      owner_id: legacy.owner_id,
-      organization_id: null,
-      created_by_user_id: legacy.owner_id,
-      assigned_agent_user_id: null,
-      published_by_user_id: null,
-      slug: legacy.slug,
-      title: legacy.title,
-      description: legacy.description,
-      listing_type: legacy.listing_type,
-      property_type: legacy.property_type,
-      listing_status: legacy.listing_status,
-      price_amount: legacy.price_amount,
-      currency_code: legacy.currency_code,
-      deposit_amount: legacy.deposit_amount,
-      area_m2: legacy.area_m2,
-      bedrooms: legacy.bedrooms,
-      bathrooms: legacy.bathrooms,
-      floor_number: legacy.floor_number,
-      total_floors: legacy.total_floors,
-      city: legacy.city,
-      neighborhood: legacy.neighborhood,
-      address_text: legacy.address_text,
-      available_from: legacy.available_from,
-      furnished: legacy.furnished,
-      parking: legacy.parking,
-      pets_allowed: legacy.pets_allowed,
-      elevator: legacy.elevator,
-      balcony: legacy.balcony,
-      internet_included: legacy.internet_included,
-      utilities_included: legacy.utilities_included,
-      heating_type: legacy.heating_type,
-      public_location_mode: legacy.public_location_mode,
-      latitude: legacy.latitude,
-      longitude: legacy.longitude,
-      updated_at: legacy.updated_at,
-      created_at: legacy.created_at,
-    } satisfies ProviderDraftEditorRecord,
+    ok: false as const,
+    message: "Listing not found or inaccessible.",
+    draft: null as ProviderDraftEditorRecord | null,
   };
 }
 
@@ -396,16 +177,7 @@ export async function loadProviderContactSettings(
     .eq("id", userId)
     .maybeSingle();
 
-  let resolvedData:
-    | {
-        preferred_contact_method: Database["public"]["Enums"]["preferred_contact_method"] | null;
-        contact_methods?: unknown[];
-        phone: string | null;
-        contact_email?: string | null;
-        whatsapp_phone?: string | null;
-        viber_phone?: string | null;
-      }
-    | null = data as
+  const resolvedData = data as
     | {
         preferred_contact_method: Database["public"]["Enums"]["preferred_contact_method"] | null;
         contact_methods?: unknown[];
@@ -415,45 +187,35 @@ export async function loadProviderContactSettings(
         viber_phone?: string | null;
       }
     | null;
-  let resolvedError = error;
 
-  if (resolvedError && isMissingContactChannelColumnError(resolvedError.message)) {
-    const { data: compatData, error: compatError } = await supabase
-      .from("profiles")
-      .select(PROVIDER_CONTACT_COMPAT_SELECT)
-      .eq("id", userId)
-      .maybeSingle();
+  if (error || !resolvedData) {
+    if (
+      error &&
+      isSupabaseSchemaDriftError(error, [
+        "profiles",
+        "contact_methods",
+        "contact_email",
+        "whatsapp_phone",
+        "viber_phone",
+      ])
+    ) {
+      logSupabaseSchemaDrift("provider_contact_settings", error, {
+        user_id: userId,
+      });
+    }
 
-    resolvedData = compatData
-      ? {
-          ...compatData,
-          contact_email: null,
-          whatsapp_phone: null,
-          viber_phone: null,
-        }
-      : null;
-    resolvedError = compatError;
-  }
-
-  if (resolvedError && isMissingContactMethodsColumnError(resolvedError.message)) {
-    const { data: legacyData, error: legacyError } = await supabase
-      .from("profiles")
-      .select(PROVIDER_CONTACT_LEGACY_SELECT)
-      .eq("id", userId)
-      .maybeSingle();
-    resolvedData = legacyData
-      ? {
-          ...legacyData,
-          contact_methods: [],
-        }
-      : null;
-    resolvedError = legacyError;
-  }
-
-  if (resolvedError || !resolvedData) {
     return {
       ok: false as const,
-      message: "Contact settings could not be loaded.",
+      message:
+        error && isSupabaseSchemaDriftError(error, [
+          "profiles",
+          "contact_methods",
+          "contact_email",
+          "whatsapp_phone",
+          "viber_phone",
+        ])
+          ? createSchemaDriftMessage("Profile contact")
+          : "Contact settings could not be loaded.",
       settings: {
         preferredContactMethod: "",
         contactMethods: ["in_app"],

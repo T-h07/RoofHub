@@ -3,6 +3,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { loadProviderUnreadLeadCount } from "@/lib/messaging/queries";
+import { createSchemaDriftMessage, isSupabaseSchemaDriftError, logSupabaseSchemaDrift } from "@/lib/supabase/schema-drift";
 import { createListingImageSignedUrl } from "@/lib/supabase/storage/listing-images";
 import type { Database } from "@/types/database";
 
@@ -44,29 +45,6 @@ const PROVIDER_MANAGED_LISTINGS_SELECT = `
   )
 `;
 
-const PROVIDER_MANAGED_LISTINGS_LEGACY_SELECT = `
-  id,
-  owner_id,
-  slug,
-  title,
-  listing_status,
-  listing_type,
-  property_type,
-  price_amount,
-  currency_code,
-  city,
-  neighborhood,
-  published_at,
-  archived_at,
-  updated_at,
-  created_at,
-  listing_images (
-    storage_path,
-    is_cover,
-    sort_order
-  )
-`;
-
 const PROVIDER_INVENTORY_MAP_LISTINGS_SELECT = `
   id,
   organization_id,
@@ -85,90 +63,8 @@ const PROVIDER_INVENTORY_MAP_LISTINGS_SELECT = `
   updated_at
 `;
 
-const PROVIDER_INVENTORY_MAP_LISTINGS_LEGACY_SELECT = `
-  id,
-  owner_id,
-  slug,
-  title,
-  listing_status,
-  listing_type,
-  property_type,
-  price_amount,
-  currency_code,
-  city,
-  neighborhood,
-  latitude,
-  longitude,
-  public_location_mode,
-  updated_at
-`;
-
 const STRICT_COORDINATE_PATTERN = /^-?\d+(?:\.\d+)?$/;
 const MAX_COORDINATE_TOKEN_LENGTH = 32;
-
-type ProviderManagedListingLegacyRow = Pick<
-  Database["public"]["Tables"]["listings"]["Row"],
-  | "id"
-  | "owner_id"
-  | "slug"
-  | "title"
-  | "listing_status"
-  | "listing_type"
-  | "property_type"
-  | "price_amount"
-  | "currency_code"
-  | "city"
-  | "neighborhood"
-  | "published_at"
-  | "archived_at"
-  | "updated_at"
-  | "created_at"
-> & {
-  listing_images:
-    | Array<
-        Pick<
-          Database["public"]["Tables"]["listing_images"]["Row"],
-          "storage_path" | "is_cover" | "sort_order"
-        >
-      >
-    | null;
-};
-
-type ProviderInventoryMapListingLegacyRow = Pick<
-  Database["public"]["Tables"]["listings"]["Row"],
-  | "id"
-  | "owner_id"
-  | "slug"
-  | "title"
-  | "listing_status"
-  | "listing_type"
-  | "property_type"
-  | "price_amount"
-  | "currency_code"
-  | "city"
-  | "neighborhood"
-  | "latitude"
-  | "longitude"
-  | "public_location_mode"
-  | "updated_at"
->;
-
-function isMissingOwnershipColumnsError(input: {
-  code?: string | null;
-  message?: string | null;
-}) {
-  const message = (input.message ?? "").toLowerCase();
-  if (input.code !== "42703") {
-    return false;
-  }
-
-  return (
-    (message.includes("listings.organization_id") && message.includes("does not exist")) ||
-    (message.includes("listings.created_by_user_id") && message.includes("does not exist")) ||
-    (message.includes("listings.assigned_agent_user_id") && message.includes("does not exist")) ||
-    (message.includes("listings.published_by_user_id") && message.includes("does not exist"))
-  );
-}
 
 function getCoverImagePath(images: ProviderManagedListingRow["listing_images"]): string | null {
   if (!images || images.length === 0) {
@@ -240,36 +136,31 @@ async function countProviderListingsByStatus(
     };
   }
 
-  if (!isMissingOwnershipColumnsError({ code: error.code ?? null, message: error.message ?? null })) {
+  if (
+    isSupabaseSchemaDriftError(error, [
+      "listings",
+      "organization_id",
+      "created_by_user_id",
+      "assigned_agent_user_id",
+      "published_by_user_id",
+    ])
+  ) {
+    logSupabaseSchemaDrift("provider_dashboard_metrics", error, {
+      user_id: input.userId,
+      organization_id: input.organizationId ?? null,
+      status: input.status ?? null,
+    });
     return {
       ok: false as const,
-      message: "Listing metrics are temporarily unavailable.",
-      count: 0,
-    };
-  }
-
-  let legacyQuery = supabase
-    .from("listings")
-    .select("id", { count: "exact", head: true })
-    .eq("owner_id", input.userId);
-
-  if (input.status) {
-    legacyQuery = legacyQuery.eq("listing_status", input.status);
-  }
-
-  const { count: legacyCount, error: legacyError } = await legacyQuery;
-
-  if (legacyError) {
-    return {
-      ok: false as const,
-      message: "Listing metrics are temporarily unavailable.",
+      message: createSchemaDriftMessage("Listing metrics"),
       count: 0,
     };
   }
 
   return {
-    ok: true as const,
-    count: legacyCount ?? 0,
+    ok: false as const,
+    message: "Listing metrics are temporarily unavailable.",
+    count: 0,
   };
 }
 
@@ -413,81 +304,36 @@ export async function loadProviderManagedListings(
 
   const primaryResult = await query;
 
-  let listingRows: ProviderManagedListingRow[] = [];
-  let legacyRows: ProviderManagedListingLegacyRow[] = [];
-  let usedLegacyProjection = false;
-
   if (primaryResult.error) {
     if (
-      !isMissingOwnershipColumnsError({
-        code: primaryResult.error.code ?? null,
-        message: primaryResult.error.message ?? null,
-      })
+      isSupabaseSchemaDriftError(primaryResult.error, [
+        "listings",
+        "organization_id",
+        "created_by_user_id",
+        "assigned_agent_user_id",
+        "published_by_user_id",
+      ])
     ) {
+      logSupabaseSchemaDrift("provider_managed_listings", primaryResult.error, {
+        user_id: input.userId,
+        organization_id: input.organizationId ?? null,
+        status_filter: statusFilter,
+      });
       return {
         ok: false as const,
-        message: "Your listings are temporarily unavailable.",
+        message: createSchemaDriftMessage("Listing workspace"),
         listings: [] as ProviderManagedListing[],
       };
     }
 
-    usedLegacyProjection = true;
-    let legacyQuery = supabase
-      .from("listings")
-      .select(PROVIDER_MANAGED_LISTINGS_LEGACY_SELECT)
-      .order("updated_at", { ascending: false })
-      .order("created_at", { ascending: false })
-      .limit(normalizedLimit)
-      .eq("owner_id", input.userId);
-
-    if (statusFilter !== "all") {
-      legacyQuery = legacyQuery.eq("listing_status", statusFilter);
-    }
-
-    const legacyResult = await legacyQuery;
-
-    if (legacyResult.error) {
-      return {
-        ok: false as const,
-        message: "Your listings are temporarily unavailable.",
-        listings: [] as ProviderManagedListing[],
-      };
-    }
-
-    legacyRows = (legacyResult.data ?? []) as ProviderManagedListingLegacyRow[];
-  } else {
-    listingRows = (primaryResult.data ?? []) as ProviderManagedListingRow[];
+    return {
+      ok: false as const,
+      message: "Your listings are temporarily unavailable.",
+      listings: [] as ProviderManagedListing[],
+    };
   }
 
-  const unifiedRows: ProviderManagedListingRow[] = usedLegacyProjection
-    ? legacyRows.map((listing) => ({
-        id: listing.id,
-        organization_id: null,
-        created_by_user_id: listing.owner_id,
-        assigned_agent_user_id: null,
-        published_by_user_id: null,
-        slug: listing.slug,
-        title: listing.title,
-        listing_status: listing.listing_status,
-        listing_type: listing.listing_type,
-        property_type: listing.property_type,
-        price_amount: listing.price_amount,
-        currency_code: listing.currency_code,
-        city: listing.city,
-        neighborhood: listing.neighborhood,
-        published_at: listing.published_at,
-        archived_at: listing.archived_at,
-        updated_at: listing.updated_at,
-        created_at: listing.created_at,
-        listing_images: listing.listing_images,
-      }))
-    : listingRows;
-
-  if (usedLegacyProjection) {
-    console.warn(
-      "[ProviderDashboard] listings ownership columns are missing; falling back to owner-only managed listing projection."
-    );
-  }
+  const unifiedRows = (primaryResult.data ?? []) as ProviderManagedListingRow[];
 
   const coverImageUrlEntries = await Promise.all(
     unifiedRows.map(async (listing) => {
@@ -600,82 +446,42 @@ export async function loadProviderInventoryMapListings(
 
   const primaryResult = await query;
 
-  let usedLegacyProjection = false;
-  let listingRows: ProviderInventoryMapListingRow[] = [];
-  let legacyRows: ProviderInventoryMapListingLegacyRow[] = [];
-  let totalCount = primaryResult.count ?? 0;
-
   if (primaryResult.error) {
     if (
-      !isMissingOwnershipColumnsError({
-        code: primaryResult.error.code ?? null,
-        message: primaryResult.error.message ?? null,
-      })
+      isSupabaseSchemaDriftError(primaryResult.error, [
+        "listings",
+        "organization_id",
+        "latitude",
+        "longitude",
+        "public_location_mode",
+      ])
     ) {
+      logSupabaseSchemaDrift("provider_inventory_map", primaryResult.error, {
+        user_id: input.userId,
+        organization_id: input.organizationId ?? null,
+        scope: normalizedScope,
+        status_filter: statusFilter,
+      });
       return {
         ok: false as const,
-        message: "Inventory map listings are temporarily unavailable.",
+        message: createSchemaDriftMessage("Inventory map"),
         listings: [] as ProviderInventoryMapListing[],
         totalCount: 0,
         mappableCount: 0,
       };
     }
 
-    usedLegacyProjection = true;
-    let legacyQuery = supabase
-      .from("listings")
-      .select(PROVIDER_INVENTORY_MAP_LISTINGS_LEGACY_SELECT, { count: "exact" })
-      .order("updated_at", { ascending: false })
-      .limit(normalizedLimit)
-      .eq("owner_id", input.userId);
-
-    if (statusFilter !== "all") {
-      legacyQuery = legacyQuery.eq("listing_status", statusFilter);
-    }
-
-    const legacyResult = await legacyQuery;
-
-    if (legacyResult.error) {
-      return {
-        ok: false as const,
-        message: "Inventory map listings are temporarily unavailable.",
-        listings: [] as ProviderInventoryMapListing[],
-        totalCount: 0,
-        mappableCount: 0,
-      };
-    }
-
-    legacyRows = (legacyResult.data ?? []) as ProviderInventoryMapListingLegacyRow[];
-    totalCount = legacyResult.count ?? 0;
-  } else {
-    listingRows = (primaryResult.data ?? []) as ProviderInventoryMapListingRow[];
+    return {
+      ok: false as const,
+      message: "Inventory map listings are temporarily unavailable.",
+      listings: [] as ProviderInventoryMapListing[],
+      totalCount: 0,
+      mappableCount: 0,
+    };
   }
 
-  const unifiedRows: ProviderInventoryMapListingRow[] = usedLegacyProjection
-    ? legacyRows.map((listing) => ({
-        id: listing.id,
-        organization_id: null,
-        slug: listing.slug,
-        title: listing.title,
-        listing_status: listing.listing_status,
-        listing_type: listing.listing_type,
-        property_type: listing.property_type,
-        price_amount: listing.price_amount,
-        currency_code: listing.currency_code,
-        city: listing.city,
-        neighborhood: listing.neighborhood,
-        latitude: listing.latitude,
-        longitude: listing.longitude,
-        public_location_mode: listing.public_location_mode,
-        updated_at: listing.updated_at,
-      }))
-    : listingRows;
-
-  if (usedLegacyProjection) {
-    console.warn(
-      "[ProviderDashboard] listings ownership columns are missing; falling back to owner-only inventory map projection."
-    );
-  }
+  const unifiedRows = (primaryResult.data ?? []) as ProviderInventoryMapListingRow[];
+  const totalCount = primaryResult.count ?? 0;
 
   const listings = unifiedRows
     .map((listing) => {

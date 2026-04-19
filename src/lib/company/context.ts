@@ -4,6 +4,11 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { getCurrentUserProfile } from "@/lib/auth/profile";
 import { canEditCompanyProfile, canManageCompanyTeam } from "@/lib/company/permissions";
+import {
+  createSchemaDriftMessage,
+  isSupabaseSchemaDriftError,
+  logSupabaseSchemaDrift,
+} from "@/lib/supabase/schema-drift";
 import type { Database, Tables } from "@/types/database";
 
 export type CompanyWorkspaceSummary = Pick<
@@ -122,21 +127,6 @@ function buildEmptyCompanyMembershipContext(): CompanyMembershipContext {
   };
 }
 
-function isMissingOrganizationProfileColumnsError(message: string | undefined) {
-  if (!message) {
-    return false;
-  }
-
-  const normalized = message.toLowerCase();
-  return (
-    normalized.includes("column") &&
-    (normalized.includes("contact_email") ||
-      normalized.includes("contact_phone") ||
-      normalized.includes("website_url") ||
-      normalized.includes("coverage_area"))
-  );
-}
-
 async function persistActiveOrganizationId(
   supabase: SupabaseClient<Database>,
   input: { userId: string; organizationId: string | null }
@@ -160,6 +150,18 @@ async function loadResolvedCompanyMembershipContext(
     .order("created_at", { ascending: true });
 
   if (membershipQuery.error) {
+    if (
+      isSupabaseSchemaDriftError(membershipQuery.error, ["organization_members", "member_status"])
+    ) {
+      logSupabaseSchemaDrift("company_context_memberships", membershipQuery.error, {
+        user_id: profile.id,
+      });
+      return {
+        ok: false,
+        message: createSchemaDriftMessage("Company workspace"),
+      };
+    }
+
     return {
       ok: false,
       message: "Company workspace context could not be loaded.",
@@ -177,11 +179,28 @@ async function loadResolvedCompanyMembershipContext(
       .in("id", organizationIds);
 
     if (organizationQuery.error) {
+      if (
+        isSupabaseSchemaDriftError(organizationQuery.error, [
+          "organizations",
+          "contact_email",
+          "contact_phone",
+          "website_url",
+          "coverage_area",
+        ])
+      ) {
+        logSupabaseSchemaDrift("company_context_organizations", organizationQuery.error, {
+          user_id: profile.id,
+          organization_ids_count: organizationIds.length,
+        });
+        return {
+          ok: false,
+          message: createSchemaDriftMessage("Company workspace"),
+        };
+      }
+
       return {
         ok: false,
-        message: isMissingOrganizationProfileColumnsError(organizationQuery.error.message)
-          ? "Company workspace schema is out of date. Apply the latest Supabase migrations and retry."
-          : "Company workspace context could not be loaded.",
+        message: "Company workspace context could not be loaded.",
       };
     }
 

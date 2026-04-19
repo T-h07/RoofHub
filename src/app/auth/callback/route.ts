@@ -213,7 +213,6 @@ async function handleProfileBootstrapAfterCallback(input: {
           phase: "callback",
           reason: profileResult.reason,
           error_code: profileResult.details?.errorCode ?? null,
-          fetch_variant: profileResult.details?.fetchVariant ?? null,
           fetch_reason_category: profileResult.details?.fetchReasonCategory ?? null,
           ...requestFingerprint,
         },
@@ -224,7 +223,6 @@ async function handleProfileBootstrapAfterCallback(input: {
       next_path: nextPath,
       reason: profileResult.reason,
       error_code: profileResult.details?.errorCode ?? null,
-      fetch_variant: profileResult.details?.fetchVariant ?? null,
       fetch_reason_category: profileResult.details?.fetchReasonCategory ?? null,
     });
 

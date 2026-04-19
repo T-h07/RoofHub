@@ -7,7 +7,12 @@ import { resolveProviderListingCreationContext } from "@/lib/listings/ownership"
 import { recordCompanyListingCreatedWorkflowEvent } from "@/lib/listings/company-workflow/actions";
 import { AUDIT_EVENT_TYPES, recordSecurityAuditEvent } from "@/lib/security/audit";
 import { enforceTrafficControl, TRAFFIC_CONTROL_RULES } from "@/lib/security/traffic-control";
-import type { Database, Enums } from "@/types/database";
+import type { Enums } from "@/types/database";
+import {
+  createSchemaDriftMessage,
+  isSupabaseSchemaDriftError,
+  logSupabaseSchemaDrift,
+} from "@/lib/supabase/schema-drift";
 
 import {
   PROVIDER_WIZARD_DEFAULT_VALUES,
@@ -220,58 +225,13 @@ function normalizeSupabaseError(message: string) {
   }
 
   if (
-    isMissingContactMethodsColumnError(message) ||
-    isMissingContactChannelColumnError(message) ||
-    (normalized.includes("invalid input value for enum") &&
-      normalized.includes("preferred_contact_method"))
+    normalized.includes("invalid input value for enum") &&
+    normalized.includes("preferred_contact_method")
   ) {
     return CONTACT_SCHEMA_OUT_OF_DATE_MESSAGE;
   }
 
   return "Draft save failed. Please retry.";
-}
-
-function isMissingListingOwnershipColumnsError(input: {
-  code?: string | null;
-  message?: string | null;
-}) {
-  const message = (input.message ?? "").toLowerCase();
-  if (input.code !== "42703") {
-    return false;
-  }
-
-  return (
-    (message.includes("listings.organization_id") && message.includes("does not exist")) ||
-    (message.includes("listings.created_by_user_id") && message.includes("does not exist")) ||
-    (message.includes("listings.assigned_agent_user_id") && message.includes("does not exist")) ||
-    (message.includes("listings.published_by_user_id") && message.includes("does not exist"))
-  );
-}
-
-function isMissingContactMethodsColumnError(message: string | undefined) {
-  if (!message) {
-    return false;
-  }
-
-  const normalized = message.toLowerCase();
-  return (
-    normalized.includes("contact_methods") &&
-    (normalized.includes("does not exist") || normalized.includes("column"))
-  );
-}
-
-function isMissingContactChannelColumnError(message: string | undefined) {
-  if (!message) {
-    return false;
-  }
-
-  const normalized = message.toLowerCase();
-  return (
-    normalized.includes("column") &&
-    (normalized.includes("contact_email") ||
-      normalized.includes("whatsapp_phone") ||
-      normalized.includes("viber_phone"))
-  );
 }
 
 function slugifyTitle(value: string) {
@@ -346,29 +306,30 @@ async function ensureDraftAccess(
     };
   }
 
-  if (error && isMissingListingOwnershipColumnsError({ code: error.code ?? null, message: error.message ?? null })) {
-    const legacyResult = await supabase
-      .from("listings")
-      .select("id, owner_id, listing_status")
-      .eq("id", draftId)
-      .eq("owner_id", userId)
-      .limit(1)
-      .maybeSingle();
-
-    if (!legacyResult.error && legacyResult.data) {
-      console.warn(
-        "[ProviderWizard] listings ownership columns are missing; falling back to legacy draft access projection."
-      );
-      return {
-        ok: true as const,
-        listing: {
-          id: legacyResult.data.id,
-          owner_id: legacyResult.data.owner_id,
-          organization_id: null,
-          listing_status: legacyResult.data.listing_status,
-        },
-      };
-    }
+  if (
+    error &&
+    isSupabaseSchemaDriftError(error, [
+      "listings",
+      "organization_id",
+      "created_by_user_id",
+      "assigned_agent_user_id",
+      "published_by_user_id",
+    ])
+  ) {
+    logSupabaseSchemaDrift("provider_wizard_draft_access", error, {
+      user_id: userId,
+      listing_id: draftId,
+    });
+    return {
+      ok: false as const,
+      message: createSchemaDriftMessage("Listing draft"),
+      listing: null as {
+        id: string;
+        owner_id: string;
+        organization_id: string | null;
+        listing_status: string;
+      } | null,
+    };
   }
 
   if (error || !data) {
@@ -575,36 +536,30 @@ export async function saveProviderWizardStepAction(
         ...DRAFT_DEFAULTS,
       };
 
-      let { error } = await supabase.from("listings").insert(primaryInsertPayload);
-      let usedLegacyInsertProjection = false;
-
-      if (
-        error &&
-        isMissingListingOwnershipColumnsError({
-          code: error.code ?? null,
-          message: error.message ?? null,
-        })
-      ) {
-        usedLegacyInsertProjection = true;
-        console.warn(
-          "[ProviderWizard] listings ownership columns are missing; falling back to legacy draft insert projection."
-        );
-
-        const legacyInsertPayload = {
-          id: draftId,
-          owner_id: profile.id,
-          slug,
-          title: basicsValidation.payload.title,
-          description: basicsValidation.payload.description,
-          ...DRAFT_DEFAULTS,
-        } as unknown as Database["public"]["Tables"]["listings"]["Insert"];
-
-        const legacyInsertResult = await supabase.from("listings").insert(legacyInsertPayload);
-
-        error = legacyInsertResult.error;
-      }
+      const { error } = await supabase.from("listings").insert(primaryInsertPayload);
 
       if (error) {
+        if (
+          isSupabaseSchemaDriftError(error, [
+            "listings",
+            "organization_id",
+            "created_by_user_id",
+            "assigned_agent_user_id",
+            "published_by_user_id",
+          ])
+        ) {
+          logSupabaseSchemaDrift("provider_wizard_draft_insert", error, {
+            user_id: profile.id,
+            listing_id: draftId,
+            ownership_mode: listingCreationContext.ownershipMode,
+          });
+          return {
+            ok: false,
+            draftId: null,
+            message: createSchemaDriftMessage("Listing draft"),
+          };
+        }
+
         if (error.code === "23505") {
           const existingAccess = await ensureDraftAccess(draftId, profile.id, supabase);
           if (existingAccess.ok) {
@@ -648,8 +603,7 @@ export async function saveProviderWizardStepAction(
       });
 
       if (
-        listingCreationContext.ownershipMode === "company" &&
-        !usedLegacyInsertProjection
+        listingCreationContext.ownershipMode === "company"
       ) {
         await recordCompanyListingCreatedWorkflowEvent({
           listingId: draftId,
@@ -871,6 +825,26 @@ export async function saveProviderWizardStepAction(
         .maybeSingle();
 
       if (error) {
+        if (
+          isSupabaseSchemaDriftError(error, [
+            "profiles",
+            "contact_methods",
+            "contact_email",
+            "whatsapp_phone",
+            "viber_phone",
+          ])
+        ) {
+          logSupabaseSchemaDrift("provider_wizard_contact_settings", error, {
+            user_id: profile.id,
+            listing_id: candidateDraftId,
+          });
+          return {
+            ok: false,
+            draftId: candidateDraftId,
+            message: createSchemaDriftMessage("Profile contact"),
+          };
+        }
+
         return {
           ok: false,
           draftId: candidateDraftId,

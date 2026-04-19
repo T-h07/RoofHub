@@ -5,22 +5,17 @@ import {
   isPreferredContactMethod,
   isProviderAccountType,
 } from "@/lib/auth/roles";
+import {
+  createSchemaDriftMessage,
+  isSupabaseSchemaDriftError,
+  logSupabaseSchemaDrift,
+} from "@/lib/supabase/schema-drift";
 import type { Database, Tables } from "@/types/database";
 
 const PROFILE_SELECT =
   "id, role, provider_account_type, active_organization_id, display_name, avatar_url, phone, bio, preferred_contact_method, contact_methods, contact_email, whatsapp_phone, viber_phone, created_at, updated_at";
-const PROVIDER_COMPATIBLE_PROFILE_SELECT =
-  "id, role, display_name, avatar_url, phone, bio, preferred_contact_method, contact_methods, contact_email, whatsapp_phone, viber_phone, created_at, updated_at";
-const LEGACY_PROFILE_SELECT =
-  "id, role, display_name, avatar_url, phone, bio, preferred_contact_method, created_at, updated_at";
 
 export type AppProfile = Tables<"profiles">;
-type LegacyAppProfileRow = Omit<AppProfile, "contact_methods">;
-type CompatibleAppProfileRow = LegacyAppProfileRow & {
-  active_organization_id?: string | null;
-  contact_methods?: unknown;
-  provider_account_type?: unknown;
-};
 
 type EnsureProfileResult =
   | {
@@ -38,20 +33,17 @@ type EnsureProfileResult =
         | "profile_conflict_refetch_failed";
       details?: {
         errorCode?: string | null;
-        fetchVariant?: ProfileSelectVariant;
-        fetchReasonCategory?: "missing_column" | "query_failed";
+        fetchReasonCategory?: "schema_drift" | "query_failed";
       };
     };
 
-type ProfileSelectVariant = "full" | "provider_compatible" | "channel_compatible" | "legacy";
 type ProfileFetchFailureDetails = {
-  variant: ProfileSelectVariant;
   errorCode: string | null;
-  reasonCategory: "missing_column" | "query_failed";
+  reasonCategory: "schema_drift" | "query_failed";
 };
 
 type ProfileFetchResult =
-  | { ok: true; profile: AppProfile | null; variant: ProfileSelectVariant }
+  | { ok: true; profile: AppProfile | null }
   | {
       ok: false;
       message: string;
@@ -88,45 +80,7 @@ function logProfileBootstrapFailure(
   });
 }
 
-function isMissingContactMethodsColumnError(message: string | undefined) {
-  if (!message) {
-    return false;
-  }
-
-  const normalized = message.toLowerCase();
-  return (
-    normalized.includes("contact_methods") &&
-    (normalized.includes("does not exist") || normalized.includes("column"))
-  );
-}
-
-function isMissingContactChannelColumnError(message: string | undefined) {
-  if (!message) {
-    return false;
-  }
-
-  const normalized = message.toLowerCase();
-  return (
-    normalized.includes("column") &&
-    (normalized.includes("contact_email") ||
-      normalized.includes("whatsapp_phone") ||
-      normalized.includes("viber_phone"))
-  );
-}
-
-function isMissingProviderAccountTypeColumnError(message: string | undefined) {
-  if (!message) {
-    return false;
-  }
-
-  const normalized = message.toLowerCase();
-  return (
-    normalized.includes("provider_account_type") &&
-    (normalized.includes("does not exist") || normalized.includes("column"))
-  );
-}
-
-function normalizeProfileRow(row: CompatibleAppProfileRow): AppProfile {
+function normalizeProfileRow(row: AppProfile): AppProfile {
   const normalizedPreferredMethod = isPreferredContactMethod(row.preferred_contact_method)
     ? row.preferred_contact_method
     : null;
@@ -135,7 +89,7 @@ function normalizeProfileRow(row: CompatibleAppProfileRow): AppProfile {
         isPreferredContactMethod(method)
       )
     : [];
-  const fallbackContactMethods =
+  const fallbackContactMethods: AppProfile["contact_methods"] =
     normalizedContactMethods.length > 0
       ? normalizedContactMethods
       : normalizedPreferredMethod
@@ -144,10 +98,7 @@ function normalizeProfileRow(row: CompatibleAppProfileRow): AppProfile {
 
   return {
     ...row,
-    active_organization_id:
-      typeof row.active_organization_id === "string" && row.active_organization_id.length > 0
-        ? row.active_organization_id
-        : null,
+    active_organization_id: row.active_organization_id ?? null,
     provider_account_type: isProviderAccountType(row.provider_account_type)
       ? row.provider_account_type
       : "individual",
@@ -165,7 +116,7 @@ function normalizeProfileRow(row: CompatibleAppProfileRow): AppProfile {
       typeof row.viber_phone === "string" && row.viber_phone.trim().length > 0
         ? row.viber_phone.trim()
         : null,
-  } as AppProfile;
+  };
 }
 
 async function getAuthenticatedUser(supabase: SupabaseClient<Database>) {
@@ -185,96 +136,45 @@ async function fetchProfileByUserId(
   supabase: SupabaseClient<Database>,
   userId: string
 ): Promise<ProfileFetchResult> {
-  const queryVariants: Array<{
-    id: ProfileSelectVariant;
-    select: string;
-    normalize: (row: CompatibleAppProfileRow) => AppProfile;
-  }> = [
-    {
-      id: "full",
-      select: PROFILE_SELECT,
-      normalize: (row) => normalizeProfileRow(row as CompatibleAppProfileRow),
-    },
-    {
-        id: "provider_compatible",
-        select: PROVIDER_COMPATIBLE_PROFILE_SELECT,
-        normalize: (row) =>
-          normalizeProfileRow({
-            ...(row as CompatibleAppProfileRow),
-            active_organization_id: null,
-            provider_account_type: "individual",
-          }),
-    },
-    {
-      id: "channel_compatible",
-      select:
-        "id, role, display_name, avatar_url, phone, bio, preferred_contact_method, contact_methods, created_at, updated_at",
-        normalize: (row) =>
-          normalizeProfileRow({
-            ...(row as CompatibleAppProfileRow),
-            active_organization_id: null,
-            provider_account_type: "individual",
-            contact_email: null,
-            whatsapp_phone: null,
-          viber_phone: null,
-        }),
-    },
-    {
-      id: "legacy",
-      select: LEGACY_PROFILE_SELECT,
-        normalize: (row) =>
-          normalizeProfileRow({
-            ...(row as CompatibleAppProfileRow),
-            active_organization_id: null,
-            provider_account_type: "individual",
-            contact_email: null,
-            whatsapp_phone: null,
-          viber_phone: null,
-        }),
-    },
-  ];
+  const { data, error } = await supabase
+    .from("profiles")
+    .select(PROFILE_SELECT)
+    .eq("id", userId)
+    .maybeSingle();
 
-  let lastFailure: ProfileFetchFailureDetails = {
-    variant: "full",
-    errorCode: null,
-    reasonCategory: "query_failed",
-  };
-
-  for (const variant of queryVariants) {
-    const { data, error } = await supabase
-      .from("profiles")
-      .select(variant.select)
-      .eq("id", userId)
-      .maybeSingle();
-
-    if (!error) {
-      return {
-        ok: true,
-        profile: data ? variant.normalize(data as unknown as CompatibleAppProfileRow) : null,
-        variant: variant.id,
-      };
-    }
-
-    const isMissingColumnError =
-      isMissingProviderAccountTypeColumnError(error.message) ||
-      isMissingContactChannelColumnError(error.message) ||
-      isMissingContactMethodsColumnError(error.message);
-
-    lastFailure = {
-      variant: variant.id,
-      errorCode: error.code ?? null,
-      reasonCategory: isMissingColumnError ? "missing_column" : "query_failed",
+  if (!error) {
+    return {
+      ok: true,
+      profile: data ? normalizeProfileRow(data as AppProfile) : null,
     };
+  }
 
-    if (!isMissingColumnError) {
-      break;
-    }
+  const isSchemaDrift = isSupabaseSchemaDriftError(error, [
+    "profiles",
+    "provider_account_type",
+    "active_organization_id",
+    "contact_methods",
+    "contact_email",
+    "whatsapp_phone",
+    "viber_phone",
+  ]);
+
+  if (isSchemaDrift) {
+    logSupabaseSchemaDrift("profiles", error, {
+      user_id: userId,
+      select: PROFILE_SELECT,
+    });
   }
 
   return {
     ok: false,
-    message: "Could not load your profile. Please refresh and try again.",
-    details: lastFailure,
+    message: isSchemaDrift
+      ? createSchemaDriftMessage("Profile")
+      : "Could not load your profile. Please refresh and try again.",
+    details: {
+      errorCode: error.code ?? null,
+      reasonCategory: isSchemaDrift ? "schema_drift" : "query_failed",
+    },
   };
 }
 
@@ -297,7 +197,6 @@ export async function ensureProfileForCurrentUser(
   if (!existing.ok) {
     logProfileBootstrapFailure("profile_fetch_failed", {
       user_id: user.id,
-      fetch_variant: existing.details.variant,
       fetch_reason_category: existing.details.reasonCategory,
       error_code: existing.details.errorCode,
     });
@@ -307,7 +206,6 @@ export async function ensureProfileForCurrentUser(
       reason: "profile_fetch_failed",
       details: {
         errorCode: existing.details.errorCode,
-        fetchVariant: existing.details.variant,
         fetchReasonCategory: existing.details.reasonCategory,
       },
     };
@@ -334,10 +232,7 @@ export async function ensureProfileForCurrentUser(
     if (!createdProfile.ok || !createdProfile.profile) {
       logProfileBootstrapFailure("profile_insert_verification_failed", {
         user_id: user.id,
-        fetch_variant: createdProfile.ok ? "full" : createdProfile.details.variant,
-        fetch_reason_category: createdProfile.ok
-          ? "query_failed"
-          : createdProfile.details.reasonCategory,
+        fetch_reason_category: createdProfile.ok ? "query_failed" : createdProfile.details.reasonCategory,
         error_code: createdProfile.ok ? null : createdProfile.details.errorCode,
       });
       return {
@@ -349,7 +244,6 @@ export async function ensureProfileForCurrentUser(
           ? undefined
           : {
               errorCode: createdProfile.details.errorCode,
-              fetchVariant: createdProfile.details.variant,
               fetchReasonCategory: createdProfile.details.reasonCategory,
             },
       };
@@ -366,7 +260,6 @@ export async function ensureProfileForCurrentUser(
 
     logProfileBootstrapFailure("profile_conflict_refetch_failed", {
       user_id: user.id,
-      fetch_variant: conflictedProfile.ok ? "full" : conflictedProfile.details.variant,
       fetch_reason_category: conflictedProfile.ok
         ? "query_failed"
         : conflictedProfile.details.reasonCategory,
@@ -381,7 +274,6 @@ export async function ensureProfileForCurrentUser(
         ? undefined
         : {
             errorCode: conflictedProfile.details.errorCode,
-            fetchVariant: conflictedProfile.details.variant,
             fetchReasonCategory: conflictedProfile.details.reasonCategory,
           },
     };

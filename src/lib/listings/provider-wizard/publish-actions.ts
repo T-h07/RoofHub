@@ -16,6 +16,11 @@ import {
   deleteListingImageObjects,
   toListingImageInsertRows,
 } from "@/lib/supabase/storage/listing-images";
+import {
+  createSchemaDriftMessage,
+  isSupabaseSchemaDriftError,
+  logSupabaseSchemaDrift,
+} from "@/lib/supabase/schema-drift";
 
 import { buildWizardValuesFromDraft } from "./mapping";
 import { loadProviderDraftForEditor } from "./queries";
@@ -189,23 +194,6 @@ function normalizeSupabaseError(message: string) {
   return "Listing update failed. Please retry.";
 }
 
-function isMissingListingOwnershipColumnsError(input: {
-  code?: string | null;
-  message?: string | null;
-}) {
-  const message = (input.message ?? "").toLowerCase();
-  if (input.code !== "42703") {
-    return false;
-  }
-
-  return (
-    (message.includes("listings.organization_id") && message.includes("does not exist")) ||
-    (message.includes("listings.created_by_user_id") && message.includes("does not exist")) ||
-    (message.includes("listings.assigned_agent_user_id") && message.includes("does not exist")) ||
-    (message.includes("listings.published_by_user_id") && message.includes("does not exist"))
-  );
-}
-
 async function ensureProviderMutationContext(): Promise<ProviderMutationContext> {
   const supabase = await createServerSupabaseClient();
   const profileResult = await getCurrentUserProfile(supabase);
@@ -256,33 +244,25 @@ async function ensureDraftAccess(
     };
   }
 
-  if (error && isMissingListingOwnershipColumnsError({ code: error.code ?? null, message: error.message ?? null })) {
-    const legacyResult = await supabase
-      .from("listings")
-      .select("id, owner_id, listing_status, slug")
-      .eq("id", input.draftId)
-      .eq("owner_id", input.userId)
-      .limit(1)
-      .maybeSingle();
-
-    if (!legacyResult.error && legacyResult.data) {
-      console.warn(
-        "[ProviderWizard] listings ownership columns are missing; falling back to legacy draft access projection for photo/publish actions."
-      );
-      return {
-        ok: true as const,
-        listing: {
-          id: legacyResult.data.id,
-          owner_id: legacyResult.data.owner_id,
-          organization_id: null,
-          created_by_user_id: legacyResult.data.owner_id,
-          assigned_agent_user_id: null,
-          published_by_user_id: null,
-          listing_status: legacyResult.data.listing_status,
-          slug: legacyResult.data.slug,
-        } satisfies ProviderDraftAccess,
-      };
-    }
+  if (
+    error &&
+    isSupabaseSchemaDriftError(error, [
+      "listings",
+      "organization_id",
+      "created_by_user_id",
+      "assigned_agent_user_id",
+      "published_by_user_id",
+    ])
+  ) {
+    logSupabaseSchemaDrift("provider_photo_publish_draft_access", error, {
+      user_id: input.userId,
+      listing_id: input.draftId,
+    });
+    return {
+      ok: false as const,
+      message: createSchemaDriftMessage("Listing draft"),
+      listing: null as ProviderDraftAccess | null,
+    };
   }
 
   return {
@@ -806,34 +786,24 @@ export async function publishProviderListingDraftAction(
     .select("slug, listing_status")
     .limit(1);
 
-  let { data, error } = await updateQuery.maybeSingle();
+  const { data, error } = await updateQuery.maybeSingle();
 
   if (
     error &&
-    isMissingListingOwnershipColumnsError({
-      code: error.code ?? null,
-      message: error.message ?? null,
-    })
+    isSupabaseSchemaDriftError(error, [
+      "listings",
+      "published_by_user_id",
+      "organization_id",
+    ])
   ) {
-    console.warn(
-      "[ProviderWizard] listings ownership columns are missing; falling back to legacy publish update projection."
-    );
-
-    const legacyUpdateResult = await supabase
-      .from("listings")
-      .update({
-        listing_status: "published",
-        published_at: new Date().toISOString(),
-        archived_at: null,
-      })
-      .eq("id", draftResult.draft.id)
-      .eq("owner_id", profile.id)
-      .select("slug, listing_status")
-      .limit(1)
-      .maybeSingle();
-
-    data = legacyUpdateResult.data;
-    error = legacyUpdateResult.error;
+    logSupabaseSchemaDrift("provider_publish_update", error, {
+      user_id: profile.id,
+      listing_id: draftResult.draft.id,
+    });
+    return {
+      ok: false,
+      message: createSchemaDriftMessage("Listing publish"),
+    };
   }
 
   if (error || !data) {
