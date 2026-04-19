@@ -4,8 +4,9 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { getCurrentUserCompanyContext, type CompanyMembershipContext } from "@/lib/company/context";
 import type { Database, Tables } from "@/types/database";
+import type { ListingOwnershipMode } from "./ownership-model";
 
-export type ListingOwnershipMode = "individual" | "company";
+export * from "./ownership-model";
 
 type ProfileForListingOwnership = Pick<Tables<"profiles">, "id" | "provider_account_type">;
 
@@ -20,18 +21,6 @@ type ProviderListingCreationFailureReason =
   | "company_context_unavailable"
   | "company_workspace_required"
   | "company_workspace_selection_required";
-
-export function getListingOwnershipMode(input: {
-  organization_id: string | null;
-}): ListingOwnershipMode {
-  return input.organization_id ? "company" : "individual";
-}
-
-export function isCompanyOwnedListing(input: {
-  organization_id: string | null;
-}) {
-  return getListingOwnershipMode(input) === "company";
-}
 
 export async function resolveProviderListingCreationContext(
   supabase: SupabaseClient<Database>,

@@ -11,6 +11,8 @@ import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { getMapStyleUrl } from "@/lib/config/map";
+import { getListingOwnershipMode } from "@/lib/listings/ownership";
+import { getListingPublicVisibilityLabel, isPublicDiscoveryListing } from "@/lib/listings/visibility";
 import { getProviderRouteContext } from "@/lib/listings/provider-wizard/access";
 import { buildWizardValuesFromDraft } from "@/lib/listings/provider-wizard/mapping";
 import { parseProviderWizardStep } from "@/lib/listings/provider-wizard/steps";
@@ -78,9 +80,10 @@ export default async function EditDashboardListingPage({
   const values = buildWizardValuesFromDraft(draftResult.draft, contactResult.settings);
   const mapStyleUrl = getMapStyleUrl();
   const isHiddenByAdmin = draftResult.draft.listing_status === "hidden_by_admin";
-  const isPubliclyVisible = draftResult.draft.listing_status === "published";
-  const ownershipLabel = draftResult.draft.organization_id ? "Company listing" : "Individual listing";
-  const isCompanyListing = Boolean(draftResult.draft.organization_id);
+  const isPubliclyVisible = isPublicDiscoveryListing(draftResult.draft);
+  const ownershipMode = getListingOwnershipMode(draftResult.draft);
+  const ownershipLabel = ownershipMode === "company" ? "Company listing" : "Individual listing";
+  const isCompanyListing = ownershipMode === "company";
 
   return (
     <MainContainer size="wide" className="space-y-5">
@@ -99,7 +102,10 @@ export default async function EditDashboardListingPage({
             <span className="text-muted-foreground text-xs">Current status</span>
             <ProviderListingStatusBadge status={draftResult.draft.listing_status} />
             <span className="text-muted-foreground text-xs">
-              Public visibility: {isPubliclyVisible ? "Visible on explore/map/detail" : "Hidden from public discovery"}
+              Public visibility:{" "}
+              {isPubliclyVisible
+                ? "Visible on explore, map, and listing detail."
+                : getListingPublicVisibilityLabel(draftResult.draft.listing_status)}
             </span>
           </div>
           {isCompanyListing ? (

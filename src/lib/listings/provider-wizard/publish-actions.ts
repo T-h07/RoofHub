@@ -21,6 +21,7 @@ import {
   isSupabaseSchemaDriftError,
   logSupabaseSchemaDrift,
 } from "@/lib/supabase/schema-drift";
+import { canPublishFromProviderControls } from "@/lib/listings/ownership";
 
 import { buildWizardValuesFromDraft } from "./mapping";
 import { loadProviderDraftForEditor } from "./queries";
@@ -681,7 +682,7 @@ export async function publishProviderListingDraftAction(
     };
   }
 
-  if (draftResult.draft.organization_id) {
+  if (!canPublishFromProviderControls(draftResult.draft)) {
     return {
       ok: false,
       message:

@@ -3,6 +3,11 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { loadProviderUnreadLeadCount } from "@/lib/messaging/queries";
+import {
+  applyProviderListingWorkspaceScope,
+  createProviderListingWorkspaceScope,
+  getListingOwnershipMode,
+} from "@/lib/listings/ownership";
 import { createSchemaDriftMessage, isSupabaseSchemaDriftError, logSupabaseSchemaDrift } from "@/lib/supabase/schema-drift";
 import { createListingImageSignedUrl } from "@/lib/supabase/storage/listing-images";
 import type { Database } from "@/types/database";
@@ -111,17 +116,15 @@ async function countProviderListingsByStatus(
     status?: ProviderListingStatus;
   }
 ) {
-  let query = supabase
-    .from("listings")
-    .select("id", { count: "exact", head: true });
+  const workspaceScope = createProviderListingWorkspaceScope({
+    ownerUserId: input.userId,
+    organizationId: input.organizationId,
+  });
 
-  if (input.organizationId) {
-    query = query.or(
-      `organization_id.eq.${input.organizationId},and(organization_id.is.null,owner_id.eq.${input.userId})`
-    );
-  } else {
-    query = query.eq("owner_id", input.userId);
-  }
+  let query = applyProviderListingWorkspaceScope(
+    supabase.from("listings").select("id", { count: "exact", head: true }),
+    workspaceScope
+  );
 
   if (input.status) {
     query = query.eq("listing_status", input.status);
@@ -288,15 +291,11 @@ export async function loadProviderManagedListings(
       .order("created_at", { ascending: false })
       .limit(normalizedLimit);
 
-  let query = buildPrimaryQuery();
-
-  if (input.organizationId) {
-    query = query.or(
-      `organization_id.eq.${input.organizationId},and(organization_id.is.null,owner_id.eq.${input.userId})`
-    );
-  } else {
-    query = query.eq("owner_id", input.userId);
-  }
+  const workspaceScope = createProviderListingWorkspaceScope({
+    ownerUserId: input.userId,
+    organizationId: input.organizationId,
+  });
+  let query = applyProviderListingWorkspaceScope(buildPrimaryQuery(), workspaceScope);
 
   if (statusFilter !== "all") {
     query = query.eq("listing_status", statusFilter);
@@ -383,7 +382,7 @@ export async function loadProviderManagedListings(
       archived_at: listing.archived_at,
       updated_at: listing.updated_at,
       created_at: listing.created_at,
-      ownershipMode: listing.organization_id ? "company" : "individual",
+      ownershipMode: getListingOwnershipMode(listing),
       coverImagePath: coverEntry?.coverImagePath ?? null,
       coverImageUrl: coverEntry?.signedUrl ?? null,
     } satisfies ProviderManagedListing;
@@ -432,12 +431,14 @@ export async function loadProviderInventoryMapListings(
     }
 
     query = query.eq("organization_id", input.organizationId);
-  } else if (normalizedScope === "mixed" && input.organizationId) {
-    query = query.or(
-      `organization_id.eq.${input.organizationId},and(organization_id.is.null,owner_id.eq.${input.userId})`
-    );
   } else {
-    query = query.eq("owner_id", input.userId);
+    query = applyProviderListingWorkspaceScope(
+      query,
+      createProviderListingWorkspaceScope({
+        ownerUserId: input.userId,
+        organizationId: null,
+      })
+    );
   }
 
   if (statusFilter !== "all") {
@@ -506,7 +507,7 @@ export async function loadProviderInventoryMapListings(
         neighborhood: listing.neighborhood,
         public_location_mode: listing.public_location_mode,
         updated_at: listing.updated_at,
-        ownershipMode: listing.organization_id ? "company" : "individual",
+        ownershipMode: getListingOwnershipMode(listing),
         latitude,
         longitude,
       } satisfies ProviderInventoryMapListing;

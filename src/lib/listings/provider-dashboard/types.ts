@@ -1,4 +1,5 @@
 import type { Enums, Tables } from "@/types/database";
+import type { ListingOwnershipMode } from "@/lib/listings/ownership-model";
 
 export type ProviderListingType = Enums<"listing_type">;
 export type ProviderListingStatus = Enums<"listing_status">;
@@ -44,7 +45,7 @@ export type ProviderManagedListingRow = Pick<
 };
 
 export type ProviderManagedListing = Omit<ProviderManagedListingRow, "listing_images"> & {
-  ownershipMode: "individual" | "company";
+  ownershipMode: ListingOwnershipMode;
   coverImagePath: string | null;
   coverImageUrl: string | null;
 };
@@ -72,12 +73,12 @@ export type ProviderInventoryMapListing = Omit<
   ProviderInventoryMapListingRow,
   "latitude" | "longitude"
 > & {
-  ownershipMode: "individual" | "company";
+  ownershipMode: ListingOwnershipMode;
   latitude: number;
   longitude: number;
 };
 
-export type ProviderInventoryMapScope = "owner" | "organization" | "mixed";
+export type ProviderInventoryMapScope = "owner" | "organization";
 
 export type ProviderListingOverviewMetrics = {
   total: number;

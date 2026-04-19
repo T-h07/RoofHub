@@ -2,6 +2,7 @@ import "server-only";
 
 import { isPreferredContactMethod, type PreferredContactMethod } from "@/lib/auth/roles";
 import { loadFavoriteListingIdsForUser } from "@/lib/listings/favorites";
+import { getListingOwnershipMode } from "@/lib/listings/ownership";
 import { PUBLIC_DISCOVERY_STATUS } from "@/lib/listings/visibility";
 import { createServerSupabaseClient } from "@/lib/supabase";
 import { createListingImageSignedUrl } from "@/lib/supabase/storage/listing-images";
@@ -84,15 +85,15 @@ type PublicMoreFromCompanyRow = Pick<
     | null;
 };
 
-type ProviderPreviewCompatibilityRow = Pick<
+type ProviderPreviewRow = Pick<
   Tables<"profiles">,
   "id" | "display_name" | "avatar_url" | "bio" | "phone" | "created_at"
 > & {
-  preferred_contact_method: unknown;
-  contact_methods?: unknown;
-  contact_email?: string | null;
-  whatsapp_phone?: string | null;
-  viber_phone?: string | null;
+  preferred_contact_method: PreferredContactMethod | null;
+  contact_methods: PreferredContactMethod[];
+  contact_email: string | null;
+  whatsapp_phone: string | null;
+  viber_phone: string | null;
 };
 
 export type PublicListingDetailImage = {
@@ -255,40 +256,10 @@ const MORE_FROM_COMPANY_SELECT = `
 
 const PROVIDER_PREVIEW_SELECT =
   "id, display_name, avatar_url, bio, created_at, preferred_contact_method, contact_methods, phone, contact_email, whatsapp_phone, viber_phone";
-const PROVIDER_PREVIEW_CHANNEL_COMPAT_SELECT =
-  "id, display_name, avatar_url, bio, created_at, preferred_contact_method, contact_methods, phone";
-const PROVIDER_PREVIEW_LEGACY_SELECT =
-  "id, display_name, avatar_url, bio, created_at, preferred_contact_method, phone";
 const LISTING_SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const LISTING_SLUG_MAX_LENGTH = 120;
 const STRICT_COORDINATE_PATTERN = /^-?\d+(?:\.\d+)?$/;
 const MAX_COORDINATE_TOKEN_LENGTH = 32;
-
-function isMissingContactMethodsColumnError(message: string | undefined) {
-  if (!message) {
-    return false;
-  }
-
-  const normalized = message.toLowerCase();
-  return (
-    normalized.includes("contact_methods") &&
-    (normalized.includes("does not exist") || normalized.includes("column"))
-  );
-}
-
-function isMissingContactChannelColumnError(message: string | undefined) {
-  if (!message) {
-    return false;
-  }
-
-  const normalized = message.toLowerCase();
-  return (
-    normalized.includes("column") &&
-    (normalized.includes("contact_email") ||
-      normalized.includes("whatsapp_phone") ||
-      normalized.includes("viber_phone"))
-  );
-}
 
 function parseCoordinate(value: number | string) {
   if (typeof value === "number") {
@@ -372,16 +343,12 @@ function normalizeOptionalText(value: string | null | undefined) {
 }
 
 function normalizeProviderContactMethods(
-  row: ProviderPreviewCompatibilityRow
+  row: ProviderPreviewRow
 ) {
-  const preferred = isPreferredContactMethod(row.preferred_contact_method)
-    ? row.preferred_contact_method
-    : null;
-  const explicitMethods = Array.isArray(row.contact_methods)
-    ? row.contact_methods.filter((method): method is PreferredContactMethod =>
-        isPreferredContactMethod(method)
-      )
-    : [];
+  const preferred = row.preferred_contact_method;
+  const explicitMethods = row.contact_methods.filter((method): method is PreferredContactMethod =>
+    isPreferredContactMethod(method)
+  );
 
   const fallbackMethods: PreferredContactMethod[] =
     explicitMethods.length > 0
@@ -394,7 +361,7 @@ function normalizeProviderContactMethods(
 }
 
 function normalizeProviderPreview(
-  row: ProviderPreviewCompatibilityRow,
+  row: ProviderPreviewRow,
   trustSignals: {
     publishedListingCount: number | null;
     emailVerified: boolean | null;
@@ -437,6 +404,7 @@ async function fetchProviderPublishedListingCount(
     .from("listings")
     .select("id", { count: "exact", head: true })
     .eq("owner_id", providerId)
+    .is("organization_id", null)
     .eq("listing_status", PUBLIC_DISCOVERY_STATUS);
 
   if (error) {
@@ -577,93 +545,12 @@ async function fetchPublicListingProvider(
     return {
       ok: true as const,
       provider: full.data
-        ? normalizeProviderPreview(full.data as ProviderPreviewCompatibilityRow, trustSignals)
+        ? normalizeProviderPreview(full.data as ProviderPreviewRow, trustSignals)
         : null,
     };
   }
-
-  if (isMissingContactChannelColumnError(full.error.message)) {
-    const channelCompatible = await supabase
-      .from("profiles")
-      .select(PROVIDER_PREVIEW_CHANNEL_COMPAT_SELECT)
-      .eq("id", providerId)
-      .maybeSingle();
-
-    if (!channelCompatible.error) {
-      return {
-        ok: true as const,
-        provider: channelCompatible.data
-          ? normalizeProviderPreview({
-              ...(channelCompatible.data as ProviderPreviewCompatibilityRow),
-              contact_email: null,
-              whatsapp_phone: null,
-              viber_phone: null,
-            }, trustSignals)
-          : null,
-      };
-    }
-
-    if (!isMissingContactMethodsColumnError(channelCompatible.error.message)) {
-      return {
-        ok: false as const,
-      };
-    }
-
-    const legacy = await supabase
-      .from("profiles")
-      .select(PROVIDER_PREVIEW_LEGACY_SELECT)
-      .eq("id", providerId)
-      .maybeSingle();
-
-    if (legacy.error) {
-      return {
-        ok: false as const,
-      };
-    }
-
-    return {
-      ok: true as const,
-      provider: legacy.data
-        ? normalizeProviderPreview({
-            ...(legacy.data as ProviderPreviewCompatibilityRow),
-            contact_methods: [],
-            contact_email: null,
-            whatsapp_phone: null,
-            viber_phone: null,
-          }, trustSignals)
-        : null,
-    };
-  }
-
-  if (!isMissingContactMethodsColumnError(full.error.message)) {
-    return {
-      ok: false as const,
-    };
-  }
-
-  const legacy = await supabase
-    .from("profiles")
-    .select(PROVIDER_PREVIEW_LEGACY_SELECT)
-    .eq("id", providerId)
-    .maybeSingle();
-
-  if (legacy.error) {
-    return {
-      ok: false as const,
-    };
-  }
-
   return {
-    ok: true as const,
-    provider: legacy.data
-      ? normalizeProviderPreview({
-          ...(legacy.data as ProviderPreviewCompatibilityRow),
-          contact_methods: [],
-          contact_email: null,
-          whatsapp_phone: null,
-          viber_phone: null,
-        }, trustSignals)
-      : null,
+    ok: false as const,
   };
 }
 
@@ -726,13 +613,19 @@ export async function loadPublicListingDetailBySlug(
       supabase,
       listingRow.organization
     );
+    const ownershipMode = getListingOwnershipMode(listingRow);
     const assignedAgent = companyAttribution
       ? normalizePublicListingAssignedAgent(listingRow.assignedAgentProfile)
       : null;
 
     const [providerResult, favoriteResult, companyPublishedListingCount, moreFromCompany] =
       await Promise.all([
-      fetchPublicListingProvider(supabase, listingRow.owner_id),
+      ownershipMode === "individual"
+        ? fetchPublicListingProvider(supabase, listingRow.owner_id)
+        : Promise.resolve({
+            ok: true as const,
+            provider: null as PublicListingDetailProvider | null,
+          }),
       user
         ? supabase
             .from("favorites")
@@ -754,6 +647,14 @@ export async function loadPublicListingDetailBySlug(
           })
         : Promise.resolve([] as PublicListingDetailMoreFromCompanyListing[]),
     ]);
+
+    if (ownershipMode === "individual" && (!providerResult.ok || !providerResult.provider)) {
+      return {
+        ok: false,
+        reason: "error",
+        message: "Listing provider details could not be loaded right now. Please try again.",
+      };
+    }
 
     const images = normalizeImages(listingRow.listing_images);
     const signedImages = await Promise.all(
@@ -777,7 +678,7 @@ export async function loadPublicListingDetailBySlug(
     const coverImage =
       signedImages.find((image) => image.isCover) ?? signedImages[0] ?? null;
     const provider: PublicListingDetailProvider | null = providerResult.ok
-      ? providerResult.provider
+      ? providerResult.provider ?? null
       : null;
     const company: PublicListingDetailCompany | null = companyAttribution
       ? {

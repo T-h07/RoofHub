@@ -173,7 +173,9 @@ export default async function ListingDetailPage({
             signInHref={signInHref}
           />
 
-          <ListingProviderCard provider={listing.provider} isOwner={isOwner} />
+          {listing.provider || !listing.company ? (
+            <ListingProviderCard provider={listing.provider} isOwner={isOwner} />
+          ) : null}
         </aside>
 
         <div className="order-2 space-y-6 xl:order-1">

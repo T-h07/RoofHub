@@ -6,6 +6,7 @@ import { AUDIT_EVENT_TYPES, recordSecurityAuditEvent } from "@/lib/security/audi
 import { enforceTrafficControl, TRAFFIC_CONTROL_RULES } from "@/lib/security/traffic-control";
 import { createServerSupabaseClient } from "@/lib/supabase";
 import { createSchemaDriftMessage, isSupabaseSchemaDriftError, logSupabaseSchemaDrift } from "@/lib/supabase/schema-drift";
+import { canPublishFromProviderControls } from "@/lib/listings/ownership";
 import { canTransitionProviderListingStatus } from "@/lib/listings/provider-wizard/status-transitions";
 import { isProviderListingStatus } from "./types";
 
@@ -322,7 +323,7 @@ export async function updateProviderListingLifecycleStatusAction(
 
   const currentListing = listingResult.listing;
 
-  if (currentListing.organization_id) {
+  if (!canPublishFromProviderControls(currentListing)) {
     return {
       ok: false,
       message:

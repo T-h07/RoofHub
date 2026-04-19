@@ -19,7 +19,6 @@ type PublicCompanyProfileRow = Pick<
   | "contact_phone"
   | "website_url"
   | "coverage_area"
-  | "created_by_user_id"
   | "created_at"
   | "updated_at"
   | "status"
@@ -56,7 +55,7 @@ export type PublicCompanyListingPreview = Omit<PublicCompanyListingRow, "listing
 
 export type PublicCompanyProfile = Omit<
   PublicCompanyProfileRow,
-  "created_by_user_id" | "logo_path"
+  "logo_path"
 > & {
   logoPath: string | null;
   logoUrl: string | null;
@@ -176,7 +175,7 @@ export async function loadPublicCompanyProfileBySlug(
     const { data: companyRow, error: companyError } = await supabase
       .from("organizations")
       .select(
-        "id, name, slug, description, logo_path, contact_email, contact_phone, website_url, coverage_area, created_by_user_id, created_at, updated_at, status"
+        "id, name, slug, description, logo_path, contact_email, contact_phone, website_url, coverage_area, created_at, updated_at, status"
       )
       .eq("slug", normalizedSlug)
       .eq("status", "active")
@@ -206,9 +205,7 @@ export async function loadPublicCompanyProfileBySlug(
       .from("listings")
       .select(PUBLIC_COMPANY_LISTINGS_SELECT, { count: "exact" })
       .eq("listing_status", PUBLIC_DISCOVERY_STATUS)
-      .or(
-        `organization_id.eq.${companyProfileRow.id},and(organization_id.is.null,owner_id.eq.${companyProfileRow.created_by_user_id})`
-      )
+      .eq("organization_id", companyProfileRow.id)
       .order("published_at", {
         ascending: false,
         nullsFirst: false,

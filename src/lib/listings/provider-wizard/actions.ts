@@ -3,7 +3,11 @@
 import { createServerSupabaseClient } from "@/lib/supabase";
 import { getCurrentUserProfile } from "@/lib/auth/profile";
 import { isProviderRole } from "@/lib/auth/roles";
-import { resolveProviderListingCreationContext } from "@/lib/listings/ownership";
+import {
+  buildListingDraftOwnershipPayload,
+  createProviderListingWorkspaceScope,
+  resolveProviderListingCreationContext,
+} from "@/lib/listings/ownership";
 import { recordCompanyListingCreatedWorkflowEvent } from "@/lib/listings/company-workflow/actions";
 import { AUDIT_EVENT_TYPES, recordSecurityAuditEvent } from "@/lib/security/audit";
 import { enforceTrafficControl, TRAFFIC_CONTROL_RULES } from "@/lib/security/traffic-control";
@@ -522,14 +526,17 @@ export async function saveProviderWizardStepAction(
       }
 
       const listingCreationContext = listingCreationContextResult.context;
+      const workspaceScope = createProviderListingWorkspaceScope({
+        ownerUserId: profile.id,
+        organizationId: listingCreationContext.organizationId,
+      });
 
       const primaryInsertPayload = {
         id: draftId,
-        owner_id: profile.id,
-        organization_id: listingCreationContext.organizationId,
-        created_by_user_id: profile.id,
-        assigned_agent_user_id:
-          listingCreationContext.ownershipMode === "company" ? profile.id : null,
+        ...buildListingDraftOwnershipPayload({
+          actorUserId: profile.id,
+          scope: workspaceScope,
+        }),
         slug,
         title: basicsValidation.payload.title,
         description: basicsValidation.payload.description,

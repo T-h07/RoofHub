@@ -7,6 +7,7 @@ import { ProviderListingStatusBadge } from "@/components/dashboard/provider-list
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import type { ProviderManagedListing, ProviderListingType } from "@/lib/listings/provider-dashboard/types";
+import { isPublicDiscoveryListing } from "@/lib/listings/visibility";
 
 type ProviderManagedListingsListProps = {
   listings: ProviderManagedListing[];
@@ -134,7 +135,7 @@ export function ProviderManagedListingsList({ listings }: ProviderManagedListing
                         <MapPin className="size-3.5" aria-hidden="true" />
                         {formatLocationLabel(listing)}
                       </p>
-                      {listing.slug && listing.listing_status === "published" ? (
+                      {listing.slug && isPublicDiscoveryListing(listing) ? (
                         <Link
                           href={`/listing/${listing.slug}`}
                           className="text-primary inline-flex items-center gap-1 text-xs hover:underline"
@@ -223,7 +224,7 @@ export function ProviderManagedListingsList({ listings }: ProviderManagedListing
               <p>{formatPriceLabel(listing)}</p>
               <p>{formatLocationLabel(listing)}</p>
               <p>Updated {formatTimestamp(listing.updated_at)}</p>
-              {listing.slug && listing.listing_status === "published" ? (
+              {listing.slug && isPublicDiscoveryListing(listing) ? (
                 <Link
                   href={`/listing/${listing.slug}`}
                   className="text-primary inline-flex items-center gap-1 hover:underline"

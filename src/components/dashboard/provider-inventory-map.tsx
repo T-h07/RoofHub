@@ -20,6 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { buttonVariants } from "@/components/ui/button";
 import type { ProviderInventoryMapListing } from "@/lib/listings/provider-dashboard/types";
+import { isPublicDiscoveryListing } from "@/lib/listings/visibility";
 import { cn } from "@/lib/utils";
 
 type ProviderInventoryMapProps = {
@@ -246,7 +247,7 @@ export function ProviderInventoryMap({
                       >
                         Open listing
                       </Link>
-                      {selectedListing.slug && selectedListing.listing_status === "published" ? (
+                      {selectedListing.slug && isPublicDiscoveryListing(selectedListing) ? (
                         <Link
                           href={`/listing/${selectedListing.slug}`}
                           className={cn(
