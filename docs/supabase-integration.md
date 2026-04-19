@@ -66,6 +66,18 @@ If you prefer direct DB-url mode for migration checks/push, use a server-only sh
 2. `npx supabase migration list --db-url "$DATABASE_URL"`
 3. `npx supabase db push --db-url "$DATABASE_URL"`
 
+## Local drift verification
+
+Use these repository scripts to fail fast on schema/type drift instead of relying on runtime compatibility:
+
+1. `npm run supabase:db:reset`
+2. `npm run verify:supabase:drift`
+
+If `src/types/database.ts` is stale, regenerate it with:
+
+1. `npm run supabase:types:generate`
+2. commit the updated types with the migration change
+
 ## File layout
 
 - `src/lib/supabase/env.ts`: runtime env validation and Supabase config access

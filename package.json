@@ -8,6 +8,10 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
+    "supabase:db:reset": "npx supabase db reset --local --no-seed --yes",
+    "supabase:types:generate": "npx supabase gen types --local --lang typescript > src/types/database.ts",
+    "verify:supabase:drift": "node tools/verify-supabase-drift.mjs",
+    "verify:supabase:drift:fresh": "npm run supabase:db:reset && npm run verify:supabase:drift",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },

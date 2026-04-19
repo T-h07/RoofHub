@@ -67,6 +67,13 @@ Type generation after schema changes:
 npx supabase gen types typescript --local > src/types/database.ts
 ```
 
+Repository verification commands:
+
+```bash
+npm run supabase:db:reset
+npm run verify:supabase:drift
+```
+
 ## Notes for PT05+
 
 - PT05 RLS policies are now defined in `docs/rls-policies.md` and applied via migration.

@@ -303,8 +303,8 @@ export type Database = {
           price_amount: number
           property_type: Database["public"]["Enums"]["property_type"]
           public_location_mode: Database["public"]["Enums"]["public_location_mode"]
-          published_by_user_id: string | null
           published_at: string | null
+          published_by_user_id: string | null
           slug: string
           title: string
           total_floors: number | null
@@ -344,8 +344,8 @@ export type Database = {
           price_amount: number
           property_type: Database["public"]["Enums"]["property_type"]
           public_location_mode?: Database["public"]["Enums"]["public_location_mode"]
-          published_by_user_id?: string | null
           published_at?: string | null
+          published_by_user_id?: string | null
           slug: string
           title: string
           total_floors?: number | null
@@ -385,8 +385,8 @@ export type Database = {
           price_amount?: number
           property_type?: Database["public"]["Enums"]["property_type"]
           public_location_mode?: Database["public"]["Enums"]["public_location_mode"]
-          published_by_user_id?: string | null
           published_at?: string | null
+          published_by_user_id?: string | null
           slug?: string
           title?: string
           total_floors?: number | null
@@ -473,64 +473,6 @@ export type Database = {
           },
         ]
       }
-      organization_members: {
-        Row: {
-          created_at: string
-          id: string
-          invited_by_user_id: string | null
-          joined_at: string
-          member_status: Database["public"]["Enums"]["organization_member_status"]
-          organization_id: string
-          role: Database["public"]["Enums"]["organization_member_role"]
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          invited_by_user_id?: string | null
-          joined_at?: string
-          member_status?: Database["public"]["Enums"]["organization_member_status"]
-          organization_id: string
-          role?: Database["public"]["Enums"]["organization_member_role"]
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          invited_by_user_id?: string | null
-          joined_at?: string
-          member_status?: Database["public"]["Enums"]["organization_member_status"]
-          organization_id?: string
-          role?: Database["public"]["Enums"]["organization_member_role"]
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "organization_members_invited_by_user_id_fkey"
-            columns: ["invited_by_user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "organization_members_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "organization_members_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       organization_member_invites: {
         Row: {
           accepted_at: string | null
@@ -602,6 +544,64 @@ export type Database = {
           {
             foreignKeyName: "organization_member_invites_target_user_id_fkey"
             columns: ["target_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organization_members: {
+        Row: {
+          created_at: string
+          id: string
+          invited_by_user_id: string | null
+          joined_at: string
+          member_status: Database["public"]["Enums"]["organization_member_status"]
+          organization_id: string
+          role: Database["public"]["Enums"]["organization_member_role"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          invited_by_user_id?: string | null
+          joined_at?: string
+          member_status?: Database["public"]["Enums"]["organization_member_status"]
+          organization_id: string
+          role?: Database["public"]["Enums"]["organization_member_role"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          invited_by_user_id?: string | null
+          joined_at?: string
+          member_status?: Database["public"]["Enums"]["organization_member_status"]
+          organization_id?: string
+          role?: Database["public"]["Enums"]["organization_member_role"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_members_invited_by_user_id_fkey"
+            columns: ["invited_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organization_members_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "organization_members_user_id_fkey"
+            columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -732,6 +732,33 @@ export type Database = {
           },
         ]
       }
+      rate_limit_counters: {
+        Row: {
+          actor_key: string
+          bucket: string
+          hit_count: number
+          updated_at: string
+          window_ends_at: string
+          window_started_at: string
+        }
+        Insert: {
+          actor_key: string
+          bucket: string
+          hit_count?: number
+          updated_at?: string
+          window_ends_at: string
+          window_started_at: string
+        }
+        Update: {
+          actor_key?: string
+          bucket?: string
+          hit_count?: number
+          updated_at?: string
+          window_ends_at?: string
+          window_started_at?: string
+        }
+        Relationships: []
+      }
       security_audit_events: {
         Row: {
           actor_role: Database["public"]["Enums"]["app_role"] | null
@@ -809,38 +836,30 @@ export type Database = {
           },
         ]
       }
-      rate_limit_counters: {
-        Row: {
-          actor_key: string
-          bucket: string
-          hit_count: number
-          updated_at: string
-          window_ends_at: string
-          window_started_at: string
-        }
-        Insert: {
-          actor_key: string
-          bucket: string
-          hit_count?: number
-          updated_at?: string
-          window_ends_at: string
-          window_started_at: string
-        }
-        Update: {
-          actor_key?: string
-          bucket?: string
-          hit_count?: number
-          updated_at?: string
-          window_ends_at?: string
-          window_started_at?: string
-        }
-        Relationships: []
-      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      accept_organization_member_invite: {
+        Args: { p_invite_token: string }
+        Returns: {
+          acceptance_outcome: string
+          invite_id: string
+          invite_status: Database["public"]["Enums"]["organization_invite_status"]
+          member_id: string
+          membership_role: Database["public"]["Enums"]["organization_member_role"]
+          organization_id: string
+        }[]
+      }
+      can_access_active_company_conversation_listing: {
+        Args: { p_listing_id: string; p_user_id?: string }
+        Returns: boolean
+      }
+      company_logo_organization_id: {
+        Args: { object_name: string }
+        Returns: string
+      }
       consume_rate_limit_token: {
         Args: {
           actor_key_input: string
@@ -854,14 +873,6 @@ export type Database = {
           retry_after_seconds: number
         }[]
       }
-      create_organization_workspace: {
-        Args: { p_description?: string; p_name: string }
-        Returns: {
-          organization_id: string
-          organization_slug: string
-          owner_member_id: string
-        }[]
-      }
       create_organization_member_invite: {
         Args: {
           p_expires_in_days?: number
@@ -872,37 +883,200 @@ export type Database = {
         }
         Returns: {
           expires_at: string
-          invite_email: string | null
+          invite_email: string
           invite_id: string
           invite_role: Database["public"]["Enums"]["organization_member_role"]
           invite_status: Database["public"]["Enums"]["organization_invite_status"]
           invite_token: string
           organization_id: string
-          target_user_id: string | null
+          target_user_id: string
         }[]
       }
-      accept_organization_member_invite: {
+      create_organization_workspace: {
+        Args: { p_description?: string; p_name: string }
+        Returns: {
+          organization_id: string
+          organization_slug: string
+          owner_member_id: string
+        }[]
+      }
+      current_active_organization_id: {
+        Args: { p_user_id?: string }
+        Returns: string
+      }
+      current_user_primary_email: { Args: never; Returns: string }
+      get_company_dashboard_activity_feed: {
         Args: {
-          p_invite_token: string
+          p_limit?: number
+          p_organization_id: string
+          p_viewer_user_id?: string
         }
         Returns: {
-          acceptance_outcome: string
-          invite_id: string
-          invite_status: Database["public"]["Enums"]["organization_invite_status"]
-          member_id: string
-          membership_role: Database["public"]["Enums"]["organization_member_role"]
+          actor_display_name: string
+          actor_user_id: string
+          event_id: string
+          event_source: string
+          event_type: string
+          metadata: Json
+          occurred_at: string
+          target_id: string
+          target_label: string
+        }[]
+      }
+      get_company_dashboard_overview: {
+        Args: { p_organization_id: string; p_viewer_user_id?: string }
+        Returns: {
+          active_member_count: number
+          draft_count: number
+          needs_changes_count: number
           organization_id: string
+          pending_invite_count: number
+          pending_review_count: number
+          published_count: number
+          viewer_role: Database["public"]["Enums"]["organization_member_role"]
+        }[]
+      }
+      get_company_dashboard_pending_queue: {
+        Args: {
+          p_limit?: number
+          p_organization_id: string
+          p_viewer_user_id?: string
+        }
+        Returns: {
+          assigned_agent_display_name: string
+          assigned_agent_user_id: string
+          city: string
+          created_at: string
+          created_by_display_name: string
+          created_by_user_id: string
+          listing_id: string
+          listing_status: Database["public"]["Enums"]["listing_status"]
+          listing_type: Database["public"]["Enums"]["listing_type"]
+          neighborhood: string
+          property_type: Database["public"]["Enums"]["property_type"]
+          submitted_at: string
+          title: string
+          updated_at: string
+        }[]
+      }
+      get_company_listing_workflow_listing: {
+        Args: { p_listing_id: string; p_viewer_user_id?: string }
+        Returns: {
+          assigned_agent_user_id: string
+          created_by_user_id: string
+          id: string
+          listing_status: Database["public"]["Enums"]["listing_status"]
+          organization_id: string
+          owner_id: string
+          published_by_user_id: string
+          slug: string
+          title: string
+          updated_at: string
+        }[]
+      }
+      is_active_organization_member: {
+        Args: { p_organization_id: string; p_user_id?: string }
+        Returns: boolean
+      }
+      is_admin: { Args: never; Returns: boolean }
+      is_company_listing_reviewer: {
+        Args: { p_organization_id: string; p_user_id?: string }
+        Returns: boolean
+      }
+      is_organization_owner_or_admin: {
+        Args: { p_organization_id: string; p_user_id?: string }
+        Returns: boolean
+      }
+      is_valid_company_logo_path: {
+        Args: { object_name: string }
+        Returns: boolean
+      }
+      is_valid_listing_image_path: {
+        Args: { object_name: string }
+        Returns: boolean
+      }
+      is_valid_profile_avatar_path: {
+        Args: { object_name: string }
+        Returns: boolean
+      }
+      listing_image_listing_id: {
+        Args: { object_name: string }
+        Returns: string
+      }
+      listing_image_owner_id: { Args: { object_name: string }; Returns: string }
+      log_listing_workflow_event: {
+        Args: {
+          p_actor_user_id?: string
+          p_event_type: Database["public"]["Enums"]["listing_workflow_event_type"]
+          p_from_status?: Database["public"]["Enums"]["listing_status"]
+          p_listing_id: string
+          p_metadata?: Json
+          p_note?: string
+          p_to_status?: Database["public"]["Enums"]["listing_status"]
+        }
+        Returns: string
+      }
+      log_security_audit_event: {
+        Args: {
+          p_actor_role?: Database["public"]["Enums"]["app_role"]
+          p_actor_user_id?: string
+          p_conversation_id?: string
+          p_event_type: string
+          p_from_status?: Database["public"]["Enums"]["listing_status"]
+          p_listing_id?: string
+          p_metadata?: Json
+          p_report_id?: string
+          p_target_id?: string
+          p_target_type?: string
+          p_to_status?: Database["public"]["Enums"]["listing_status"]
+        }
+        Returns: string
+      }
+      organization_active_member_count: {
+        Args: { p_organization_id: string; p_user_id?: string }
+        Returns: number
+      }
+      organization_active_member_role: {
+        Args: { p_organization_id: string; p_user_id?: string }
+        Returns: Database["public"]["Enums"]["organization_member_role"]
+      }
+      organization_active_owner_count: {
+        Args: { p_organization_id: string }
+        Returns: number
+      }
+      profile_avatar_owner_id: {
+        Args: { object_name: string }
+        Returns: string
+      }
+      remove_organization_member: {
+        Args: { p_membership_id: string }
+        Returns: {
+          membership_id: string
+          organization_id: string
+          removed_role: Database["public"]["Enums"]["organization_member_role"]
+          removed_status: Database["public"]["Enums"]["organization_member_status"]
+          user_id: string
         }[]
       }
       revoke_organization_member_invite: {
-        Args: {
-          p_invite_id: string
-        }
+        Args: { p_invite_id: string }
         Returns: {
           invite_id: string
           invite_role: Database["public"]["Enums"]["organization_member_role"]
           invite_status: Database["public"]["Enums"]["organization_invite_status"]
           organization_id: string
+        }[]
+      }
+      transition_company_listing_workflow: {
+        Args: { p_action: string; p_listing_id: string; p_note?: string }
+        Returns: {
+          event_type: Database["public"]["Enums"]["listing_workflow_event_type"]
+          listing_id: string
+          next_status: Database["public"]["Enums"]["listing_status"]
+          organization_id: string
+          previous_status: Database["public"]["Enums"]["listing_status"]
+          published_at: string
+          published_by_user_id: string
         }[]
       }
       update_organization_member_role: {
@@ -932,208 +1106,23 @@ export type Database = {
           user_id: string
         }[]
       }
-      remove_organization_member: {
-        Args: {
-          p_membership_id: string
-        }
-        Returns: {
-          membership_id: string
-          organization_id: string
-          removed_role: Database["public"]["Enums"]["organization_member_role"]
-          removed_status: Database["public"]["Enums"]["organization_member_status"]
-          user_id: string
-        }[]
-      }
-      get_company_dashboard_activity_feed: {
-        Args: {
-          p_limit?: number
-          p_organization_id: string
-          p_viewer_user_id?: string
-        }
-        Returns: {
-          actor_display_name: string | null
-          actor_user_id: string | null
-          event_id: string
-          event_source: string
-          event_type: string
-          metadata: Json
-          occurred_at: string
-          target_id: string
-          target_label: string
-        }[]
-      }
-      get_company_dashboard_overview: {
-        Args: {
-          p_organization_id: string
-          p_viewer_user_id?: string
-        }
-        Returns: {
-          active_member_count: number
-          draft_count: number
-          needs_changes_count: number
-          organization_id: string
-          pending_invite_count: number
-          pending_review_count: number
-          published_count: number
-          viewer_role: Database["public"]["Enums"]["organization_member_role"]
-        }[]
-      }
-      get_company_dashboard_pending_queue: {
-        Args: {
-          p_limit?: number
-          p_organization_id: string
-          p_viewer_user_id?: string
-        }
-        Returns: {
-          assigned_agent_display_name: string | null
-          assigned_agent_user_id: string | null
-          city: string
-          created_at: string
-          created_by_display_name: string | null
-          created_by_user_id: string
-          listing_id: string
-          listing_status: Database["public"]["Enums"]["listing_status"]
-          listing_type: Database["public"]["Enums"]["listing_type"]
-          neighborhood: string | null
-          property_type: Database["public"]["Enums"]["property_type"]
-          submitted_at: string | null
-          title: string
-          updated_at: string
-        }[]
-      }
-      get_company_listing_workflow_listing: {
-        Args: {
-          p_listing_id: string
-          p_viewer_user_id?: string
-        }
-        Returns: {
-          assigned_agent_user_id: string | null
-          created_by_user_id: string
-          id: string
-          listing_status: Database["public"]["Enums"]["listing_status"]
-          organization_id: string | null
-          owner_id: string
-          published_by_user_id: string | null
-          slug: string | null
-          title: string
-          updated_at: string
-        }[]
-      }
-      current_user_primary_email: {
-        Args: never
-        Returns: string
-      }
-      organization_active_member_count: {
-        Args: {
-          p_organization_id: string
-          p_user_id?: string
-        }
-        Returns: number
-      }
-      organization_active_member_role: {
-        Args: {
-          p_organization_id: string
-          p_user_id?: string
-        }
-        Returns: Database["public"]["Enums"]["organization_member_role"]
-      }
-      organization_active_owner_count: {
-        Args: {
-          p_organization_id: string
-        }
-        Returns: number
-      }
-      is_organization_owner_or_admin: {
-        Args: {
-          p_organization_id: string
-          p_user_id?: string
-        }
-        Returns: boolean
-      }
-      is_active_organization_member: {
-        Args: {
-          p_organization_id: string
-          p_user_id?: string
-        }
-        Returns: boolean
-      }
-      is_company_listing_reviewer: {
-        Args: {
-          p_organization_id: string
-          p_user_id?: string
-        }
-        Returns: boolean
-      }
-      is_admin: { Args: never; Returns: boolean }
-      log_listing_workflow_event: {
-        Args: {
-          p_actor_user_id?: string
-          p_event_type: Database["public"]["Enums"]["listing_workflow_event_type"]
-          p_from_status?: Database["public"]["Enums"]["listing_status"]
-          p_listing_id: string
-          p_metadata?: Json
-          p_note?: string
-          p_to_status?: Database["public"]["Enums"]["listing_status"]
-        }
-        Returns: string
-      }
-      log_security_audit_event: {
-        Args: {
-          p_actor_role?: Database["public"]["Enums"]["app_role"]
-          p_actor_user_id?: string
-          p_conversation_id?: string
-          p_event_type: string
-          p_from_status?: Database["public"]["Enums"]["listing_status"]
-          p_listing_id?: string
-          p_metadata?: Json
-          p_report_id?: string
-          p_target_id?: string
-          p_target_type?: string
-          p_to_status?: Database["public"]["Enums"]["listing_status"]
-        }
-        Returns: string
-      }
-      transition_company_listing_workflow: {
-        Args: {
-          p_action: string
-          p_listing_id: string
-          p_note?: string
-        }
-        Returns: {
-          event_type: Database["public"]["Enums"]["listing_workflow_event_type"]
-          listing_id: string
-          next_status: Database["public"]["Enums"]["listing_status"]
-          organization_id: string
-          previous_status: Database["public"]["Enums"]["listing_status"]
-          published_at: string | null
-          published_by_user_id: string | null
-        }[]
-      }
-      is_valid_listing_image_path: {
-        Args: { object_name: string }
-        Returns: boolean
-      }
-      listing_image_listing_id: {
-        Args: { object_name: string }
-        Returns: string
-      }
-      listing_image_owner_id: { Args: { object_name: string }; Returns: string }
     }
     Enums: {
       app_role: "seeker" | "provider" | "admin"
       heating_type: "central" | "electric" | "gas" | "district" | "other"
       listing_status:
         | "draft"
-        | "submitted_for_review"
-        | "needs_changes"
-        | "approved"
         | "published"
-        | "unpublished"
         | "paused"
         | "archived"
         | "sold"
         | "rented"
         | "hidden_by_admin"
+        | "submitted_for_review"
+        | "needs_changes"
+        | "approved"
+        | "unpublished"
+      listing_type: "rent" | "sale"
       listing_workflow_event_type:
         | "created"
         | "submitted_for_review"
@@ -1141,14 +1130,18 @@ export type Database = {
         | "approved"
         | "published"
         | "unpublished"
-      listing_type: "rent" | "sale"
       organization_invite_status: "pending" | "accepted" | "revoked" | "expired"
       organization_member_role: "owner" | "admin" | "manager" | "agent"
       organization_member_status: "active" | "invited" | "inactive"
       organization_status: "active" | "inactive"
-      preferred_contact_method: "in_app" | "phone" | "email" | "whatsapp" | "viber"
-      provider_account_type: "individual" | "company"
+      preferred_contact_method:
+        | "in_app"
+        | "phone"
+        | "email"
+        | "whatsapp"
+        | "viber"
       property_type: "apartment" | "house" | "studio" | "land" | "commercial"
+      provider_account_type: "individual" | "company"
       public_location_mode: "exact" | "approximate" | "hidden"
       report_reason:
         | "spam"
@@ -1292,17 +1285,18 @@ export const Constants = {
       heating_type: ["central", "electric", "gas", "district", "other"],
       listing_status: [
         "draft",
-        "submitted_for_review",
-        "needs_changes",
-        "approved",
         "published",
-        "unpublished",
         "paused",
         "archived",
         "sold",
         "rented",
         "hidden_by_admin",
+        "submitted_for_review",
+        "needs_changes",
+        "approved",
+        "unpublished",
       ],
+      listing_type: ["rent", "sale"],
       listing_workflow_event_type: [
         "created",
         "submitted_for_review",
@@ -1311,14 +1305,19 @@ export const Constants = {
         "published",
         "unpublished",
       ],
-      listing_type: ["rent", "sale"],
       organization_invite_status: ["pending", "accepted", "revoked", "expired"],
       organization_member_role: ["owner", "admin", "manager", "agent"],
       organization_member_status: ["active", "invited", "inactive"],
       organization_status: ["active", "inactive"],
-      preferred_contact_method: ["in_app", "phone", "email", "whatsapp", "viber"],
-      provider_account_type: ["individual", "company"],
+      preferred_contact_method: [
+        "in_app",
+        "phone",
+        "email",
+        "whatsapp",
+        "viber",
+      ],
       property_type: ["apartment", "house", "studio", "land", "commercial"],
+      provider_account_type: ["individual", "company"],
       public_location_mode: ["exact", "approximate", "hidden"],
       report_reason: [
         "spam",
@@ -1332,3 +1331,4 @@ export const Constants = {
     },
   },
 } as const
+

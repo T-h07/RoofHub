@@ -397,14 +397,14 @@ begin
       timezone('utc', now()) + make_interval(days => v_expires_days)
     )
     returning
-      id,
-      invite_token,
-      organization_id,
-      target_user_id,
-      invite_email,
-      role,
-      invite_status,
-      expires_at
+      public.organization_member_invites.id,
+      public.organization_member_invites.invite_token,
+      public.organization_member_invites.organization_id,
+      public.organization_member_invites.target_user_id,
+      public.organization_member_invites.invite_email,
+      public.organization_member_invites.role,
+      public.organization_member_invites.invite_status,
+      public.organization_member_invites.expires_at
     into
       invite_id,
       invite_token,

@@ -12,7 +12,7 @@ comment on column public.profiles.active_organization_id is
 with single_active_membership as (
   select
     om.user_id,
-    min(om.organization_id) as organization_id
+    min(om.organization_id::text)::uuid as organization_id
   from public.organization_members om
   join public.organizations org
     on org.id = om.organization_id
