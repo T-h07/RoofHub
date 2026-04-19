@@ -1,4 +1,9 @@
 import type { Enums, Tables } from "@/types/database";
+import type {
+  OrganizationMemberRole,
+  OrganizationMemberStatus,
+} from "@/lib/company/team-types";
+import type { MessagingCompanyQueueAccess } from "./authorization";
 
 export type MessagingErrorCode =
   | "auth_required"
@@ -50,6 +55,41 @@ export type MessagingListingSnippet = Pick<
 
 export type MessagingParticipantRole = "provider" | "seeker";
 
+export type MessagingInboxMode =
+  | "seeker"
+  | "individual_provider"
+  | "company_workspace";
+
+export type MessagingInboxContext = {
+  viewerUserId: string;
+  mode: MessagingInboxMode;
+  workspaceName: string | null;
+  workspaceSlug: string | null;
+  companyQueueAccess: MessagingCompanyQueueAccess | null;
+};
+
+export type MessagingAssignableCompanyMember = {
+  userId: string;
+  displayName: string;
+  role: OrganizationMemberRole;
+};
+
+export type MessagingCompanyRoutingSummary = {
+  organizationId: string;
+  organizationName: string;
+  organizationSlug: string;
+  assignedAgentUserId: string | null;
+  assignedAgentDisplayName: string | null;
+  queueAccess: MessagingCompanyQueueAccess;
+  canManageRouting: boolean;
+};
+
+export type MessagingCompanyRoutingDetail = MessagingCompanyRoutingSummary & {
+  membershipRole: OrganizationMemberRole;
+  membershipStatus: OrganizationMemberStatus;
+  assignableMembers: MessagingAssignableCompanyMember[];
+};
+
 export type ConversationCreateResult = {
   conversation: MessagingConversationRecord;
   created: boolean;
@@ -73,11 +113,13 @@ export type MessagingConversationSummary = {
   counterpartDisplayName: string | null;
   unreadCount: number;
   lastMessage: MessagingMessageRecord | null;
+  companyRouting: MessagingCompanyRoutingSummary | null;
 };
 
 export type MessagingConversationSummariesResult = {
   summaries: MessagingConversationSummary[];
   unreadTotalCount: number;
+  inbox: MessagingInboxContext;
 };
 
 export type MessagingThreadResult = {
@@ -89,6 +131,8 @@ export type MessagingThreadResult = {
   counterpartDisplayName: string | null;
   messages: MessagingMessageRecord[];
   unreadCount: number;
+  companyRouting: MessagingCompanyRoutingDetail | null;
+  inbox: MessagingInboxContext;
 };
 
 export type CreateOrGetConversationInput = {
@@ -102,6 +146,16 @@ export type SendConversationMessageInput = {
 
 export type MarkConversationReadInput = {
   conversationId: string;
+};
+
+export type UpdateConversationRoutingInput = {
+  conversationId: string;
+  assigneeUserId: string | null;
+};
+
+export type UpdateConversationRoutingResult = {
+  conversationId: string;
+  assignedAgentUserId: string | null;
 };
 
 export type LoadConversationSummariesInput = {

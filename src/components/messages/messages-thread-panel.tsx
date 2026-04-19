@@ -8,6 +8,7 @@ import { ArrowLeft, LoaderCircle, SendHorizontal } from "lucide-react";
 import { ProviderListingStatusBadge } from "@/components/dashboard/provider-listing-status-badge";
 import { buttonVariants } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import {
   areMessagesOnSameDay,
@@ -24,6 +25,7 @@ type MessagesThreadPanelProps = {
   isSending: boolean;
   sendError: string | null;
   onSendMessage: (body: string) => Promise<boolean>;
+  onUpdateRouting: (assigneeUserId: string | null) => Promise<boolean>;
   onBack: () => void;
   showBackButton: boolean;
 };
@@ -73,11 +75,16 @@ export function MessagesThreadPanel({
   isSending,
   sendError,
   onSendMessage,
+  onUpdateRouting,
   onBack,
   showBackButton,
 }: MessagesThreadPanelProps) {
   const [draftBody, setDraftBody] = useState("");
   const [localError, setLocalError] = useState<string | null>(null);
+  const [selectedAssigneeUserId, setSelectedAssigneeUserId] = useState(
+    thread.companyRouting?.assignedAgentUserId ?? ""
+  );
+  const [isUpdatingRouting, setIsUpdatingRouting] = useState(false);
   const messageScrollContainerRef = useRef<HTMLDivElement | null>(null);
   const previousMessageCountRef = useRef(thread.messages.length);
   const messageCountLabel = useMemo(() => {
@@ -134,6 +141,19 @@ export function MessagesThreadPanel({
     }
   }
 
+  async function submitRoutingUpdate() {
+    if (!thread.companyRouting?.canManageRouting || isUpdatingRouting) {
+      return;
+    }
+
+    setIsUpdatingRouting(true);
+    const ok = await onUpdateRouting(selectedAssigneeUserId || null);
+    if (!ok) {
+      setSelectedAssigneeUserId(thread.companyRouting.assignedAgentUserId ?? "");
+    }
+    setIsUpdatingRouting(false);
+  }
+
   return (
     <section className="border-border/75 bg-card/60 flex min-h-[68dvh] flex-col overflow-hidden rounded-xl border">
       <header className="border-border/70 bg-card/80 space-y-3 border-b px-4 py-3 sm:px-5">
@@ -165,6 +185,14 @@ export function MessagesThreadPanel({
                 {getLocationLabel(thread)}
                 {priceLabel ? ` • ${priceLabel}` : ""}
               </p>
+              {thread.companyRouting ? (
+                <p className="text-muted-foreground truncate text-xs">
+                  {thread.companyRouting.organizationName} •{" "}
+                  {thread.companyRouting.assignedAgentDisplayName
+                    ? `Assigned to ${thread.companyRouting.assignedAgentDisplayName}`
+                    : "Unassigned conversation"}
+                </p>
+              ) : null}
             </div>
           </div>
 
@@ -199,6 +227,59 @@ export function MessagesThreadPanel({
 
           <p className="text-muted-foreground text-xs">{messageCountLabel}</p>
         </div>
+
+        {thread.companyRouting ? (
+          <div className="border-border/60 bg-background/55 flex flex-col gap-2 rounded-lg border px-3 py-2 sm:flex-row sm:items-end sm:justify-between">
+            <div className="min-w-0 space-y-1">
+              <p className="text-xs font-semibold">
+                {thread.companyRouting.queueAccess === "company_queue"
+                  ? "Company queue access"
+                  : "Assigned queue access"}
+              </p>
+              <p className="text-muted-foreground text-xs">
+                {thread.companyRouting.assignedAgentDisplayName
+                  ? `${thread.companyRouting.assignedAgentDisplayName} currently owns the follow-up path for this conversation.`
+                  : "This conversation is currently unassigned and visible through the company queue."}
+              </p>
+            </div>
+
+            {thread.companyRouting.canManageRouting ? (
+              <div className="flex w-full flex-col gap-2 sm:w-auto sm:min-w-72">
+                <Select
+                  value={selectedAssigneeUserId}
+                  onChange={(event) => setSelectedAssigneeUserId(event.currentTarget.value)}
+                  disabled={isUpdatingRouting}
+                  className="h-9"
+                >
+                  <option value="">Unassigned company queue</option>
+                  {thread.companyRouting.assignableMembers.map((member) => (
+                    <option key={member.userId} value={member.userId}>
+                      {member.displayName} • {member.role}
+                    </option>
+                  ))}
+                </Select>
+                <button
+                  type="button"
+                  onClick={() => void submitRoutingUpdate()}
+                  disabled={
+                    isUpdatingRouting ||
+                    (thread.companyRouting.assignedAgentUserId ?? "") ===
+                      selectedAssigneeUserId
+                  }
+                  className={cn(
+                    buttonVariants({ variant: "outline", size: "sm" }),
+                    "h-9 justify-center text-xs"
+                  )}
+                >
+                  {isUpdatingRouting ? (
+                    <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
+                  ) : null}
+                  Update routing
+                </button>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
       </header>
 
       <div

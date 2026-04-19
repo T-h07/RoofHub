@@ -28,6 +28,18 @@ export const COMPANY_PERMISSION_MATRIX = {
     manager: true,
     agent: false,
   },
+  companyInboxQueueAccess: {
+    owner: true,
+    admin: true,
+    manager: true,
+    agent: false,
+  },
+  companyConversationRouting: {
+    owner: true,
+    admin: true,
+    manager: true,
+    agent: false,
+  },
   profileEdit: {
     owner: true,
     admin: false,
@@ -168,6 +180,20 @@ export function canViewCompanyActivityFeed(
   status: OrganizationMemberStatus
 ) {
   return hasActiveCompanyPermission("activityFeedAccess", role, status);
+}
+
+export function canViewCompanyInboxQueue(
+  role: OrganizationMemberRole,
+  status: OrganizationMemberStatus
+) {
+  return hasActiveCompanyPermission("companyInboxQueueAccess", role, status);
+}
+
+export function canManageCompanyConversationRouting(
+  role: OrganizationMemberRole,
+  status: OrganizationMemberStatus
+) {
+  return hasActiveCompanyPermission("companyConversationRouting", role, status);
 }
 
 export function canInviteOrganizationRole(

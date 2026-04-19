@@ -4,6 +4,7 @@ export {
   loadMessagingThreadAction,
   markConversationReadAction,
   sendConversationMessageAction,
+  updateConversationRoutingAction,
 } from "./actions";
 export {
   loadMessagingConversationSummariesQuery,

@@ -5,10 +5,14 @@ import { ChevronRight, LoaderCircle, MessageSquareText } from "lucide-react";
 import { EmptyState } from "@/components/ui/empty-state";
 import type { MessagingRealtimeHealth } from "@/lib/messaging/client-model";
 import { formatConversationActivityLabel, formatConversationActivityTitle } from "@/lib/messaging/presentation";
-import type { MessagingConversationSummary } from "@/lib/messaging/types";
+import type {
+  MessagingConversationSummary,
+  MessagingInboxContext,
+} from "@/lib/messaging/types";
 import { cn } from "@/lib/utils";
 
 type MessagesConversationListProps = {
+  inbox: MessagingInboxContext;
   summaries: MessagingConversationSummary[];
   selectedConversationId: string | null;
   unreadTotalCount: number;
@@ -49,6 +53,7 @@ function getListingTitle(summary: MessagingConversationSummary) {
 }
 
 export function MessagesConversationList({
+  inbox,
   summaries,
   selectedConversationId,
   unreadTotalCount,
@@ -74,6 +79,9 @@ export function MessagesConversationList({
           <p className="text-sm font-semibold tracking-tight">Inbox</p>
           <p className="text-muted-foreground text-xs">
             {summaries.length} thread{summaries.length === 1 ? "" : "s"} • {unreadTotalCount} unread
+            {inbox.mode === "company_workspace" && inbox.workspaceName
+              ? ` • ${inbox.companyQueueAccess === "company_queue" ? "company queue" : "assigned queue"}`
+              : ""}
           </p>
         </div>
 
@@ -153,6 +161,14 @@ export function MessagesConversationList({
                   <p className="text-muted-foreground text-xs leading-5">
                     {getCounterpartLabel(summary)} • {getListingContext(summary)}
                   </p>
+
+                  {summary.companyRouting ? (
+                    <p className="text-muted-foreground text-[11px] leading-5">
+                      {summary.companyRouting.assignedAgentDisplayName
+                        ? `Assigned to ${summary.companyRouting.assignedAgentDisplayName}`
+                        : "Unassigned company conversation"}
+                    </p>
+                  ) : null}
 
                   <p className="text-muted-foreground truncate text-sm">
                     {summary.lastMessage

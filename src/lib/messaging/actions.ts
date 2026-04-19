@@ -6,6 +6,13 @@ import { AUDIT_EVENT_TYPES, recordSecurityAuditEvent } from "@/lib/security/audi
 import { enforceTrafficControl, TRAFFIC_CONTROL_RULES } from "@/lib/security/traffic-control";
 import type { Database, Tables } from "@/types/database";
 
+import {
+  getMessagingAdminClient,
+  loadActiveOrganizationAssignableMembers,
+  loadCompanyConversationAccessRecord,
+  viewerCanAccessCompanyConversation,
+} from "./company";
+import { canManageCompanyConversationRouting } from "./authorization";
 import { isListingContactableForNewConversation } from "./contact-rules";
 import { getMessagingViewerContext, toMessagingFailure } from "./context";
 import {
@@ -26,6 +33,8 @@ import type {
   MessagingMessageRecord,
   MessagingResult,
   SendConversationMessageInput,
+  UpdateConversationRoutingInput,
+  UpdateConversationRoutingResult,
 } from "./types";
 import { isUuid, normalizeMessageBody } from "./validation";
 
@@ -134,6 +143,54 @@ async function loadAccessibleConversationForViewer(
   return {
     ok: true as const,
     conversation: data as AccessibleConversationRow,
+  };
+}
+
+async function loadCompanyConversationForViewer(
+  conversationId: string,
+  viewer: Extract<
+    Awaited<ReturnType<typeof getMessagingViewerContext>>,
+    { ok: true }
+  >["data"] & { mode: "company_workspace" }
+) {
+  const adminSupabase = getMessagingAdminClient();
+  const record = await loadCompanyConversationAccessRecord(
+    adminSupabase,
+    conversationId
+  );
+
+  if (!record) {
+    return {
+      ok: false as const,
+      failure: toMessagingFailure(
+        "not_found",
+        "Conversation not found or inaccessible."
+      ),
+    };
+  }
+
+  if (
+    !viewerCanAccessCompanyConversation({
+      viewerUserId: viewer.profile.id,
+      activeOrganizationId: viewer.organization.id,
+      membershipRole: viewer.membership.role,
+      membershipStatus: viewer.membership.member_status,
+      listing: record.listing,
+    })
+  ) {
+    return {
+      ok: false as const,
+      failure: toMessagingFailure(
+        "forbidden",
+        "You do not have permission to access this company conversation."
+      ),
+    };
+  }
+
+  return {
+    ok: true as const,
+    adminSupabase,
+    record,
   };
 }
 
@@ -317,21 +374,37 @@ export async function sendConversationMessageAction(
   }
 
   const { supabase, profile } = contextResult.data;
+  let conversation: AccessibleConversationRow;
 
-  const conversationResult = await loadAccessibleConversationForViewer(
-    supabase,
-    input.conversationId
-  );
-  if (!conversationResult.ok) {
-    return conversationResult.failure;
-  }
+  if (contextResult.data.mode === "company_workspace") {
+    const conversationResult = await loadAccessibleConversationForViewer(
+      supabase,
+      input.conversationId
+    );
+    if (!conversationResult.ok) {
+      return conversationResult.failure;
+    }
 
-  const conversation = conversationResult.conversation;
-  const isParticipant =
-    conversation.provider_id === profile.id || conversation.seeker_id === profile.id;
+    conversation = conversationResult.conversation;
+  } else {
+    const conversationResult = await loadAccessibleConversationForViewer(
+      supabase,
+      input.conversationId
+    );
+    if (!conversationResult.ok) {
+      return conversationResult.failure;
+    }
 
-  if (!isParticipant) {
-    return toMessagingFailure("forbidden", "You are not a participant in this conversation.");
+    conversation = conversationResult.conversation;
+    const isParticipant =
+      conversation.provider_id === profile.id || conversation.seeker_id === profile.id;
+
+    if (!isParticipant) {
+      return toMessagingFailure(
+        "forbidden",
+        "You are not a participant in this conversation."
+      );
+    }
   }
 
   const messagePerConversationLimit = await enforceTrafficControl({
@@ -421,20 +494,37 @@ export async function markConversationReadAction(
   }
 
   const { supabase, profile } = contextResult.data;
+  let conversation: AccessibleConversationRow;
 
-  const conversationResult = await loadAccessibleConversationForViewer(
-    supabase,
-    input.conversationId
-  );
-  if (!conversationResult.ok) {
-    return conversationResult.failure;
-  }
-  const conversation = conversationResult.conversation;
-  const isParticipant =
-    conversation.provider_id === profile.id || conversation.seeker_id === profile.id;
+  if (contextResult.data.mode === "company_workspace") {
+    const conversationResult = await loadAccessibleConversationForViewer(
+      supabase,
+      input.conversationId
+    );
+    if (!conversationResult.ok) {
+      return conversationResult.failure;
+    }
 
-  if (!isParticipant) {
-    return toMessagingFailure("forbidden", "You are not a participant in this conversation.");
+    conversation = conversationResult.conversation;
+  } else {
+    const conversationResult = await loadAccessibleConversationForViewer(
+      supabase,
+      input.conversationId
+    );
+    if (!conversationResult.ok) {
+      return conversationResult.failure;
+    }
+
+    conversation = conversationResult.conversation;
+    const isParticipant =
+      conversation.provider_id === profile.id || conversation.seeker_id === profile.id;
+
+    if (!isParticipant) {
+      return toMessagingFailure(
+        "forbidden",
+        "You are not a participant in this conversation."
+      );
+    }
   }
 
   const nowIso = new Date().toISOString();
@@ -463,6 +553,168 @@ export async function markConversationReadAction(
     data: {
       conversationId: input.conversationId,
       markedReadCount: data?.length ?? 0,
+    },
+  };
+}
+
+export async function updateConversationRoutingAction(
+  input: UpdateConversationRoutingInput
+): Promise<MessagingResult<UpdateConversationRoutingResult>> {
+  if (
+    !isRecord(input) ||
+    typeof input.conversationId !== "string" ||
+    !isUuid(input.conversationId)
+  ) {
+    return toMessagingFailure("invalid_input", "Conversation reference is invalid.");
+  }
+
+  if (
+    input.assigneeUserId !== null &&
+    (typeof input.assigneeUserId !== "string" || !isUuid(input.assigneeUserId))
+  ) {
+    return toMessagingFailure("invalid_input", "Assignee reference is invalid.");
+  }
+
+  const contextResult = await getMessagingViewerContext();
+  if (!contextResult.ok) {
+    return contextResult;
+  }
+
+  if (contextResult.data.mode !== "company_workspace") {
+    return toMessagingFailure(
+      "forbidden",
+      "Conversation routing is available only inside an active RoofHub company workspace."
+    );
+  }
+
+  const { supabase, profile, organization, membership } = contextResult.data;
+  if (
+    !canManageCompanyConversationRouting(
+      membership.role,
+      membership.member_status
+    )
+  ) {
+    return toMessagingFailure(
+      "forbidden",
+      "Only owner, admin, or manager members can route company conversations."
+    );
+  }
+
+  const conversationResult = await loadCompanyConversationForViewer(
+    input.conversationId,
+    contextResult.data
+  );
+  if (!conversationResult.ok) {
+    return conversationResult.failure;
+  }
+
+  const { adminSupabase, record } = conversationResult;
+  const listing = record.listing;
+
+  if (!listing.organization_id || listing.organization_id !== organization.id) {
+    return toMessagingFailure(
+      "forbidden",
+      "This conversation does not belong to the active RoofHub company workspace."
+    );
+  }
+
+  const assignableMembers = await loadActiveOrganizationAssignableMembers(
+    adminSupabase,
+    organization.id
+  );
+  const requestedAssignee =
+    input.assigneeUserId === null
+      ? null
+      : assignableMembers.find((member) => member.userId === input.assigneeUserId) ??
+        null;
+
+  if (input.assigneeUserId !== null && !requestedAssignee) {
+    return toMessagingFailure(
+      "forbidden",
+      "The selected assignee is not an active member of this RoofHub company workspace."
+    );
+  }
+
+  const trafficResult = await enforceTrafficControl({
+    supabase,
+    rule: TRAFFIC_CONTROL_RULES.companyMemberMutatePerUser,
+    identity: {
+      userId: profile.id,
+      scope: `conversation-route:${input.conversationId}`,
+      includeIp: false,
+    },
+    throttledMessage:
+      "Too many conversation routing updates from this account. Please wait and retry.",
+    unavailableMessage:
+      "Conversation routing is temporarily unavailable. Please retry shortly.",
+  });
+  if (!trafficResult.ok) {
+    return toTrafficFailure(trafficResult);
+  }
+
+  const previousAssigneeUserId = listing.assigned_agent_user_id;
+  const previousAssigneeDisplayName =
+    previousAssigneeUserId === null
+      ? null
+      : assignableMembers.find((member) => member.userId === previousAssigneeUserId)
+          ?.displayName ?? null;
+
+  if (previousAssigneeUserId === (requestedAssignee?.userId ?? null)) {
+    return {
+      ok: true,
+      data: {
+        conversationId: record.conversation.id,
+        assignedAgentUserId: requestedAssignee?.userId ?? null,
+      },
+    };
+  }
+
+  const { error } = await adminSupabase
+    .from("listings")
+    .update({
+      assigned_agent_user_id: requestedAssignee?.userId ?? null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", listing.id)
+    .eq("organization_id", organization.id);
+
+  if (error) {
+    return toMessagingFailure("internal", "Conversation routing could not be updated right now.");
+  }
+
+  const eventType =
+    previousAssigneeUserId === null && requestedAssignee?.userId
+      ? AUDIT_EVENT_TYPES.messagingConversationAssigned
+      : requestedAssignee?.userId
+        ? AUDIT_EVENT_TYPES.messagingConversationReassigned
+        : AUDIT_EVENT_TYPES.messagingConversationUnassigned;
+
+  await recordSecurityAuditEvent({
+    supabase,
+    event: {
+      eventType,
+      actorUserId: profile.id,
+      actorRole: profile.role,
+      targetType: "conversation",
+      targetId: record.conversation.id,
+      listingId: listing.id,
+      conversationId: record.conversation.id,
+      metadata: {
+        organization_id: organization.id,
+        previous_assignee_user_id: previousAssigneeUserId,
+        previous_assignee_display_name: previousAssigneeDisplayName,
+        assigned_agent_user_id: requestedAssignee?.userId ?? null,
+        assigned_agent_display_name: requestedAssignee?.displayName ?? null,
+        membership_role: membership.role,
+      },
+    },
+  });
+
+  return {
+    ok: true,
+    data: {
+      conversationId: record.conversation.id,
+      assignedAgentUserId: requestedAssignee?.userId ?? null,
     },
   };
 }

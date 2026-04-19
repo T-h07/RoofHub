@@ -13,6 +13,7 @@ import {
   loadMessagingThreadAction,
   markConversationReadAction,
   sendConversationMessageAction,
+  updateConversationRoutingAction,
 } from "@/lib/messaging/actions";
 import {
   createOptimisticMessageId,
@@ -27,6 +28,7 @@ import type {
   MessagingRealtimeHealth,
 } from "@/lib/messaging/client-model";
 import type {
+  MessagingInboxContext,
   MessagingConversationSummary,
   MessagingMessageRecord,
   MessagingThreadResult,
@@ -41,6 +43,7 @@ const FALLBACK_REFRESH_INTERVAL_MS = 15_000;
 
 type MessagesWorkspaceProps = {
   initialSummaries: MessagingConversationSummary[];
+  initialInbox: MessagingInboxContext;
   selectedConversationId: string | null;
   initialThread: MessagingThreadResult | null;
   initialThreadError: string | null;
@@ -162,6 +165,7 @@ function optimisticMessage(
 
 export function MessagesWorkspace({
   initialSummaries,
+  initialInbox,
   selectedConversationId,
   initialThread,
   initialThreadError,
@@ -170,6 +174,7 @@ export function MessagesWorkspace({
   const supabase = useMemo(() => createBrowserSupabaseClient(), []);
 
   const [summaries, setSummaries] = useState<MessagingConversationSummary[]>(initialSummaries);
+  const [inbox, setInbox] = useState(initialInbox);
   const [thread, setThread] = useState<MessagingClientThread | null>(
     initialThread ? toClientThread(initialThread) : null
   );
@@ -185,7 +190,10 @@ export function MessagesWorkspace({
   const markReadInFlightRef = useRef(false);
   const shouldResyncOnReconnectRef = useRef(false);
 
-  const viewerUserId = useMemo(() => deriveViewerUserId(thread, summaries), [thread, summaries]);
+  const viewerUserId = useMemo(
+    () => deriveViewerUserId(thread, summaries, inbox.viewerUserId),
+    [inbox.viewerUserId, summaries, thread]
+  );
   const conversationIds = useMemo(
     () => Array.from(new Set(summaries.map((summary) => summary.conversation.id))).sort(),
     [summaries]
@@ -216,6 +224,7 @@ export function MessagesWorkspace({
 
         if (summariesResult.ok) {
           setSummaries(sortSummariesByRecentActivity(summariesResult.data.summaries));
+          setInbox(summariesResult.data.inbox);
         } else if (mode === "manual") {
           toast.error(summariesResult.message);
         }
@@ -640,6 +649,25 @@ export function MessagesWorkspace({
     return true;
   }
 
+  async function handleConversationRoutingChange(assigneeUserId: string | null) {
+    if (!thread) {
+      return false;
+    }
+
+    const result = await updateConversationRoutingAction({
+      conversationId: thread.conversation.id,
+      assigneeUserId,
+    });
+
+    if (!result.ok) {
+      toast.error(result.message);
+      return false;
+    }
+
+    await refreshWorkspaceFromServer("manual");
+    return true;
+  }
+
   function retryLiveSync() {
     setRealtimeHealth("connecting");
     setRealtimeError(null);
@@ -690,6 +718,7 @@ export function MessagesWorkspace({
       <div className="grid gap-3 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)]">
         <div className={cn(showConversationListOnMobile ? "block" : "hidden", "lg:block")}>
           <MessagesConversationList
+            inbox={inbox}
             summaries={summaries}
             selectedConversationId={selectedConversationId}
             unreadTotalCount={unreadTotalCount}
@@ -703,12 +732,13 @@ export function MessagesWorkspace({
         <div className={cn(showThreadOnMobile ? "block" : "hidden", "lg:block")}>
           {hasConversationSelection && thread && viewerUserId ? (
             <MessagesThreadPanel
-              key={thread.conversation.id}
+              key={`${thread.conversation.id}:${thread.companyRouting?.assignedAgentUserId ?? "unassigned"}`}
               thread={thread}
               viewerUserId={viewerUserId}
               isSending={isSending}
               sendError={sendError}
               onSendMessage={handleSendMessage}
+              onUpdateRouting={handleConversationRoutingChange}
               onBack={clearThreadSelection}
               showBackButton={showThreadOnMobile}
             />

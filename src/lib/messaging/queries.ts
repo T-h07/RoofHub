@@ -3,9 +3,20 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { Database, Tables } from "@/types/database";
+import {
+  buildCompanyRoutingDetail,
+  buildCompanyRoutingSummary,
+  createListingImageSignedUrlForMessaging,
+  getMessagingAdminClient,
+  loadActiveOrganizationAssignableMembers,
+  loadCompanyConversationAccessRecord,
+  loadCompanyConversationUnreadCount,
+  viewerCanAccessCompanyConversation,
+} from "@/lib/messaging/company";
 import { createListingImageSignedUrl } from "@/lib/supabase/storage/listing-images";
 
 import { getMessagingViewerContext, toMessagingFailure } from "./context";
+import { canManageCompanyConversationRouting } from "./authorization";
 import type {
   LoadConversationSummariesInput,
   LoadConversationThreadInput,
@@ -128,6 +139,374 @@ async function loadLatestMessagesMap(
   );
 }
 
+async function loadCompanyMessagingConversationSummariesQuery(
+  viewer: Extract<
+    Awaited<ReturnType<typeof getMessagingViewerContext>>,
+    { ok: true }
+  >["data"] & { mode: "company_workspace" },
+  limit: number
+): Promise<MessagingResult<MessagingConversationSummariesResult>> {
+  const adminSupabase = getMessagingAdminClient();
+  const { data: listingRows, error: listingError } = await adminSupabase
+    .from("listings")
+    .select(
+      "id, slug, title, city, neighborhood, listing_status, listing_type, property_type, price_amount, currency_code, organization_id, assigned_agent_user_id"
+    )
+    .eq("organization_id", viewer.organization.id);
+
+  if (listingError) {
+    return toMessagingFailure(
+      "internal",
+      "Company conversations could not be loaded right now."
+    );
+  }
+
+  const accessibleListings = (listingRows ?? []).filter((listing) =>
+    viewerCanAccessCompanyConversation({
+      viewerUserId: viewer.profile.id,
+      activeOrganizationId: viewer.organization.id,
+      membershipRole: viewer.membership.role,
+      membershipStatus: viewer.membership.member_status,
+      listing: {
+        organization_id: listing.organization_id,
+        assigned_agent_user_id: listing.assigned_agent_user_id,
+      },
+    })
+  );
+
+  if (accessibleListings.length === 0) {
+    return {
+      ok: true,
+      data: {
+        summaries: [],
+        unreadTotalCount: 0,
+        inbox: viewer.inbox,
+      },
+    };
+  }
+
+  const accessibleListingIds = accessibleListings.map((listing) => listing.id);
+  const listingMap = new Map<string, MessagingListingSnippet>();
+  const listingRoutingMap = new Map<
+    string,
+    { assignedAgentUserId: string | null }
+  >();
+
+  for (const listing of accessibleListings) {
+    listingMap.set(listing.id, {
+      id: listing.id,
+      slug: listing.slug,
+      title: listing.title,
+      city: listing.city,
+      neighborhood: listing.neighborhood,
+      listing_status: listing.listing_status,
+      listing_type: listing.listing_type,
+      property_type: listing.property_type,
+      price_amount: listing.price_amount,
+      currency_code: listing.currency_code,
+    });
+    listingRoutingMap.set(listing.id, {
+      assignedAgentUserId: listing.assigned_agent_user_id,
+    });
+  }
+
+  const { data: conversationRows, error: conversationError } = await adminSupabase
+    .from("conversations")
+    .select(CONVERSATION_SELECT)
+    .in("listing_id", accessibleListingIds)
+    .order("last_message_at", { ascending: false })
+    .limit(limit);
+
+  if (conversationError) {
+    return toMessagingFailure(
+      "internal",
+      "Company conversations could not be loaded right now."
+    );
+  }
+
+  const conversations = (conversationRows ?? []) as ConversationRow[];
+  if (conversations.length === 0) {
+    return {
+      ok: true,
+      data: {
+        summaries: [],
+        unreadTotalCount: 0,
+        inbox: viewer.inbox,
+      },
+    };
+  }
+
+  const conversationIds = conversations.map((conversation) => conversation.id);
+  const seekerIds = Array.from(
+    new Set(conversations.map((conversation) => conversation.seeker_id))
+  );
+  const assigneeIds = Array.from(
+    new Set(
+      accessibleListings
+        .map((listing) => listing.assigned_agent_user_id)
+        .filter((value): value is string => typeof value === "string")
+    )
+  );
+
+  const [latestMessageMap, unreadRowsResult, seekerProfilesResult, assigneeProfilesResult] =
+    await Promise.all([
+      loadLatestMessagesMap(adminSupabase, conversationIds),
+      adminSupabase
+        .from("messages")
+        .select("conversation_id")
+        .in("conversation_id", conversationIds)
+        .neq("sender_id", viewer.profile.id)
+        .is("read_at", null),
+      adminSupabase
+        .from("profiles")
+        .select(PROFILE_DISPLAY_NAME_SELECT)
+        .in("id", seekerIds),
+      assigneeIds.length === 0
+        ? Promise.resolve({ data: [], error: null })
+        : adminSupabase
+            .from("profiles")
+            .select(PROFILE_DISPLAY_NAME_SELECT)
+            .in("id", assigneeIds),
+    ]);
+
+  if (unreadRowsResult.error) {
+    return toMessagingFailure(
+      "internal",
+      "Unread conversation state could not be loaded."
+    );
+  }
+
+  const unreadCountMap = new Map<string, number>();
+  for (const unreadRow of unreadRowsResult.data ?? []) {
+    unreadCountMap.set(
+      unreadRow.conversation_id,
+      (unreadCountMap.get(unreadRow.conversation_id) ?? 0) + 1
+    );
+  }
+
+  const seekerDisplayNameMap = new Map<string, string>();
+  for (const row of (seekerProfilesResult.data ?? []) as ProfileDisplayNameRow[]) {
+    if (row.display_name.trim()) {
+      seekerDisplayNameMap.set(row.id, row.display_name.trim());
+    }
+  }
+
+  const assigneeDisplayNameMap = new Map<string, string>();
+  for (const row of (assigneeProfilesResult.data ?? []) as ProfileDisplayNameRow[]) {
+    if (row.display_name.trim()) {
+      assigneeDisplayNameMap.set(row.id, row.display_name.trim());
+    }
+  }
+
+  const summaries: MessagingConversationSummary[] = conversations.map(
+    (conversation) => {
+      const listing = listingMap.get(conversation.listing_id) ?? null;
+      const routing = listingRoutingMap.get(conversation.listing_id);
+      const assignedAgentUserId = routing?.assignedAgentUserId ?? null;
+
+      return {
+        conversation: toConversationRecord(conversation),
+        listing,
+        participantRole: "provider",
+        counterpartUserId: conversation.seeker_id,
+        counterpartDisplayName:
+          seekerDisplayNameMap.get(conversation.seeker_id) ?? null,
+        unreadCount: unreadCountMap.get(conversation.id) ?? 0,
+        lastMessage: latestMessageMap.get(conversation.id) ?? null,
+        companyRouting: buildCompanyRoutingSummary({
+          organizationId: viewer.organization.id,
+          organizationName: viewer.organization.name,
+          organizationSlug: viewer.organization.slug,
+          assignedAgentUserId,
+          assignedAgentDisplayName: assignedAgentUserId
+            ? assigneeDisplayNameMap.get(assignedAgentUserId) ?? null
+            : null,
+          queueAccess: viewer.inbox.companyQueueAccess,
+          canManageRouting: viewer.canManageRouting,
+        }),
+      };
+    }
+  );
+
+  return {
+    ok: true,
+    data: {
+      summaries,
+      unreadTotalCount: summaries.reduce(
+        (total, summary) => total + summary.unreadCount,
+        0
+      ),
+      inbox: viewer.inbox,
+    },
+  };
+}
+
+async function loadCompanyMessagingThreadQuery(
+  viewer: Extract<
+    Awaited<ReturnType<typeof getMessagingViewerContext>>,
+    { ok: true }
+  >["data"] & { mode: "company_workspace" },
+  input: LoadConversationThreadInput & { conversationId: string }
+): Promise<MessagingResult<MessagingThreadResult>> {
+  const adminSupabase = getMessagingAdminClient();
+  const record = await loadCompanyConversationAccessRecord(
+    adminSupabase,
+    input.conversationId
+  );
+
+  if (!record) {
+    return toMessagingFailure("not_found", "Conversation not found or inaccessible.");
+  }
+
+  if (
+    !viewerCanAccessCompanyConversation({
+      viewerUserId: viewer.profile.id,
+      activeOrganizationId: viewer.organization.id,
+      membershipRole: viewer.membership.role,
+      membershipStatus: viewer.membership.member_status,
+      listing: record.listing,
+    })
+  ) {
+    return toMessagingFailure(
+      "forbidden",
+      "You do not have permission to access this company conversation."
+    );
+  }
+
+  const limit = clampLimit(input.limit, 180, 1, 400);
+  const assigneeUserId = record.listing.assigned_agent_user_id;
+  const [messagesResult, unreadCount, listingCoverImageResult, seekerProfileResult, assigneeProfileResult, assignableMembers] =
+    await Promise.all([
+      adminSupabase
+        .from("messages")
+        .select(MESSAGE_SELECT)
+        .eq("conversation_id", record.conversation.id)
+        .order("created_at", { ascending: true })
+        .limit(limit),
+      loadCompanyConversationUnreadCount(
+        adminSupabase,
+        record.conversation.id,
+        viewer.profile.id
+      ),
+      adminSupabase
+        .from("listing_images")
+        .select(LISTING_COVER_IMAGE_SELECT)
+        .eq("listing_id", record.listing.id)
+        .order("is_cover", { ascending: false })
+        .order("sort_order", { ascending: true })
+        .limit(1)
+        .maybeSingle(),
+      adminSupabase
+        .from("profiles")
+        .select(PROFILE_DISPLAY_NAME_SELECT)
+        .eq("id", record.conversation.seeker_id)
+        .maybeSingle(),
+      assigneeUserId
+        ? adminSupabase
+            .from("profiles")
+            .select(PROFILE_DISPLAY_NAME_SELECT)
+            .eq("id", assigneeUserId)
+            .maybeSingle()
+        : Promise.resolve({ data: null, error: null }),
+      canManageCompanyConversationRouting(
+        viewer.membership.role,
+        viewer.membership.member_status
+      )
+        ? loadActiveOrganizationAssignableMembers(
+            adminSupabase,
+            viewer.organization.id
+          )
+        : Promise.resolve([]),
+    ]);
+
+  if (messagesResult.error) {
+    return toMessagingFailure(
+      "internal",
+      "Conversation messages could not be loaded right now."
+    );
+  }
+
+  const messages: MessagingMessageRecord[] = (messagesResult.data ?? []).map((row) => {
+    const message = row as MessageRow;
+
+    return {
+      id: message.id,
+      conversation_id: message.conversation_id,
+      sender_id: message.sender_id,
+      body: message.body,
+      read_at: message.read_at,
+      created_at: message.created_at,
+    };
+  });
+
+  let listingCoverImageUrl: string | null = null;
+  if (!listingCoverImageResult.error && listingCoverImageResult.data) {
+    try {
+      listingCoverImageUrl = await createListingImageSignedUrlForMessaging(
+        adminSupabase,
+        (listingCoverImageResult.data as ListingCoverImageRow).storage_path
+      );
+    } catch {
+      listingCoverImageUrl = null;
+    }
+  }
+
+  const counterpartDisplayName =
+    !seekerProfileResult.error && seekerProfileResult.data
+      ? (seekerProfileResult.data as ProfileDisplayNameRow).display_name.trim() ||
+        null
+      : null;
+
+  const assignedAgentDisplayName =
+    assigneeUserId === null
+      ? null
+      : !assigneeProfileResult.error && assigneeProfileResult.data
+        ? (assigneeProfileResult.data as ProfileDisplayNameRow).display_name.trim() ||
+          null
+        : assignableMembers.find((member) => member.userId === assigneeUserId)
+            ?.displayName ?? null;
+
+  return {
+    ok: true,
+    data: {
+      conversation: toConversationRecord(record.conversation),
+      listing: {
+        id: record.listing.id,
+        slug: record.listing.slug,
+        title: record.listing.title,
+        city: record.listing.city,
+        neighborhood: record.listing.neighborhood,
+        listing_status: record.listing.listing_status,
+        listing_type: record.listing.listing_type,
+        property_type: record.listing.property_type,
+        price_amount: record.listing.price_amount,
+        currency_code: record.listing.currency_code,
+      },
+      listingCoverImageUrl,
+      participantRole: "provider",
+      counterpartUserId: record.conversation.seeker_id,
+      counterpartDisplayName,
+      messages,
+      unreadCount,
+      companyRouting: buildCompanyRoutingDetail({
+        summary: buildCompanyRoutingSummary({
+          organizationId: viewer.organization.id,
+          organizationName: viewer.organization.name,
+          organizationSlug: viewer.organization.slug,
+          assignedAgentUserId: record.listing.assigned_agent_user_id,
+          assignedAgentDisplayName,
+          queueAccess: viewer.inbox.companyQueueAccess,
+          canManageRouting: viewer.canManageRouting,
+        }),
+        membershipRole: viewer.membership.role,
+        membershipStatus: viewer.membership.member_status,
+        assignableMembers,
+      }),
+      inbox: viewer.inbox,
+    },
+  };
+}
+
 export async function loadMessagingConversationSummariesQuery(
   input: LoadConversationSummariesInput = {}
 ): Promise<MessagingResult<MessagingConversationSummariesResult>> {
@@ -138,6 +517,13 @@ export async function loadMessagingConversationSummariesQuery(
   const contextResult = await getMessagingViewerContext();
   if (!contextResult.ok) {
     return contextResult;
+  }
+
+  if (contextResult.data.mode === "company_workspace") {
+    return loadCompanyMessagingConversationSummariesQuery(
+      contextResult.data,
+      limit
+    );
   }
 
   const { supabase, profile } = contextResult.data;
@@ -164,6 +550,7 @@ export async function loadMessagingConversationSummariesQuery(
       data: {
         summaries: [],
         unreadTotalCount: 0,
+        inbox: contextResult.data.inbox,
       },
     };
   }
@@ -249,6 +636,7 @@ export async function loadMessagingConversationSummariesQuery(
       counterpartDisplayName: profileDisplayNameMap.get(counterpartUserId) ?? null,
       unreadCount: unreadCountMap.get(conversation.id) ?? 0,
       lastMessage: latestMessageMap.get(conversation.id) ?? null,
+      companyRouting: null,
     };
   });
 
@@ -257,6 +645,7 @@ export async function loadMessagingConversationSummariesQuery(
     data: {
       summaries,
       unreadTotalCount: summaries.reduce((total, summary) => total + summary.unreadCount, 0),
+      inbox: contextResult.data.inbox,
     },
   };
 }
@@ -273,6 +662,13 @@ export async function loadMessagingThreadQuery(
   const contextResult = await getMessagingViewerContext();
   if (!contextResult.ok) {
     return contextResult;
+  }
+
+  if (contextResult.data.mode === "company_workspace") {
+    return loadCompanyMessagingThreadQuery(contextResult.data, {
+      conversationId: input.conversationId,
+      limit: input.limit,
+    });
   }
 
   const { supabase, profile } = contextResult.data;
@@ -392,6 +788,8 @@ export async function loadMessagingThreadQuery(
       counterpartDisplayName,
       messages,
       unreadCount: unreadCountResult.error ? 0 : unreadCountResult.count ?? 0,
+      companyRouting: null,
+      inbox: contextResult.data.inbox,
     },
   };
 }

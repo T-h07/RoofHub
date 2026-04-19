@@ -75,6 +75,7 @@ export default async function MessagesPage({ searchParams }: MessagesPageProps) 
 
   let threadError: string | null = null;
   let thread = null;
+  const inbox = summariesResult.data.inbox;
 
   if (conversationId) {
     if (!isUuid(conversationId)) {
@@ -102,10 +103,15 @@ export default async function MessagesPage({ searchParams }: MessagesPageProps) 
     <MainContainer size="wide" className="space-y-4">
       <section className="border-border/75 bg-card/58 space-y-3 rounded-xl border p-5 sm:p-6">
         <Badge variant="primary">Messages</Badge>
-        <h1 className="type-page-title max-w-4xl">Listing-bound conversations with protected participant access.</h1>
+        <h1 className="type-page-title max-w-4xl">
+          {inbox.mode === "company_workspace"
+            ? `${inbox.workspaceName} inbox with protected company routing.`
+            : "Listing-bound conversations with protected participant access."}
+        </h1>
         <p className="type-body-muted max-w-3xl">
-          Track listing inquiries, review message history, and respond in one inbox without leaving the marketplace
-          workflow.
+          {inbox.mode === "company_workspace"
+            ? "Review company inquiries, keep routing accountable, and respond from the active RoofHub workspace."
+            : "Track listing inquiries, review message history, and respond in one inbox without leaving the marketplace workflow."}
         </p>
       </section>
 
@@ -129,6 +135,7 @@ export default async function MessagesPage({ searchParams }: MessagesPageProps) 
         <MessagesWorkspace
           key={`${conversationId || "none"}-${summariesResult.data.summaries.length}-${summariesResult.data.summaries[0]?.conversation.id ?? "empty"}`}
           initialSummaries={summariesResult.data.summaries}
+          initialInbox={inbox}
           selectedConversationId={conversationId || null}
           initialThread={thread}
           initialThreadError={threadError}

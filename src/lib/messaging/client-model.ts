@@ -71,12 +71,15 @@ export function sortMessagesChronologically<TMessage extends { id: string; creat
 
 export function deriveViewerUserId(
   thread: MessagingClientThread | null,
-  summaries: MessagingConversationSummary[]
+  summaries: MessagingConversationSummary[],
+  fallbackViewerUserId: string | null
 ) {
   if (thread) {
-    return thread.participantRole === "provider"
-      ? thread.conversation.provider_id
-      : thread.conversation.seeker_id;
+    return thread.inbox.viewerUserId;
+  }
+
+  if (fallbackViewerUserId) {
+    return fallbackViewerUserId;
   }
 
   const firstSummary = summaries[0];
