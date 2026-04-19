@@ -28,14 +28,14 @@ test("company conversation access respects active workspace organization and ass
     viewerUserId: "viewer-user",
     activeOrganizationId: "org-a",
     membershipStatus: "active" as const,
-    listingOrganizationId: "org-a",
+    conversationOrganizationId: "org-a",
   };
 
   assert.equal(
     canAccessCompanyConversation({
       ...baseInput,
       membershipRole: "owner",
-      assignedAgentUserId: null,
+      assignedMemberUserId: null,
     }),
     true
   );
@@ -44,7 +44,7 @@ test("company conversation access respects active workspace organization and ass
     canAccessCompanyConversation({
       ...baseInput,
       membershipRole: "agent",
-      assignedAgentUserId: "viewer-user",
+      assignedMemberUserId: "viewer-user",
     }),
     true
   );
@@ -53,7 +53,16 @@ test("company conversation access respects active workspace organization and ass
     canAccessCompanyConversation({
       ...baseInput,
       membershipRole: "agent",
-      assignedAgentUserId: "other-user",
+      assignedMemberUserId: null,
+    }),
+    false
+  );
+
+  assert.equal(
+    canAccessCompanyConversation({
+      ...baseInput,
+      membershipRole: "agent",
+      assignedMemberUserId: "other-user",
     }),
     false
   );
@@ -63,7 +72,7 @@ test("company conversation access respects active workspace organization and ass
       ...baseInput,
       activeOrganizationId: "org-b",
       membershipRole: "manager",
-      assignedAgentUserId: null,
+      assignedMemberUserId: null,
     }),
     false
   );
@@ -73,7 +82,7 @@ test("company conversation access respects active workspace organization and ass
       ...baseInput,
       membershipRole: "manager",
       membershipStatus: "inactive",
-      assignedAgentUserId: null,
+      assignedMemberUserId: null,
     }),
     false
   );

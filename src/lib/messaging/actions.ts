@@ -10,6 +10,7 @@ import {
   getMessagingAdminClient,
   loadActiveOrganizationAssignableMembers,
   loadCompanyConversationAccessRecord,
+  resolveInitialCompanyConversationAssignee,
   viewerCanAccessCompanyConversation,
 } from "./company";
 import { canManageCompanyConversationRouting } from "./authorization";
@@ -38,14 +39,29 @@ import type {
 } from "./types";
 import { isUuid, normalizeMessageBody } from "./validation";
 
-const CONVERSATION_SELECT = "id, listing_id, provider_id, seeker_id, last_message_at, created_at, updated_at";
+const CONVERSATION_SELECT =
+  "id, listing_id, provider_id, seeker_id, owner_mode, organization_id, assigned_member_user_id, routing_status, assigned_at, last_message_at, created_at, updated_at";
 const MESSAGE_SELECT = "id, conversation_id, sender_id, body, read_at, created_at";
 
-type ConversationEligibilityRow = Pick<Tables<"listings">, "id" | "owner_id" | "listing_status">;
+type ConversationEligibilityRow = Pick<
+  Tables<"listings">,
+  "id" | "owner_id" | "listing_status" | "organization_id" | "assigned_agent_user_id"
+>;
 
 type AccessibleConversationRow = Pick<
   Tables<"conversations">,
-  "id" | "listing_id" | "provider_id" | "seeker_id" | "last_message_at" | "created_at" | "updated_at"
+  | "id"
+  | "listing_id"
+  | "provider_id"
+  | "seeker_id"
+  | "owner_mode"
+  | "organization_id"
+  | "assigned_member_user_id"
+  | "routing_status"
+  | "assigned_at"
+  | "last_message_at"
+  | "created_at"
+  | "updated_at"
 >;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -106,7 +122,7 @@ async function loadConversationEligibilityListing(
 ) {
   const { data, error } = await supabase
     .from("listings")
-    .select("id, owner_id, listing_status")
+    .select("id, owner_id, listing_status, organization_id, assigned_agent_user_id")
     .eq("id", listingId)
     .maybeSingle();
 
@@ -175,7 +191,7 @@ async function loadCompanyConversationForViewer(
       activeOrganizationId: viewer.organization.id,
       membershipRole: viewer.membership.role,
       membershipStatus: viewer.membership.member_status,
-      listing: record.listing,
+      conversation: record.conversation,
     })
   ) {
     return {
@@ -189,7 +205,6 @@ async function loadCompanyConversationForViewer(
 
   return {
     ok: true as const,
-    adminSupabase,
     record,
   };
 }
@@ -254,10 +269,20 @@ export async function createOrGetConversationForListingAction(
     return toTrafficFailure(conversationCreationListingLimit);
   }
 
+  let initialAssignedMemberUserId: string | null = null;
+  if (listing.organization_id) {
+    initialAssignedMemberUserId = await resolveInitialCompanyConversationAssignee(
+      getMessagingAdminClient(),
+      listing.organization_id,
+      listing.assigned_agent_user_id
+    );
+  }
+
   const conversationInsert = {
     listing_id: listing.id,
     provider_id: listing.owner_id,
     seeker_id: profile.id,
+    assigned_member_user_id: initialAssignedMemberUserId,
   };
 
   const { data, error } = await supabase
@@ -280,6 +305,10 @@ export async function createOrGetConversationForListingAction(
         metadata: {
           outcome: "created",
           participant_role: "seeker",
+          owner_mode: data.owner_mode,
+          organization_id: data.organization_id,
+          routing_status: data.routing_status,
+          assigned_member_user_id: data.assigned_member_user_id,
         },
       },
     });
@@ -316,6 +345,10 @@ export async function createOrGetConversationForListingAction(
           metadata: {
             outcome: "existing",
             participant_role: "seeker",
+            owner_mode: existing.owner_mode,
+            organization_id: existing.organization_id,
+            routing_status: existing.routing_status,
+            assigned_member_user_id: existing.assigned_member_user_id,
           },
         },
       });
@@ -377,15 +410,15 @@ export async function sendConversationMessageAction(
   let conversation: AccessibleConversationRow;
 
   if (contextResult.data.mode === "company_workspace") {
-    const conversationResult = await loadAccessibleConversationForViewer(
-      supabase,
-      input.conversationId
+    const conversationResult = await loadCompanyConversationForViewer(
+      input.conversationId,
+      contextResult.data
     );
     if (!conversationResult.ok) {
       return conversationResult.failure;
     }
 
-    conversation = conversationResult.conversation;
+    conversation = conversationResult.record.conversation;
   } else {
     const conversationResult = await loadAccessibleConversationForViewer(
       supabase,
@@ -453,8 +486,6 @@ export async function sendConversationMessageAction(
     return toMessagingFailure("internal", "Message could not be sent right now.");
   }
 
-  // Message bodies are intentionally excluded from audit metadata.
-  // The canonical message content remains only in the product table.
   await recordSecurityAuditEvent({
     supabase,
     event: {
@@ -468,6 +499,10 @@ export async function sendConversationMessageAction(
       metadata: {
         body_length: normalizedBody.length,
         sender_role: profile.role,
+        owner_mode: conversation.owner_mode,
+        organization_id: conversation.organization_id,
+        routing_status: conversation.routing_status,
+        assigned_member_user_id: conversation.assigned_member_user_id,
       },
     },
   });
@@ -497,15 +532,15 @@ export async function markConversationReadAction(
   let conversation: AccessibleConversationRow;
 
   if (contextResult.data.mode === "company_workspace") {
-    const conversationResult = await loadAccessibleConversationForViewer(
-      supabase,
-      input.conversationId
+    const conversationResult = await loadCompanyConversationForViewer(
+      input.conversationId,
+      contextResult.data
     );
     if (!conversationResult.ok) {
       return conversationResult.failure;
     }
 
-    conversation = conversationResult.conversation;
+    conversation = conversationResult.record.conversation;
   } else {
     const conversationResult = await loadAccessibleConversationForViewer(
       supabase,
@@ -551,7 +586,7 @@ export async function markConversationReadAction(
   return {
     ok: true,
     data: {
-      conversationId: input.conversationId,
+      conversationId: conversation.id,
       markedReadCount: data?.length ?? 0,
     },
   };
@@ -608,10 +643,12 @@ export async function updateConversationRoutingAction(
     return conversationResult.failure;
   }
 
-  const { adminSupabase, record } = conversationResult;
-  const listing = record.listing;
+  const { record } = conversationResult;
 
-  if (!listing.organization_id || listing.organization_id !== organization.id) {
+  if (
+    !record.conversation.organization_id ||
+    record.conversation.organization_id !== organization.id
+  ) {
     return toMessagingFailure(
       "forbidden",
       "This conversation does not belong to the active RoofHub company workspace."
@@ -619,7 +656,7 @@ export async function updateConversationRoutingAction(
   }
 
   const assignableMembers = await loadActiveOrganizationAssignableMembers(
-    adminSupabase,
+    getMessagingAdminClient(),
     organization.id
   );
   const requestedAssignee =
@@ -631,7 +668,7 @@ export async function updateConversationRoutingAction(
   if (input.assigneeUserId !== null && !requestedAssignee) {
     return toMessagingFailure(
       "forbidden",
-      "The selected assignee is not an active member of this RoofHub company workspace."
+      "The selected handler is not an active member of this RoofHub company workspace."
     );
   }
 
@@ -652,7 +689,7 @@ export async function updateConversationRoutingAction(
     return toTrafficFailure(trafficResult);
   }
 
-  const previousAssigneeUserId = listing.assigned_agent_user_id;
+  const previousAssigneeUserId = record.conversation.assigned_member_user_id;
   const previousAssigneeDisplayName =
     previousAssigneeUserId === null
       ? null
@@ -664,22 +701,31 @@ export async function updateConversationRoutingAction(
       ok: true,
       data: {
         conversationId: record.conversation.id,
-        assignedAgentUserId: requestedAssignee?.userId ?? null,
+        assignedMemberUserId: requestedAssignee?.userId ?? null,
       },
     };
   }
 
-  const { error } = await adminSupabase
-    .from("listings")
+  const nextAssignedAt = requestedAssignee?.userId ? new Date().toISOString() : null;
+  const { error } = await supabase
+    .from("conversations")
     .update({
-      assigned_agent_user_id: requestedAssignee?.userId ?? null,
+      assigned_member_user_id: requestedAssignee?.userId ?? null,
+      assigned_at: nextAssignedAt,
       updated_at: new Date().toISOString(),
     })
-    .eq("id", listing.id)
+    .eq("id", record.conversation.id)
+    .eq("owner_mode", "company_workspace")
     .eq("organization_id", organization.id);
 
   if (error) {
-    return toMessagingFailure("internal", "Conversation routing could not be updated right now.");
+    const normalized = normalizeSupabaseError(
+      error.message,
+      "Conversation routing could not be updated right now.",
+      "You do not have permission to update conversation routing in this workspace."
+    );
+
+    return toMessagingFailure(normalized.code, normalized.message);
   }
 
   const eventType =
@@ -697,14 +743,16 @@ export async function updateConversationRoutingAction(
       actorRole: profile.role,
       targetType: "conversation",
       targetId: record.conversation.id,
-      listingId: listing.id,
+      listingId: record.listing.id,
       conversationId: record.conversation.id,
       metadata: {
         organization_id: organization.id,
-        previous_assignee_user_id: previousAssigneeUserId,
-        previous_assignee_display_name: previousAssigneeDisplayName,
-        assigned_agent_user_id: requestedAssignee?.userId ?? null,
-        assigned_agent_display_name: requestedAssignee?.displayName ?? null,
+        previous_assigned_member_user_id: previousAssigneeUserId,
+        previous_assigned_member_display_name: previousAssigneeDisplayName,
+        assigned_member_user_id: requestedAssignee?.userId ?? null,
+        assigned_member_display_name: requestedAssignee?.displayName ?? null,
+        previous_routing_status: record.conversation.routing_status,
+        next_routing_status: requestedAssignee?.userId ? "assigned_member" : "shared_queue",
         membership_role: membership.role,
       },
     },
@@ -714,7 +762,7 @@ export async function updateConversationRoutingAction(
     ok: true,
     data: {
       conversationId: record.conversation.id,
-      assignedAgentUserId: requestedAssignee?.userId ?? null,
+      assignedMemberUserId: requestedAssignee?.userId ?? null,
     },
   };
 }

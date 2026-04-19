@@ -16,7 +16,6 @@ import {
 import { createListingImageSignedUrl } from "@/lib/supabase/storage/listing-images";
 
 import { getMessagingViewerContext, toMessagingFailure } from "./context";
-import { canManageCompanyConversationRouting } from "./authorization";
 import type {
   LoadConversationSummariesInput,
   LoadConversationThreadInput,
@@ -30,7 +29,8 @@ import type {
 } from "./types";
 import { isUuid, toMessagePreview } from "./validation";
 
-const CONVERSATION_SELECT = "id, listing_id, provider_id, seeker_id, last_message_at, created_at, updated_at";
+const CONVERSATION_SELECT =
+  "id, listing_id, provider_id, seeker_id, owner_mode, organization_id, assigned_member_user_id, routing_status, assigned_at, last_message_at, created_at, updated_at";
 const MESSAGE_SELECT = "id, conversation_id, sender_id, body, read_at, created_at";
 const LISTING_SNIPPET_SELECT =
   "id, slug, title, city, neighborhood, listing_status, listing_type, property_type, price_amount, currency_code";
@@ -39,7 +39,18 @@ const PROFILE_DISPLAY_NAME_SELECT = "id, display_name";
 
 type ConversationRow = Pick<
   Tables<"conversations">,
-  "id" | "listing_id" | "provider_id" | "seeker_id" | "last_message_at" | "created_at" | "updated_at"
+  | "id"
+  | "listing_id"
+  | "provider_id"
+  | "seeker_id"
+  | "owner_mode"
+  | "organization_id"
+  | "assigned_member_user_id"
+  | "routing_status"
+  | "assigned_at"
+  | "last_message_at"
+  | "created_at"
+  | "updated_at"
 >;
 
 type MessageRow = Pick<
@@ -100,6 +111,11 @@ function toConversationRecord(row: ConversationRow): MessagingConversationRecord
     listing_id: row.listing_id,
     provider_id: row.provider_id,
     seeker_id: row.seeker_id,
+    owner_mode: row.owner_mode,
+    organization_id: row.organization_id,
+    assigned_member_user_id: row.assigned_member_user_id,
+    routing_status: row.routing_status,
+    assigned_at: row.assigned_at,
     last_message_at: row.last_message_at,
     created_at: row.created_at,
     updated_at: row.updated_at,
@@ -139,6 +155,101 @@ async function loadLatestMessagesMap(
   );
 }
 
+async function loadListingSnippetMap(
+  supabase: SupabaseClient<Database>,
+  listingIds: string[]
+) {
+  if (listingIds.length === 0) {
+    return new Map<string, MessagingListingSnippet>();
+  }
+
+  const { data, error } = await supabase
+    .from("listings")
+    .select(LISTING_SNIPPET_SELECT)
+    .in("id", listingIds);
+
+  const listingMap = new Map<string, MessagingListingSnippet>();
+  if (error || !data) {
+    return listingMap;
+  }
+
+  for (const row of data as ListingSnippetRow[]) {
+    listingMap.set(row.id, {
+      id: row.id,
+      slug: row.slug,
+      title: row.title,
+      city: row.city,
+      neighborhood: row.neighborhood,
+      listing_status: row.listing_status,
+      listing_type: row.listing_type,
+      property_type: row.property_type,
+      price_amount: row.price_amount,
+      currency_code: row.currency_code,
+    });
+  }
+
+  return listingMap;
+}
+
+async function loadDisplayNameMap(
+  supabase: SupabaseClient<Database>,
+  userIds: string[]
+) {
+  if (userIds.length === 0) {
+    return new Map<string, string>();
+  }
+
+  const { data, error } = await supabase
+    .from("profiles")
+    .select(PROFILE_DISPLAY_NAME_SELECT)
+    .in("id", userIds);
+
+  const profileDisplayNameMap = new Map<string, string>();
+  if (error || !data) {
+    return profileDisplayNameMap;
+  }
+
+  for (const row of data as ProfileDisplayNameRow[]) {
+    const normalizedName = row.display_name.trim();
+    if (normalizedName.length > 0) {
+      profileDisplayNameMap.set(row.id, normalizedName);
+    }
+  }
+
+  return profileDisplayNameMap;
+}
+
+async function loadUnreadCountMap(
+  supabase: SupabaseClient<Database>,
+  conversationIds: string[],
+  viewerUserId: string
+) {
+  const unreadCountMap = new Map<string, number>();
+  if (conversationIds.length === 0) {
+    return unreadCountMap;
+  }
+
+  const { data, error } = await supabase
+    .from("messages")
+    .select("conversation_id")
+    .in("conversation_id", conversationIds)
+    .neq("sender_id", viewerUserId)
+    .is("read_at", null);
+
+  if (error) {
+    return unreadCountMap;
+  }
+
+  for (const row of data ?? []) {
+    unreadCountMap.set(
+      row.conversation_id,
+      (unreadCountMap.get(row.conversation_id) ?? 0) + 1
+    );
+  }
+
+  return unreadCountMap;
+}
+
 async function loadCompanyMessagingConversationSummariesQuery(
   viewer: Extract<
     Awaited<ReturnType<typeof getMessagingViewerContext>>,
@@ -147,75 +258,22 @@ async function loadCompanyMessagingConversationSummariesQuery(
   limit: number
 ): Promise<MessagingResult<MessagingConversationSummariesResult>> {
   const adminSupabase = getMessagingAdminClient();
-  const { data: listingRows, error: listingError } = await adminSupabase
-    .from("listings")
-    .select(
-      "id, slug, title, city, neighborhood, listing_status, listing_type, property_type, price_amount, currency_code, organization_id, assigned_agent_user_id"
-    )
-    .eq("organization_id", viewer.organization.id);
+  let conversationQuery = adminSupabase
+    .from("conversations")
+    .select(CONVERSATION_SELECT)
+    .eq("owner_mode", "company_workspace")
+    .eq("organization_id", viewer.organization.id)
+    .order("last_message_at", { ascending: false })
+    .limit(limit);
 
-  if (listingError) {
-    return toMessagingFailure(
-      "internal",
-      "Company conversations could not be loaded right now."
+  if (viewer.inbox.companyQueueAccess === "assigned_only") {
+    conversationQuery = conversationQuery.eq(
+      "assigned_member_user_id",
+      viewer.profile.id
     );
   }
 
-  const accessibleListings = (listingRows ?? []).filter((listing) =>
-    viewerCanAccessCompanyConversation({
-      viewerUserId: viewer.profile.id,
-      activeOrganizationId: viewer.organization.id,
-      membershipRole: viewer.membership.role,
-      membershipStatus: viewer.membership.member_status,
-      listing: {
-        organization_id: listing.organization_id,
-        assigned_agent_user_id: listing.assigned_agent_user_id,
-      },
-    })
-  );
-
-  if (accessibleListings.length === 0) {
-    return {
-      ok: true,
-      data: {
-        summaries: [],
-        unreadTotalCount: 0,
-        inbox: viewer.inbox,
-      },
-    };
-  }
-
-  const accessibleListingIds = accessibleListings.map((listing) => listing.id);
-  const listingMap = new Map<string, MessagingListingSnippet>();
-  const listingRoutingMap = new Map<
-    string,
-    { assignedAgentUserId: string | null }
-  >();
-
-  for (const listing of accessibleListings) {
-    listingMap.set(listing.id, {
-      id: listing.id,
-      slug: listing.slug,
-      title: listing.title,
-      city: listing.city,
-      neighborhood: listing.neighborhood,
-      listing_status: listing.listing_status,
-      listing_type: listing.listing_type,
-      property_type: listing.property_type,
-      price_amount: listing.price_amount,
-      currency_code: listing.currency_code,
-    });
-    listingRoutingMap.set(listing.id, {
-      assignedAgentUserId: listing.assigned_agent_user_id,
-    });
-  }
-
-  const { data: conversationRows, error: conversationError } = await adminSupabase
-    .from("conversations")
-    .select(CONVERSATION_SELECT)
-    .in("listing_id", accessibleListingIds)
-    .order("last_message_at", { ascending: false })
-    .limit(limit);
+  const { data: conversationRows, error: conversationError } = await conversationQuery;
 
   if (conversationError) {
     return toMessagingFailure(
@@ -237,76 +295,43 @@ async function loadCompanyMessagingConversationSummariesQuery(
   }
 
   const conversationIds = conversations.map((conversation) => conversation.id);
-  const seekerIds = Array.from(
-    new Set(conversations.map((conversation) => conversation.seeker_id))
-  );
+  const listingIds = Array.from(new Set(conversations.map((conversation) => conversation.listing_id)));
+  const seekerIds = Array.from(new Set(conversations.map((conversation) => conversation.seeker_id)));
   const assigneeIds = Array.from(
     new Set(
-      accessibleListings
-        .map((listing) => listing.assigned_agent_user_id)
+      conversations
+        .map((conversation) => conversation.assigned_member_user_id)
         .filter((value): value is string => typeof value === "string")
     )
   );
 
-  const [latestMessageMap, unreadRowsResult, seekerProfilesResult, assigneeProfilesResult] =
-    await Promise.all([
-      loadLatestMessagesMap(adminSupabase, conversationIds),
-      adminSupabase
-        .from("messages")
-        .select("conversation_id")
-        .in("conversation_id", conversationIds)
-        .neq("sender_id", viewer.profile.id)
-        .is("read_at", null),
-      adminSupabase
-        .from("profiles")
-        .select(PROFILE_DISPLAY_NAME_SELECT)
-        .in("id", seekerIds),
-      assigneeIds.length === 0
-        ? Promise.resolve({ data: [], error: null })
-        : adminSupabase
-            .from("profiles")
-            .select(PROFILE_DISPLAY_NAME_SELECT)
-            .in("id", assigneeIds),
-    ]);
+  const [
+    latestMessageMap,
+    unreadCountMap,
+    listingMap,
+    seekerDisplayNameMap,
+    assigneeDisplayNameMap,
+    activeAssignableMembers,
+  ] = await Promise.all([
+    loadLatestMessagesMap(adminSupabase, conversationIds),
+    loadUnreadCountMap(adminSupabase, conversationIds, viewer.profile.id),
+    loadListingSnippetMap(adminSupabase, listingIds),
+    loadDisplayNameMap(adminSupabase, seekerIds),
+    loadDisplayNameMap(adminSupabase, assigneeIds),
+    loadActiveOrganizationAssignableMembers(adminSupabase, viewer.organization.id),
+  ]);
 
-  if (unreadRowsResult.error) {
-    return toMessagingFailure(
-      "internal",
-      "Unread conversation state could not be loaded."
-    );
-  }
-
-  const unreadCountMap = new Map<string, number>();
-  for (const unreadRow of unreadRowsResult.data ?? []) {
-    unreadCountMap.set(
-      unreadRow.conversation_id,
-      (unreadCountMap.get(unreadRow.conversation_id) ?? 0) + 1
-    );
-  }
-
-  const seekerDisplayNameMap = new Map<string, string>();
-  for (const row of (seekerProfilesResult.data ?? []) as ProfileDisplayNameRow[]) {
-    if (row.display_name.trim()) {
-      seekerDisplayNameMap.set(row.id, row.display_name.trim());
-    }
-  }
-
-  const assigneeDisplayNameMap = new Map<string, string>();
-  for (const row of (assigneeProfilesResult.data ?? []) as ProfileDisplayNameRow[]) {
-    if (row.display_name.trim()) {
-      assigneeDisplayNameMap.set(row.id, row.display_name.trim());
-    }
-  }
+  const activeAssignableMemberIds = new Set(
+    activeAssignableMembers.map((member) => member.userId)
+  );
 
   const summaries: MessagingConversationSummary[] = conversations.map(
     (conversation) => {
-      const listing = listingMap.get(conversation.listing_id) ?? null;
-      const routing = listingRoutingMap.get(conversation.listing_id);
-      const assignedAgentUserId = routing?.assignedAgentUserId ?? null;
+      const assignedMemberUserId = conversation.assigned_member_user_id;
 
       return {
         conversation: toConversationRecord(conversation),
-        listing,
+        listing: listingMap.get(conversation.listing_id) ?? null,
         participantRole: "provider",
         counterpartUserId: conversation.seeker_id,
         counterpartDisplayName:
@@ -317,10 +342,14 @@ async function loadCompanyMessagingConversationSummariesQuery(
           organizationId: viewer.organization.id,
           organizationName: viewer.organization.name,
           organizationSlug: viewer.organization.slug,
-          assignedAgentUserId,
-          assignedAgentDisplayName: assignedAgentUserId
-            ? assigneeDisplayNameMap.get(assignedAgentUserId) ?? null
+          routingStatus: conversation.routing_status,
+          assignedMemberUserId,
+          assignedMemberDisplayName: assignedMemberUserId
+            ? assigneeDisplayNameMap.get(assignedMemberUserId) ?? null
             : null,
+          assignedMemberActive: assignedMemberUserId
+            ? activeAssignableMemberIds.has(assignedMemberUserId)
+            : false,
           queueAccess: viewer.inbox.companyQueueAccess,
           canManageRouting: viewer.canManageRouting,
         }),
@@ -364,7 +393,7 @@ async function loadCompanyMessagingThreadQuery(
       activeOrganizationId: viewer.organization.id,
       membershipRole: viewer.membership.role,
       membershipStatus: viewer.membership.member_status,
-      listing: record.listing,
+      conversation: record.conversation,
     })
   ) {
     return toMessagingFailure(
@@ -374,50 +403,48 @@ async function loadCompanyMessagingThreadQuery(
   }
 
   const limit = clampLimit(input.limit, 180, 1, 400);
-  const assigneeUserId = record.listing.assigned_agent_user_id;
-  const [messagesResult, unreadCount, listingCoverImageResult, seekerProfileResult, assigneeProfileResult, assignableMembers] =
-    await Promise.all([
-      adminSupabase
-        .from("messages")
-        .select(MESSAGE_SELECT)
-        .eq("conversation_id", record.conversation.id)
-        .order("created_at", { ascending: true })
-        .limit(limit),
-      loadCompanyConversationUnreadCount(
-        adminSupabase,
-        record.conversation.id,
-        viewer.profile.id
-      ),
-      adminSupabase
-        .from("listing_images")
-        .select(LISTING_COVER_IMAGE_SELECT)
-        .eq("listing_id", record.listing.id)
-        .order("is_cover", { ascending: false })
-        .order("sort_order", { ascending: true })
-        .limit(1)
-        .maybeSingle(),
-      adminSupabase
-        .from("profiles")
-        .select(PROFILE_DISPLAY_NAME_SELECT)
-        .eq("id", record.conversation.seeker_id)
-        .maybeSingle(),
-      assigneeUserId
-        ? adminSupabase
-            .from("profiles")
-            .select(PROFILE_DISPLAY_NAME_SELECT)
-            .eq("id", assigneeUserId)
-            .maybeSingle()
-        : Promise.resolve({ data: null, error: null }),
-      canManageCompanyConversationRouting(
-        viewer.membership.role,
-        viewer.membership.member_status
-      )
-        ? loadActiveOrganizationAssignableMembers(
-            adminSupabase,
-            viewer.organization.id
-          )
-        : Promise.resolve([]),
-    ]);
+  const assignedMemberUserId = record.conversation.assigned_member_user_id;
+  const [
+    messagesResult,
+    unreadCount,
+    listingCoverImageResult,
+    seekerProfileResult,
+    assigneeProfileResult,
+    activeAssignableMembers,
+  ] = await Promise.all([
+    adminSupabase
+      .from("messages")
+      .select(MESSAGE_SELECT)
+      .eq("conversation_id", record.conversation.id)
+      .order("created_at", { ascending: true })
+      .limit(limit),
+    loadCompanyConversationUnreadCount(
+      adminSupabase,
+      record.conversation.id,
+      viewer.profile.id
+    ),
+    adminSupabase
+      .from("listing_images")
+      .select(LISTING_COVER_IMAGE_SELECT)
+      .eq("listing_id", record.listing.id)
+      .order("is_cover", { ascending: false })
+      .order("sort_order", { ascending: true })
+      .limit(1)
+      .maybeSingle(),
+    adminSupabase
+      .from("profiles")
+      .select(PROFILE_DISPLAY_NAME_SELECT)
+      .eq("id", record.conversation.seeker_id)
+      .maybeSingle(),
+    assignedMemberUserId
+      ? adminSupabase
+          .from("profiles")
+          .select(PROFILE_DISPLAY_NAME_SELECT)
+          .eq("id", assignedMemberUserId)
+          .maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
+    loadActiveOrganizationAssignableMembers(adminSupabase, viewer.organization.id),
+  ]);
 
   if (messagesResult.error) {
     return toMessagingFailure(
@@ -457,14 +484,18 @@ async function loadCompanyMessagingThreadQuery(
         null
       : null;
 
-  const assignedAgentDisplayName =
-    assigneeUserId === null
+  const assignedMemberDisplayName =
+    assignedMemberUserId === null
       ? null
       : !assigneeProfileResult.error && assigneeProfileResult.data
         ? (assigneeProfileResult.data as ProfileDisplayNameRow).display_name.trim() ||
           null
-        : assignableMembers.find((member) => member.userId === assigneeUserId)
-            ?.displayName ?? null;
+        : activeAssignableMembers.find((member) => member.userId === assignedMemberUserId)
+              ?.displayName ?? null;
+
+  const activeAssignableMemberIds = new Set(
+    activeAssignableMembers.map((member) => member.userId)
+  );
 
   return {
     ok: true,
@@ -493,14 +524,18 @@ async function loadCompanyMessagingThreadQuery(
           organizationId: viewer.organization.id,
           organizationName: viewer.organization.name,
           organizationSlug: viewer.organization.slug,
-          assignedAgentUserId: record.listing.assigned_agent_user_id,
-          assignedAgentDisplayName,
+          routingStatus: record.conversation.routing_status,
+          assignedMemberUserId,
+          assignedMemberDisplayName,
+          assignedMemberActive: assignedMemberUserId
+            ? activeAssignableMemberIds.has(assignedMemberUserId)
+            : false,
           queueAccess: viewer.inbox.companyQueueAccess,
           canManageRouting: viewer.canManageRouting,
         }),
         membershipRole: viewer.membership.role,
         membershipStatus: viewer.membership.member_status,
-        assignableMembers,
+        assignableMembers: viewer.canManageRouting ? activeAssignableMembers : [],
       }),
       inbox: viewer.inbox,
     },
@@ -567,61 +602,12 @@ export async function loadMessagingConversationSummariesQuery(
     )
   );
 
-  const [latestMessageMap, unreadRowsResult, listingRowsResult, profileRowsResult] = await Promise.all([
+  const [latestMessageMap, unreadCountMap, listingMap, profileDisplayNameMap] = await Promise.all([
     loadLatestMessagesMap(supabase, conversationIds),
-    supabase
-      .from("messages")
-      .select("conversation_id")
-      .in("conversation_id", conversationIds)
-      .neq("sender_id", profile.id)
-      .is("read_at", null),
-    supabase.from("listings").select(LISTING_SNIPPET_SELECT).in("id", listingIds),
-    counterpartUserIds.length === 0
-      ? Promise.resolve({ data: [], error: null })
-      : supabase.from("profiles").select(PROFILE_DISPLAY_NAME_SELECT).in("id", counterpartUserIds),
+    loadUnreadCountMap(supabase, conversationIds, profile.id),
+    loadListingSnippetMap(supabase, listingIds),
+    loadDisplayNameMap(supabase, counterpartUserIds),
   ]);
-
-  if (unreadRowsResult.error) {
-    return toMessagingFailure("internal", "Unread message state could not be loaded.");
-  }
-
-  const unreadCountMap = new Map<string, number>();
-  for (const unreadRow of unreadRowsResult.data ?? []) {
-    unreadCountMap.set(
-      unreadRow.conversation_id,
-      (unreadCountMap.get(unreadRow.conversation_id) ?? 0) + 1
-    );
-  }
-
-  const listingMap = new Map<string, MessagingListingSnippet>();
-  if (!listingRowsResult.error) {
-    for (const listingRow of listingRowsResult.data ?? []) {
-      const row = listingRow as ListingSnippetRow;
-      listingMap.set(row.id, {
-        id: row.id,
-        slug: row.slug,
-        title: row.title,
-        city: row.city,
-        neighborhood: row.neighborhood,
-        listing_status: row.listing_status,
-        listing_type: row.listing_type,
-        property_type: row.property_type,
-        price_amount: row.price_amount,
-        currency_code: row.currency_code,
-      });
-    }
-  }
-
-  const profileDisplayNameMap = new Map<string, string>();
-  if (!profileRowsResult.error) {
-    for (const profileRow of profileRowsResult.data ?? []) {
-      const row = profileRow as ProfileDisplayNameRow;
-      const normalizedName = row.display_name.trim();
-      if (normalizedName.length > 0) {
-        profileDisplayNameMap.set(row.id, normalizedName);
-      }
-    }
-  }
 
   const summaries: MessagingConversationSummary[] = participantConversations.map((conversation) => {
     const participantRole = conversation.provider_id === profile.id ? "provider" : "seeker";
@@ -692,38 +678,34 @@ export async function loadMessagingThreadQuery(
   const counterpartUserId =
     participantRole === "provider" ? conversation.seeker_id : conversation.provider_id;
 
-  const [messagesResult, listingResult, unreadCountResult, listingCoverImageResult, counterpartProfileResult] =
+  const [messagesResult, listingMap, unreadCountResult, listingCoverImageResult, counterpartProfileResult] =
     await Promise.all([
-    supabase
-      .from("messages")
-      .select(MESSAGE_SELECT)
-      .eq("conversation_id", conversation.id)
-      .order("created_at", { ascending: true })
-      .limit(limit),
-    supabase
-      .from("listings")
-      .select(LISTING_SNIPPET_SELECT)
-      .eq("id", conversation.listing_id)
-      .maybeSingle(),
-    supabase
-      .from("messages")
-      .select("id", { count: "exact", head: true })
-      .eq("conversation_id", conversation.id)
-      .neq("sender_id", profile.id)
-      .is("read_at", null),
-    supabase
-      .from("listing_images")
-      .select(LISTING_COVER_IMAGE_SELECT)
-      .eq("listing_id", conversation.listing_id)
-      .order("is_cover", { ascending: false })
-      .order("sort_order", { ascending: true })
-      .limit(1)
-      .maybeSingle(),
-    supabase
-      .from("profiles")
-      .select(PROFILE_DISPLAY_NAME_SELECT)
-      .eq("id", counterpartUserId)
-      .maybeSingle(),
+      supabase
+        .from("messages")
+        .select(MESSAGE_SELECT)
+        .eq("conversation_id", conversation.id)
+        .order("created_at", { ascending: true })
+        .limit(limit),
+      loadListingSnippetMap(supabase, [conversation.listing_id]),
+      supabase
+        .from("messages")
+        .select("id", { count: "exact", head: true })
+        .eq("conversation_id", conversation.id)
+        .neq("sender_id", profile.id)
+        .is("read_at", null),
+      supabase
+        .from("listing_images")
+        .select(LISTING_COVER_IMAGE_SELECT)
+        .eq("listing_id", conversation.listing_id)
+        .order("is_cover", { ascending: false })
+        .order("sort_order", { ascending: true })
+        .limit(1)
+        .maybeSingle(),
+      supabase
+        .from("profiles")
+        .select(PROFILE_DISPLAY_NAME_SELECT)
+        .eq("id", counterpartUserId)
+        .maybeSingle(),
     ]);
 
   if (messagesResult.error) {
@@ -742,22 +724,6 @@ export async function loadMessagingThreadQuery(
       created_at: message.created_at,
     };
   });
-
-  const listing: MessagingListingSnippet | null =
-    !listingResult.error && listingResult.data
-      ? {
-          id: (listingResult.data as ListingSnippetRow).id,
-          slug: (listingResult.data as ListingSnippetRow).slug,
-          title: (listingResult.data as ListingSnippetRow).title,
-          city: (listingResult.data as ListingSnippetRow).city,
-          neighborhood: (listingResult.data as ListingSnippetRow).neighborhood,
-          listing_status: (listingResult.data as ListingSnippetRow).listing_status,
-          listing_type: (listingResult.data as ListingSnippetRow).listing_type,
-          property_type: (listingResult.data as ListingSnippetRow).property_type,
-          price_amount: (listingResult.data as ListingSnippetRow).price_amount,
-          currency_code: (listingResult.data as ListingSnippetRow).currency_code,
-        }
-      : null;
 
   let listingCoverImageUrl: string | null = null;
   if (!listingCoverImageResult.error && listingCoverImageResult.data) {
@@ -781,7 +747,7 @@ export async function loadMessagingThreadQuery(
     ok: true,
     data: {
       conversation: toConversationRecord(conversation),
-      listing,
+      listing: listingMap.get(conversation.listing_id) ?? null,
       listingCoverImageUrl,
       participantRole,
       counterpartUserId,
@@ -820,7 +786,8 @@ export async function loadProviderUnreadLeadCount(
   const { data: conversations, error: conversationError } = await supabase
     .from("conversations")
     .select("id")
-    .eq("provider_id", providerUserId);
+    .eq("provider_id", providerUserId)
+    .eq("owner_mode", "individual_provider");
 
   if (conversationError) {
     return {

@@ -105,12 +105,12 @@ export default async function MessagesPage({ searchParams }: MessagesPageProps) 
         <Badge variant="primary">Messages</Badge>
         <h1 className="type-page-title max-w-4xl">
           {inbox.mode === "company_workspace"
-            ? `${inbox.workspaceName} inbox with protected company routing.`
+            ? `${inbox.workspaceName} inbox with company-owned routing.`
             : "Listing-bound conversations with protected participant access."}
         </h1>
         <p className="type-body-muted max-w-3xl">
           {inbox.mode === "company_workspace"
-            ? "Review company inquiries, keep routing accountable, and respond from the active RoofHub workspace."
+            ? "Review shared inquiries, assign the active handler, and respond from the correct RoofHub workspace without collapsing ownership into one personal inbox."
             : "Track listing inquiries, review message history, and respond in one inbox without leaving the marketplace workflow."}
         </p>
       </section>

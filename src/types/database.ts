@@ -36,39 +36,68 @@ export type Database = {
     Tables: {
       conversations: {
         Row: {
+          assigned_at: string | null
+          assigned_member_user_id: string | null
           created_at: string
           id: string
           last_message_at: string
           listing_id: string
+          organization_id: string | null
+          owner_mode: Database["public"]["Enums"]["conversation_owner_mode"]
           provider_id: string
+          routing_status: Database["public"]["Enums"]["conversation_routing_status"]
           seeker_id: string
           updated_at: string
         }
         Insert: {
+          assigned_at?: string | null
+          assigned_member_user_id?: string | null
           created_at?: string
           id?: string
           last_message_at?: string
           listing_id: string
+          organization_id?: string | null
+          owner_mode?: Database["public"]["Enums"]["conversation_owner_mode"]
           provider_id: string
+          routing_status?: Database["public"]["Enums"]["conversation_routing_status"]
           seeker_id: string
           updated_at?: string
         }
         Update: {
+          assigned_at?: string | null
+          assigned_member_user_id?: string | null
           created_at?: string
           id?: string
           last_message_at?: string
           listing_id?: string
+          organization_id?: string | null
+          owner_mode?: Database["public"]["Enums"]["conversation_owner_mode"]
           provider_id?: string
+          routing_status?: Database["public"]["Enums"]["conversation_routing_status"]
           seeker_id?: string
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "conversations_assigned_member_user_id_fkey"
+            columns: ["assigned_member_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "conversations_listing_provider_fk"
             columns: ["listing_id", "provider_id"]
             isOneToOne: false
             referencedRelation: "listings"
             referencedColumns: ["id", "owner_id"]
+          },
+          {
+            foreignKeyName: "conversations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "conversations_provider_id_fkey"
@@ -852,6 +881,10 @@ export type Database = {
           organization_id: string
         }[]
       }
+      can_access_active_company_conversation: {
+        Args: { p_conversation_id: string; p_user_id?: string }
+        Returns: boolean
+      }
       can_access_active_company_conversation_listing: {
         Args: { p_listing_id: string; p_user_id?: string }
         Returns: boolean
@@ -1109,6 +1142,11 @@ export type Database = {
     }
     Enums: {
       app_role: "seeker" | "provider" | "admin"
+      conversation_owner_mode: "individual_provider" | "company_workspace"
+      conversation_routing_status:
+        | "direct_provider"
+        | "shared_queue"
+        | "assigned_member"
       heating_type: "central" | "electric" | "gas" | "district" | "other"
       listing_status:
         | "draft"
@@ -1282,6 +1320,12 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["seeker", "provider", "admin"],
+      conversation_owner_mode: ["individual_provider", "company_workspace"],
+      conversation_routing_status: [
+        "direct_provider",
+        "shared_queue",
+        "assigned_member",
+      ],
       heating_type: ["central", "electric", "gas", "district", "other"],
       listing_status: [
         "draft",
@@ -1331,4 +1375,3 @@ export const Constants = {
     },
   },
 } as const
-

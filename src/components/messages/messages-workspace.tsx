@@ -437,32 +437,63 @@ export function MessagesWorkspace({
       setRealtimeHealth("connecting");
     });
 
-    const conversationsChannel = supabase
-      .channel(`conversations-live-${viewerUserId}-${subscriptionVersion}-${Date.now()}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "conversations",
-          filter: `provider_id=eq.${viewerUserId}`,
-        },
-        () => {
-          void refreshWorkspaceFromServer("resync");
-        }
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "conversations",
-          filter: `seeker_id=eq.${viewerUserId}`,
-        },
-        () => {
-          void refreshWorkspaceFromServer("resync");
-        }
-      );
+    const conversationsChannel = supabase.channel(
+      `conversations-live-${viewerUserId}-${subscriptionVersion}-${Date.now()}`
+    );
+
+    if (inbox.mode === "company_workspace" && inbox.workspaceOrganizationId) {
+      conversationsChannel
+        .on(
+          "postgres_changes",
+          {
+            event: "INSERT",
+            schema: "public",
+            table: "conversations",
+            filter: `organization_id=eq.${inbox.workspaceOrganizationId}`,
+          },
+          () => {
+            void refreshWorkspaceFromServer("resync");
+          }
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "UPDATE",
+            schema: "public",
+            table: "conversations",
+            filter: `organization_id=eq.${inbox.workspaceOrganizationId}`,
+          },
+          () => {
+            void refreshWorkspaceFromServer("resync");
+          }
+        );
+    } else {
+      conversationsChannel
+        .on(
+          "postgres_changes",
+          {
+            event: "INSERT",
+            schema: "public",
+            table: "conversations",
+            filter: `provider_id=eq.${viewerUserId}`,
+          },
+          () => {
+            void refreshWorkspaceFromServer("resync");
+          }
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "INSERT",
+            schema: "public",
+            table: "conversations",
+            filter: `seeker_id=eq.${viewerUserId}`,
+          },
+          () => {
+            void refreshWorkspaceFromServer("resync");
+          }
+        );
+    }
 
     conversationsChannel.subscribe();
 
@@ -475,6 +506,8 @@ export function MessagesWorkspace({
     conversationIdsSignature,
     handleRealtimeMessageInsert,
     handleRealtimeMessageUpdate,
+    inbox.mode,
+    inbox.workspaceOrganizationId,
     refreshWorkspaceFromServer,
     subscriptionVersion,
     supabase,
@@ -732,7 +765,7 @@ export function MessagesWorkspace({
         <div className={cn(showThreadOnMobile ? "block" : "hidden", "lg:block")}>
           {hasConversationSelection && thread && viewerUserId ? (
             <MessagesThreadPanel
-              key={`${thread.conversation.id}:${thread.companyRouting?.assignedAgentUserId ?? "unassigned"}`}
+              key={`${thread.conversation.id}:${thread.companyRouting?.assignedMemberUserId ?? "unassigned"}`}
               thread={thread}
               viewerUserId={viewerUserId}
               isSending={isSending}

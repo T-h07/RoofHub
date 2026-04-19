@@ -35,14 +35,14 @@ export function canAccessCompanyConversation(input: {
   activeOrganizationId: string | null;
   membershipRole: OrganizationMemberRole;
   membershipStatus: OrganizationMemberStatus;
-  listingOrganizationId: string | null;
-  assignedAgentUserId: string | null;
+  conversationOrganizationId: string | null;
+  assignedMemberUserId: string | null;
 }) {
   if (
     !isActiveCompanyMemberStatus(input.membershipStatus) ||
     !input.activeOrganizationId ||
-    !input.listingOrganizationId ||
-    input.activeOrganizationId !== input.listingOrganizationId
+    !input.conversationOrganizationId ||
+    input.activeOrganizationId !== input.conversationOrganizationId
   ) {
     return false;
   }
@@ -56,5 +56,5 @@ export function canAccessCompanyConversation(input: {
     return true;
   }
 
-  return input.assignedAgentUserId === input.viewerUserId;
+  return input.assignedMemberUserId === input.viewerUserId;
 }

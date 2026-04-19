@@ -26,6 +26,7 @@ export type MessagingViewerContext = {
         mode: "seeker";
         workspaceName: null;
         workspaceSlug: null;
+        workspaceOrganizationId: null;
         companyQueueAccess: null;
       };
     }
@@ -36,6 +37,7 @@ export type MessagingViewerContext = {
         mode: "individual_provider";
         workspaceName: null;
         workspaceSlug: null;
+        workspaceOrganizationId: null;
         companyQueueAccess: null;
       };
     }
@@ -73,6 +75,7 @@ export type MessagingViewerContext = {
         mode: "company_workspace";
         workspaceName: string;
         workspaceSlug: string;
+        workspaceOrganizationId: string;
         companyQueueAccess: "company_queue" | "assigned_only";
       };
       canManageRouting: boolean;
@@ -129,6 +132,7 @@ export async function getMessagingViewerContext(): Promise<MessagingResult<Messa
           mode: "seeker",
           workspaceName: null,
           workspaceSlug: null,
+          workspaceOrganizationId: null,
           companyQueueAccess: null,
         },
       },
@@ -147,6 +151,7 @@ export async function getMessagingViewerContext(): Promise<MessagingResult<Messa
           mode: "individual_provider",
           workspaceName: null,
           workspaceSlug: null,
+          workspaceOrganizationId: null,
           companyQueueAccess: null,
         },
       },
@@ -196,6 +201,7 @@ export async function getMessagingViewerContext(): Promise<MessagingResult<Messa
         mode: "company_workspace",
         workspaceName: companyContextResult.company.activeOrganization.name,
         workspaceSlug: companyContextResult.company.activeOrganization.slug,
+        workspaceOrganizationId: companyContextResult.company.activeOrganization.id,
         companyQueueAccess: queueAccess,
       },
       canManageRouting: canManageCompanyConversationRouting(

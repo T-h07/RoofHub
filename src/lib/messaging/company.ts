@@ -9,6 +9,7 @@ import type {
   MessagingAssignableCompanyMember,
   MessagingCompanyRoutingDetail,
   MessagingCompanyRoutingSummary,
+  MessagingConversationRecord,
 } from "./types";
 import { canAccessCompanyConversation } from "./authorization";
 
@@ -28,16 +29,7 @@ export type CompanyConversationListingRow = Pick<
   | "assigned_agent_user_id"
 >;
 
-export type CompanyConversationRow = Pick<
-  Tables<"conversations">,
-  | "id"
-  | "listing_id"
-  | "provider_id"
-  | "seeker_id"
-  | "last_message_at"
-  | "created_at"
-  | "updated_at"
->;
+export type CompanyConversationRow = MessagingConversationRecord;
 
 export type CompanyConversationAccessRecord = {
   conversation: CompanyConversationRow;
@@ -48,6 +40,9 @@ type AssignableMemberRow = Pick<Tables<"organization_members">, "user_id" | "rol
   profile: Pick<Tables<"profiles">, "display_name"> | null;
 };
 
+const COMPANY_CONVERSATION_SELECT =
+  "id, listing_id, provider_id, seeker_id, owner_mode, organization_id, assigned_member_user_id, routing_status, assigned_at, last_message_at, created_at, updated_at";
+
 export function getMessagingAdminClient() {
   return createAdminSupabaseClient();
 }
@@ -56,29 +51,32 @@ export async function loadCompanyConversationAccessRecord(
   adminSupabase: ReturnType<typeof getMessagingAdminClient>,
   conversationId: string
 ): Promise<CompanyConversationAccessRecord | null> {
-  const { data, error } = await adminSupabase
+  const { data: conversation, error: conversationError } = await adminSupabase
     .from("conversations")
-    .select(
-      "id, listing_id, provider_id, seeker_id, last_message_at, created_at, updated_at, listing:listings!conversations_listing_provider_fk(id, slug, title, city, neighborhood, listing_status, listing_type, property_type, price_amount, currency_code, organization_id, assigned_agent_user_id)"
-    )
+    .select(COMPANY_CONVERSATION_SELECT)
     .eq("id", conversationId)
+    .eq("owner_mode", "company_workspace")
     .maybeSingle();
 
-  if (error || !data || !data.listing) {
+  if (conversationError || !conversation) {
+    return null;
+  }
+
+  const { data: listing, error: listingError } = await adminSupabase
+    .from("listings")
+    .select(
+      "id, slug, title, city, neighborhood, listing_status, listing_type, property_type, price_amount, currency_code, organization_id, assigned_agent_user_id"
+    )
+    .eq("id", conversation.listing_id)
+    .maybeSingle();
+
+  if (listingError || !listing) {
     return null;
   }
 
   return {
-    conversation: {
-      id: data.id,
-      listing_id: data.listing_id,
-      provider_id: data.provider_id,
-      seeker_id: data.seeker_id,
-      last_message_at: data.last_message_at,
-      created_at: data.created_at,
-      updated_at: data.updated_at,
-    },
-    listing: data.listing as CompanyConversationListingRow,
+    conversation: conversation as CompanyConversationRow,
+    listing: listing as CompanyConversationListingRow,
   };
 }
 
@@ -108,12 +106,38 @@ export async function loadActiveOrganizationAssignableMembers(
     .sort((left, right) => left.displayName.localeCompare(right.displayName));
 }
 
+export async function resolveInitialCompanyConversationAssignee(
+  adminSupabase: ReturnType<typeof getMessagingAdminClient>,
+  organizationId: string | null,
+  preferredUserId: string | null
+) {
+  if (!organizationId || !preferredUserId) {
+    return null;
+  }
+
+  const { data, error } = await adminSupabase
+    .from("organization_members")
+    .select("user_id")
+    .eq("organization_id", organizationId)
+    .eq("user_id", preferredUserId)
+    .eq("member_status", "active")
+    .maybeSingle();
+
+  if (error || !data) {
+    return null;
+  }
+
+  return data.user_id;
+}
+
 export function buildCompanyRoutingSummary(input: {
   organizationId: string;
   organizationName: string;
   organizationSlug: string;
-  assignedAgentUserId: string | null;
-  assignedAgentDisplayName: string | null;
+  routingStatus: MessagingCompanyRoutingSummary["routingStatus"];
+  assignedMemberUserId: string | null;
+  assignedMemberDisplayName: string | null;
+  assignedMemberActive: boolean;
   queueAccess: "company_queue" | "assigned_only";
   canManageRouting: boolean;
 }): MessagingCompanyRoutingSummary {
@@ -121,8 +145,10 @@ export function buildCompanyRoutingSummary(input: {
     organizationId: input.organizationId,
     organizationName: input.organizationName,
     organizationSlug: input.organizationSlug,
-    assignedAgentUserId: input.assignedAgentUserId,
-    assignedAgentDisplayName: input.assignedAgentDisplayName,
+    routingStatus: input.routingStatus,
+    assignedMemberUserId: input.assignedMemberUserId,
+    assignedMemberDisplayName: input.assignedMemberDisplayName,
+    assignedMemberActive: input.assignedMemberActive,
     queueAccess: input.queueAccess,
     canManageRouting: input.canManageRouting,
   };
@@ -147,18 +173,15 @@ export function viewerCanAccessCompanyConversation(input: {
   activeOrganizationId: string;
   membershipRole: MessagingCompanyRoutingDetail["membershipRole"];
   membershipStatus: MessagingCompanyRoutingDetail["membershipStatus"];
-  listing: Pick<
-    CompanyConversationListingRow,
-    "organization_id" | "assigned_agent_user_id"
-  >;
+  conversation: Pick<CompanyConversationRow, "organization_id" | "assigned_member_user_id">;
 }) {
   return canAccessCompanyConversation({
     viewerUserId: input.viewerUserId,
     activeOrganizationId: input.activeOrganizationId,
     membershipRole: input.membershipRole,
     membershipStatus: input.membershipStatus,
-    listingOrganizationId: input.listing.organization_id,
-    assignedAgentUserId: input.listing.assigned_agent_user_id,
+    conversationOrganizationId: input.conversation.organization_id,
+    assignedMemberUserId: input.conversation.assigned_member_user_id,
   });
 }
 

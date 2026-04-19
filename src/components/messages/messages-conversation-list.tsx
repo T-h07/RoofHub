@@ -4,7 +4,10 @@ import { ChevronRight, LoaderCircle, MessageSquareText } from "lucide-react";
 
 import { EmptyState } from "@/components/ui/empty-state";
 import type { MessagingRealtimeHealth } from "@/lib/messaging/client-model";
-import { formatConversationActivityLabel, formatConversationActivityTitle } from "@/lib/messaging/presentation";
+import {
+  formatConversationActivityLabel,
+  formatConversationActivityTitle,
+} from "@/lib/messaging/presentation";
 import type {
   MessagingConversationSummary,
   MessagingInboxContext,
@@ -52,6 +55,26 @@ function getListingTitle(summary: MessagingConversationSummary) {
   return summary.listing?.title ?? "Listing unavailable";
 }
 
+function getConversationLaneLabel(summary: MessagingConversationSummary) {
+  if (!summary.companyRouting) {
+    return null;
+  }
+
+  if (summary.companyRouting.routingStatus === "shared_queue") {
+    return "Shared queue";
+  }
+
+  if (!summary.companyRouting.assignedMemberActive) {
+    return summary.companyRouting.assignedMemberDisplayName
+      ? `Handler inactive • ${summary.companyRouting.assignedMemberDisplayName}`
+      : "Handler inactive";
+  }
+
+  return summary.companyRouting.assignedMemberDisplayName
+    ? `Handled by ${summary.companyRouting.assignedMemberDisplayName}`
+    : "Assigned thread";
+}
+
 export function MessagesConversationList({
   inbox,
   summaries,
@@ -66,8 +89,12 @@ export function MessagesConversationList({
     return (
       <EmptyState
         icon={MessageSquareText}
-        title="No conversations yet"
-        description="Start from a listing detail page and use Contact to open your first listing-bound conversation."
+        title={inbox.mode === "company_workspace" ? "No company inquiries yet" : "No conversations yet"}
+        description={
+          inbox.mode === "company_workspace"
+            ? "New listing inquiries will land here and stay visible to the right RoofHub workspace queue."
+            : "Start from a listing detail page and use Contact to open your first listing-bound conversation."
+        }
       />
     );
   }
@@ -76,11 +103,13 @@ export function MessagesConversationList({
     <div className="space-y-2.5">
       <div className="border-border/70 bg-card/45 flex items-center justify-between rounded-lg border px-3.5 py-2.5">
         <div className="space-y-0.5">
-          <p className="text-sm font-semibold tracking-tight">Inbox</p>
+          <p className="text-sm font-semibold tracking-tight">
+            {inbox.mode === "company_workspace" ? "Team inbox" : "Inbox"}
+          </p>
           <p className="text-muted-foreground text-xs">
             {summaries.length} thread{summaries.length === 1 ? "" : "s"} • {unreadTotalCount} unread
             {inbox.mode === "company_workspace" && inbox.workspaceName
-              ? ` • ${inbox.companyQueueAccess === "company_queue" ? "company queue" : "assigned queue"}`
+              ? ` • ${inbox.companyQueueAccess === "company_queue" ? "workspace queue" : "assigned threads"}`
               : ""}
           </p>
         </div>
@@ -127,6 +156,7 @@ export function MessagesConversationList({
         {summaries.map((summary) => {
           const activityTimestamp = summary.lastMessage?.created_at ?? summary.conversation.last_message_at;
           const isSelected = summary.conversation.id === selectedConversationId;
+          const laneLabel = getConversationLaneLabel(summary);
 
           return (
             <li key={summary.conversation.id}>
@@ -162,12 +192,8 @@ export function MessagesConversationList({
                     {getCounterpartLabel(summary)} • {getListingContext(summary)}
                   </p>
 
-                  {summary.companyRouting ? (
-                    <p className="text-muted-foreground text-[11px] leading-5">
-                      {summary.companyRouting.assignedAgentDisplayName
-                        ? `Assigned to ${summary.companyRouting.assignedAgentDisplayName}`
-                        : "Unassigned company conversation"}
-                    </p>
+                  {laneLabel ? (
+                    <p className="text-muted-foreground text-[11px] leading-5">{laneLabel}</p>
                   ) : null}
 
                   <p className="text-muted-foreground truncate text-sm">

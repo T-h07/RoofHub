@@ -69,6 +69,26 @@ function getLocationLabel(thread: MessagingClientThread) {
   return thread.listing.city;
 }
 
+function getRoutingStatusLabel(thread: MessagingClientThread) {
+  if (!thread.companyRouting) {
+    return null;
+  }
+
+  if (thread.companyRouting.routingStatus === "shared_queue") {
+    return "Shared workspace queue";
+  }
+
+  if (!thread.companyRouting.assignedMemberActive) {
+    return thread.companyRouting.assignedMemberDisplayName
+      ? `Handler inactive • ${thread.companyRouting.assignedMemberDisplayName}`
+      : "Handler inactive";
+  }
+
+  return thread.companyRouting.assignedMemberDisplayName
+    ? `Handled by ${thread.companyRouting.assignedMemberDisplayName}`
+    : "Assigned thread";
+}
+
 export function MessagesThreadPanel({
   thread,
   viewerUserId,
@@ -82,7 +102,7 @@ export function MessagesThreadPanel({
   const [draftBody, setDraftBody] = useState("");
   const [localError, setLocalError] = useState<string | null>(null);
   const [selectedAssigneeUserId, setSelectedAssigneeUserId] = useState(
-    thread.companyRouting?.assignedAgentUserId ?? ""
+    thread.companyRouting?.assignedMemberUserId ?? ""
   );
   const [isUpdatingRouting, setIsUpdatingRouting] = useState(false);
   const messageScrollContainerRef = useRef<HTMLDivElement | null>(null);
@@ -96,6 +116,7 @@ export function MessagesThreadPanel({
   const characterCount = draftBody.trim().length;
   const listingHref = thread.listing?.slug ? `/listing/${thread.listing.slug}` : null;
   const priceLabel = formatPrice(thread);
+  const routingStatusLabel = getRoutingStatusLabel(thread);
 
   useEffect(() => {
     const container = messageScrollContainerRef.current;
@@ -149,7 +170,7 @@ export function MessagesThreadPanel({
     setIsUpdatingRouting(true);
     const ok = await onUpdateRouting(selectedAssigneeUserId || null);
     if (!ok) {
-      setSelectedAssigneeUserId(thread.companyRouting.assignedAgentUserId ?? "");
+      setSelectedAssigneeUserId(thread.companyRouting.assignedMemberUserId ?? "");
     }
     setIsUpdatingRouting(false);
   }
@@ -187,10 +208,8 @@ export function MessagesThreadPanel({
               </p>
               {thread.companyRouting ? (
                 <p className="text-muted-foreground truncate text-xs">
-                  {thread.companyRouting.organizationName} •{" "}
-                  {thread.companyRouting.assignedAgentDisplayName
-                    ? `Assigned to ${thread.companyRouting.assignedAgentDisplayName}`
-                    : "Unassigned conversation"}
+                  {thread.companyRouting.organizationName} owns this inquiry
+                  {routingStatusLabel ? ` • ${routingStatusLabel}` : ""}
                 </p>
               ) : null}
             </div>
@@ -232,15 +251,23 @@ export function MessagesThreadPanel({
           <div className="border-border/60 bg-background/55 flex flex-col gap-2 rounded-lg border px-3 py-2 sm:flex-row sm:items-end sm:justify-between">
             <div className="min-w-0 space-y-1">
               <p className="text-xs font-semibold">
-                {thread.companyRouting.queueAccess === "company_queue"
-                  ? "Company queue access"
-                  : "Assigned queue access"}
+                {thread.companyRouting.routingStatus === "shared_queue"
+                  ? "Shared workspace queue"
+                  : "Assigned handler"}
               </p>
               <p className="text-muted-foreground text-xs">
-                {thread.companyRouting.assignedAgentDisplayName
-                  ? `${thread.companyRouting.assignedAgentDisplayName} currently owns the follow-up path for this conversation.`
-                  : "This conversation is currently unassigned and visible through the company queue."}
+                {thread.companyRouting.routingStatus === "shared_queue"
+                  ? "This inquiry belongs to the company queue until a member claims or is assigned to it."
+                  : thread.companyRouting.assignedMemberDisplayName
+                    ? `${thread.companyRouting.assignedMemberDisplayName} is the active handler for this inquiry while the company retains ownership.`
+                    : "A company handler is attached to this inquiry."}
               </p>
+              {!thread.companyRouting.assignedMemberActive &&
+              thread.companyRouting.routingStatus === "assigned_member" ? (
+                <p className="text-warning text-xs">
+                  The current handler is no longer active in this workspace. Reassign this thread to keep follow-up moving.
+                </p>
+              ) : null}
             </div>
 
             {thread.companyRouting.canManageRouting ? (
@@ -251,7 +278,7 @@ export function MessagesThreadPanel({
                   disabled={isUpdatingRouting}
                   className="h-9"
                 >
-                  <option value="">Unassigned company queue</option>
+                  <option value="">Shared company queue</option>
                   {thread.companyRouting.assignableMembers.map((member) => (
                     <option key={member.userId} value={member.userId}>
                       {member.displayName} • {member.role}
@@ -263,8 +290,7 @@ export function MessagesThreadPanel({
                   onClick={() => void submitRoutingUpdate()}
                   disabled={
                     isUpdatingRouting ||
-                    (thread.companyRouting.assignedAgentUserId ?? "") ===
-                      selectedAssigneeUserId
+                    (thread.companyRouting.assignedMemberUserId ?? "") === selectedAssigneeUserId
                   }
                   className={cn(
                     buttonVariants({ variant: "outline", size: "sm" }),
@@ -274,7 +300,7 @@ export function MessagesThreadPanel({
                   {isUpdatingRouting ? (
                     <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
                   ) : null}
-                  Update routing
+                  Update handler
                 </button>
               </div>
             ) : null}

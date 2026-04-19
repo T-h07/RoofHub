@@ -29,9 +29,23 @@ export type MessagingResult<TData> =
     }
   | MessagingFailure;
 
+export type MessagingConversationOwnerMode = Enums<"conversation_owner_mode">;
+export type MessagingConversationRoutingStatus = Enums<"conversation_routing_status">;
+
 export type MessagingConversationRecord = Pick<
   Tables<"conversations">,
-  "id" | "listing_id" | "provider_id" | "seeker_id" | "last_message_at" | "created_at" | "updated_at"
+  | "id"
+  | "listing_id"
+  | "provider_id"
+  | "seeker_id"
+  | "owner_mode"
+  | "organization_id"
+  | "assigned_member_user_id"
+  | "routing_status"
+  | "assigned_at"
+  | "last_message_at"
+  | "created_at"
+  | "updated_at"
 >;
 
 export type MessagingMessageRecord = Pick<
@@ -65,6 +79,7 @@ export type MessagingInboxContext = {
   mode: MessagingInboxMode;
   workspaceName: string | null;
   workspaceSlug: string | null;
+  workspaceOrganizationId: string | null;
   companyQueueAccess: MessagingCompanyQueueAccess | null;
 };
 
@@ -78,8 +93,10 @@ export type MessagingCompanyRoutingSummary = {
   organizationId: string;
   organizationName: string;
   organizationSlug: string;
-  assignedAgentUserId: string | null;
-  assignedAgentDisplayName: string | null;
+  routingStatus: MessagingConversationRoutingStatus;
+  assignedMemberUserId: string | null;
+  assignedMemberDisplayName: string | null;
+  assignedMemberActive: boolean;
   queueAccess: MessagingCompanyQueueAccess;
   canManageRouting: boolean;
 };
@@ -155,7 +172,7 @@ export type UpdateConversationRoutingInput = {
 
 export type UpdateConversationRoutingResult = {
   conversationId: string;
-  assignedAgentUserId: string | null;
+  assignedMemberUserId: string | null;
 };
 
 export type LoadConversationSummariesInput = {
