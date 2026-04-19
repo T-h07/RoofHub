@@ -153,5 +153,18 @@ For dependency/lockfile/scanner specifics, also follow `docs/supply-chain-guardr
 - A table-level trigger now blocks update/delete paths that would remove the last active owner, including service-role initiated mutations.
 - Company conversation/message RLS now enforces active-workspace organization scope for company inbox access instead of loose same-org membership.
 - Company inbox queue access is reviewer-scoped, while agent access is assignment-scoped.
-- Conversation routing updates are limited to `owner` / `admin` / `manager` members and validate assignee organization membership before mutation.
+- Conversation routing updates are limited to `owner` / `admin` / `manager` members and validate assignee organization membership before mutating the company-owned conversation row.
 - Targeted TS security assertions now cover company permission matrix and company messaging access/routing behavior (`npx -y tsx --test src/lib/company/permissions.test.ts src/lib/messaging/authorization.test.ts`).
+
+## PT-FIX04 validation notes
+
+- Company messaging ownership now lives on `public.conversations` via `owner_mode`, `organization_id`, `assigned_member_user_id`, `routing_status`, and `assigned_at`.
+- Company inbox queries load workspace threads from `conversations.organization_id`, not from listing assignment overlays.
+- Shared queue and assigned handler states are explicit conversation states, not UI-only filters.
+- Routing updates now change only conversation handler state; they do not rewrite listing assignment to simulate thread ownership.
+- Company realtime refresh now follows company conversation ownership/routing changes instead of personal `provider_id` / `seeker_id` inserts alone.
+- Validation completed:
+  - `npm run typecheck`
+  - `npx -y tsx --test src/lib/messaging/authorization.test.ts src/lib/company/permissions.test.ts`
+  - `npm run lint`
+  - `npm run build`

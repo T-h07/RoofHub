@@ -53,7 +53,8 @@ Audit and observability execution details are defined in `docs/audit-observabili
 - Restrict company pending-review queue visibility to reviewer-capable membership roles (`owner`/`admin`/`manager`) on trusted server paths.
 - Restrict listing workflow timeline visibility to reviewer roles or listing-responsible actors (creator/assigned agent), not broad active-member reads.
 - For company operational dashboards, use trusted server-side organization resolution and membership-gated query paths. Any company-internal read-model RPCs must be server-only primitives, not broadly callable authenticated APIs.
-- For company messaging, enforce access from persisted active workspace context (`profiles.active_organization_id`) plus valid organization membership; do not treat loose same-org membership or client-selected workspace as authority.
+- For company messaging, enforce access from persisted active workspace context (`profiles.active_organization_id`) plus valid organization membership; do not treat loose same-org membership, listing assignment, or client-selected workspace as authority.
+- Company-owned thread context must live on the conversation record itself (`owner_mode`, `organization_id`, `assigned_member_user_id`, `routing_status`) rather than being inferred from listing metadata at read time.
 - Company inbox queue visibility must stay role-scoped:
   - `owner` / `admin` / `manager`: active workspace queue access
   - `agent`: assigned conversations only
@@ -61,7 +62,7 @@ Audit and observability execution details are defined in `docs/audit-observabili
   - authenticated actor
   - active membership state
   - actor role (`owner` / `admin` / `manager`)
-  - target conversation listing organization
+  - target conversation organization
   - target assignee active membership in the same organization
 - Company invite acceptance must be bound to authenticated user identity (target user id match or invite-email match), never client-asserted claims.
 - Invite-email identity matching must use server-trusted email resolution (`auth.users` / trusted helper), not mutable client metadata assumptions.
@@ -106,7 +107,7 @@ Audit and observability execution details are defined in `docs/audit-observabili
   - reviewer-capable active workspace members can access active-workspace company conversations
   - agent members can access only assigned active-workspace company conversations
 - Conversation creation must enforce listing contactability and anti-self-contact checks.
-- Company routing updates must never rely on button hiding or client-supplied assignee/org ids; the trusted server path must resolve and verify the target membership directly.
+- Company routing updates must never rely on button hiding or client-supplied assignee/org ids; the trusted server path must resolve the owning company conversation and verify the target membership directly.
 - Moderation actions are admin-only and must not be bypassed by provider/user controls.
 - Listing visibility must obey listing status (`published`-only for public discovery surfaces).
 - Company listing review states (`draft`, `submitted_for_review`, `needs_changes`, `approved`, `unpublished`) are internal-only and must never leak to public discovery/detail/company feeds.

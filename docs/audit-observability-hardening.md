@@ -137,7 +137,8 @@ Moderation visibility events include optional `report_id` linkage when action is
 - `messaging.conversation.unassigned`
 
 Message audit metadata records only safe descriptors (for example message length), never raw body duplication.
-Conversation-routing audit metadata records organization id, actor membership role, and bounded assignee identifiers/display names only; it must not duplicate message bodies or secrets.
+Conversation-routing audit metadata records organization id, actor membership role, routing transition state, and bounded assignee identifiers/display names only; it must not duplicate message bodies or secrets.
+Company messaging audit events must describe company-owned thread context from the conversation row, not from listing assignment overlays.
 
 ### Profile role-sensitive
 

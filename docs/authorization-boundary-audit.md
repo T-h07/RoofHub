@@ -144,13 +144,28 @@ Route protection improves UX but is not an authorization substitute.
 - Last-owner protection is enforced at both layers:
   - app-layer permission and mutation checks
   - table-layer trigger (`prevent_last_active_owner_loss()`)
+
+### PT-FIX04 company-native messaging routing
+
+- Company conversations are now modeled explicitly on `public.conversations`:
+  - `owner_mode`
+  - `organization_id`
+  - `assigned_member_user_id`
+  - `routing_status`
+  - `assigned_at`
+- Company inquiry ownership is conversation-scoped, not inferred from `listings.assigned_agent_user_id`.
+- Listing assignment remains a listing/workflow concept; conversation routing is now its own company-owned state machine.
 - Company messaging authority is now split intentionally:
   - conversation/message table access is enforced through RLS plus persisted active-workspace checks
-  - company thread-routing mutation remains a trusted server action that validates active membership, role, and same-organization target assignment before updating `listings.assigned_agent_user_id`
+  - company thread-routing mutation remains a trusted server action that validates active membership, role, and same-organization target assignment before updating the conversation row
 - Company inbox visibility is no longer based on loose same-org membership:
   - `owner` / `admin` / `manager` can access the active workspace queue
-  - `agent` can access only conversations assigned to the same authenticated user inside the active workspace
-- Company messaging reads/writes now validate the persisted active workspace (`profiles.active_organization_id`) against the target listing organization, preventing cross-workspace leakage for multi-company members.
+  - `agent` can access only company conversations assigned to the same authenticated user inside the active workspace
+- Company messaging reads/writes validate the persisted active workspace (`profiles.active_organization_id`) against `conversations.organization_id`, preventing cross-workspace leakage for multi-company members.
+- Shared-queue behavior is first-class:
+  - `routing_status = 'shared_queue'` means company-owned and unassigned
+  - `routing_status = 'assigned_member'` means company-owned with an active handler
+- Reassignment changes handler state only; it does not change company ownership of the inquiry context.
 
 ### Favorites
 
@@ -175,7 +190,7 @@ Route protection improves UX but is not an authorization substitute.
 - Company workspace messaging is active-workspace scoped, not generic same-org scoped:
   - active workspace is derived from persisted profile context
   - reviewer-capable company roles (`owner`, `admin`, `manager`) can access the active workspace inbox queue
-  - `agent` membership can access only conversations whose listing is assigned to that same agent
+  - `agent` membership can access only conversations whose `assigned_member_user_id` matches that same agent
 - Company conversation routing (assign / reassign / unassign) is restricted to `owner`, `admin`, or `manager` members in the active workspace and fails closed for agents, suspended members, and cross-company target ids.
 
 ## Public/private visibility boundaries

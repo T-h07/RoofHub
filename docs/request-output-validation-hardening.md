@@ -42,6 +42,7 @@ Treat these as untrusted input boundaries:
 - Company listing workflow actions must validate listing id shape, action allowlist, and bounded review-note length before execution.
 - Company listing workflow timeline reads must validate membership access server-side and reject non-member/non-admin readers.
 - Company pending-review queue loaders must enforce reviewer-role visibility server-side.
+- Company messaging routing actions must validate conversation id shape, active workspace scope, and same-organization assignee membership server-side before mutating handler state.
 
 ## Query and route param rules
 
@@ -102,6 +103,7 @@ Treat these as untrusted input boundaries:
 - Company ownership/membership resolution must continue to come from persisted organization membership data, not client role toggles.
 - Company invite and membership mutations must continue to use server-side validated identifiers (no client-only role/member authority assumptions).
 - Company workflow and queue visibility must remain reviewer-scoped where reviewer-only operational data is exposed.
+- Company messaging must continue to distinguish company-owned inquiry context from assigned member handling in both payload validation and response shaping.
 
 ## Deferred from SH-PT04
 
