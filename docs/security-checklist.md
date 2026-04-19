@@ -16,6 +16,8 @@ For dependency/lockfile/scanner specifics, also follow `docs/supply-chain-guardr
 - [ ] Admin/provider/user boundary checks are explicit.
 - [ ] Provider actions remain owner-scoped; admin is not implicitly treated as provider-owner in provider flows.
 - [ ] Messaging list/thread/send/read actions enforce participant-only access.
+- [ ] Company messaging queue/thread access enforces persisted active-workspace scope plus membership role/assignment checks.
+- [ ] Company routing mutations (assign/reassign/unassign) are server-enforced and reject cross-company assignee ids.
 - [ ] RLS assumptions are preserved (no app-side bypass pattern introduced).
 
 ## Input and output safety
@@ -149,3 +151,7 @@ For dependency/lockfile/scanner specifics, also follow `docs/supply-chain-guardr
 - Audit writes run through the shared server helper and no longer depend on a broadly callable audit RPC.
 - Traffic-control RPC execution is service-role-only and remains enforced at server action / route-handler boundaries.
 - A table-level trigger now blocks update/delete paths that would remove the last active owner, including service-role initiated mutations.
+- Company conversation/message RLS now enforces active-workspace organization scope for company inbox access instead of loose same-org membership.
+- Company inbox queue access is reviewer-scoped, while agent access is assignment-scoped.
+- Conversation routing updates are limited to `owner` / `admin` / `manager` members and validate assignee organization membership before mutation.
+- Targeted TS security assertions now cover company permission matrix and company messaging access/routing behavior (`npx -y tsx --test src/lib/company/permissions.test.ts src/lib/messaging/authorization.test.ts`).

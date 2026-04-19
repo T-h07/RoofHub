@@ -144,6 +144,13 @@ Route protection improves UX but is not an authorization substitute.
 - Last-owner protection is enforced at both layers:
   - app-layer permission and mutation checks
   - table-layer trigger (`prevent_last_active_owner_loss()`)
+- Company messaging authority is now split intentionally:
+  - conversation/message table access is enforced through RLS plus persisted active-workspace checks
+  - company thread-routing mutation remains a trusted server action that validates active membership, role, and same-organization target assignment before updating `listings.assigned_agent_user_id`
+- Company inbox visibility is no longer based on loose same-org membership:
+  - `owner` / `admin` / `manager` can access the active workspace queue
+  - `agent` can access only conversations assigned to the same authenticated user inside the active workspace
+- Company messaging reads/writes now validate the persisted active workspace (`profiles.active_organization_id`) against the target listing organization, preventing cross-workspace leakage for multi-company members.
 
 ### Favorites
 
@@ -165,6 +172,11 @@ Route protection improves UX but is not an authorization substitute.
 - Thread reads, message sends, and read-state updates require participant membership checks.
 - Conversation list/thread loaders must not leak non-participant conversations.
 - Admin is intentionally blocked from normal participant inbox surfaces in app-layer messaging context.
+- Company workspace messaging is active-workspace scoped, not generic same-org scoped:
+  - active workspace is derived from persisted profile context
+  - reviewer-capable company roles (`owner`, `admin`, `manager`) can access the active workspace inbox queue
+  - `agent` membership can access only conversations whose listing is assigned to that same agent
+- Company conversation routing (assign / reassign / unassign) is restricted to `owner`, `admin`, or `manager` members in the active workspace and fails closed for agents, suspended members, and cross-company target ids.
 
 ## Public/private visibility boundaries
 
@@ -208,6 +220,8 @@ Targeted hardening outcomes:
 - provider listing management queries/actions are now strictly owner-scoped
 - admin is no longer implicitly treated as provider owner in provider listing flows
 - messaging thread/list/read paths now enforce participant checks in app layer
+- company messaging queue visibility and routing now enforce active-workspace organization scope plus role/assignment constraints
+- conversation/message RLS now blocks cross-company access unless the authenticated user is an allowed active-workspace company viewer
 
 ## What future PTs must preserve
 
