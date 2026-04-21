@@ -24,6 +24,7 @@ const AUTH_SHARED_NAV: NavItem[] = [
   { title: "Map", href: "/map" },
   { title: "Favorites", href: "/favorites" },
   { title: "Messages", href: "/messages" },
+  { title: "Notifications", href: "/notifications" },
   { title: "Profile", href: "/profile" },
 ];
 

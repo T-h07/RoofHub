@@ -4,6 +4,7 @@ import Link from "next/link";
 import { MapPinned, Sparkles } from "lucide-react";
 
 import { buttonVariants } from "@/components/ui/button";
+import { NotificationBell } from "@/components/notifications/notification-bell";
 import { useActiveRoute } from "@/hooks/use-active-route";
 import type { AppRole, ProviderAccountType } from "@/lib/auth/roles";
 import { siteConfig } from "@/lib/config/site";
@@ -103,6 +104,9 @@ export function SiteHeader({ authState }: SiteHeaderProps) {
           <div className="hidden items-center gap-2 lg:flex">
             {isAuthenticated ? (
               <>
+                <NotificationBell
+                  initialUnreadCount={authState.unreadNotificationCount}
+                />
                 <Link
                   href={cta.href}
                   className={cn(
@@ -118,7 +122,6 @@ export function SiteHeader({ authState }: SiteHeaderProps) {
                   role={authState.role}
                   providerAccountType={authState.providerAccountType}
                   profileError={authState.profileError}
-                  unreadNotificationCount={authState.unreadNotificationCount}
                   cta={cta}
                   links={accountMenuNav}
                 />
@@ -145,7 +148,13 @@ export function SiteHeader({ authState }: SiteHeaderProps) {
             )}
           </div>
 
-          <div className="lg:hidden">
+          <div className="flex items-center gap-2 lg:hidden">
+            {isAuthenticated ? (
+              <NotificationBell
+                initialUnreadCount={authState.unreadNotificationCount}
+                compact
+              />
+            ) : null}
             <MobileNavSheet authState={authState} />
           </div>
         </div>

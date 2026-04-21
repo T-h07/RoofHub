@@ -52,6 +52,7 @@ type MobileNavSheetProps = {
     role: AppRole | null;
     providerAccountType: ProviderAccountType | null;
     profileError: string | null;
+    unreadNotificationCount: number;
   };
 };
 
@@ -124,6 +125,12 @@ export function MobileNavSheet({ authState }: MobileNavSheetProps) {
             </div>
             {isAuthenticated ? (
               <div className="space-y-2">
+                {authState.unreadNotificationCount > 0 ? (
+                  <p className="text-nav-muted text-xs">
+                    {authState.unreadNotificationCount} unread notification
+                    {authState.unreadNotificationCount === 1 ? "" : "s"} in your inbox.
+                  </p>
+                ) : null}
                 {authState.profileError ? (
                   <p className="text-destructive text-xs leading-5">{authState.profileError}</p>
                 ) : null}

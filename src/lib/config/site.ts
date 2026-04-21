@@ -13,6 +13,7 @@ export const footerLinkGroups: FooterLinkGroup[] = [
     title: "Account",
     links: [
       { title: "Messages", href: "/messages" },
+      { title: "Notifications", href: "/notifications" },
       { title: "Profile", href: "/profile" },
       { title: "Create account", href: "/auth/sign-up" },
     ],
