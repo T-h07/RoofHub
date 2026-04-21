@@ -690,6 +690,123 @@ async function enforceInviteAcceptTrafficControl(input: {
   });
 }
 
+async function findAuthUserIdByEmail(input: {
+  adminSupabase: ReturnType<typeof getCompanyAdminClient>;
+  normalizedEmail: string;
+}) {
+  const perPage = 200;
+
+  for (let page = 1; page <= 10; page += 1) {
+    const { data, error } = await input.adminSupabase.auth.admin.listUsers({
+      page,
+      perPage,
+    });
+
+    if (error) {
+      return null;
+    }
+
+    const users = data?.users ?? [];
+    if (users.length === 0) {
+      return null;
+    }
+
+    const matchedUser = users.find(
+      (candidate) => candidate.email?.trim().toLowerCase() === input.normalizedEmail
+    );
+
+    if (matchedUser?.id) {
+      return matchedUser.id;
+    }
+
+    if (users.length < perPage) {
+      return null;
+    }
+  }
+
+  return null;
+}
+
+async function createInviteForKnownUserByEmailFallback(input: {
+  organizationId: string;
+  actorUserId: string;
+  inviteRole: TeamInviteMutationResult["role"];
+  inviteEmail: string;
+}) {
+  const adminSupabase = getCompanyAdminClient();
+  const normalizedEmail = input.inviteEmail.trim().toLowerCase();
+
+  if (!normalizedEmail) {
+    return {
+      ok: false as const,
+      errorMessage: "Invite email is invalid.",
+      errorCode: "P0001",
+    };
+  }
+
+  const targetUserId = await findAuthUserIdByEmail({
+    adminSupabase,
+    normalizedEmail,
+  });
+
+  if (!targetUserId) {
+    return {
+      ok: false as const,
+      errorMessage: createSchemaDriftMessage("Company invite"),
+      errorCode: "SCHEMA_DRIFT_EMAIL_LOOKUP",
+    };
+  }
+
+  const { data: existingMembership, error: existingMembershipError } = await adminSupabase
+    .from("organization_members")
+    .select("id, member_status")
+    .eq("organization_id", input.organizationId)
+    .eq("user_id", targetUserId)
+    .maybeSingle();
+
+  if (existingMembershipError) {
+    return {
+      ok: false as const,
+      errorMessage: existingMembershipError.message,
+      errorCode: existingMembershipError.code ?? null,
+    };
+  }
+
+  if (existingMembership?.member_status === "active") {
+    return {
+      ok: false as const,
+      errorMessage: "Target user is already an active company member.",
+      errorCode: "P0001",
+    };
+  }
+
+  const { data, error } = await adminSupabase
+    .from("organization_member_invites")
+    .insert({
+      organization_id: input.organizationId,
+      invited_by_user_id: input.actorUserId,
+      invite_email: null,
+      target_user_id: targetUserId,
+      role: input.inviteRole,
+      invite_status: "pending",
+    })
+    .select("id, organization_id, role, invite_status, invite_token, invite_email, target_user_id")
+    .maybeSingle();
+
+  if (error || !data) {
+    return {
+      ok: false as const,
+      errorMessage: error?.message ?? "unknown_invite_create_error",
+      errorCode: error?.code ?? null,
+    };
+  }
+
+  return {
+    ok: true as const,
+    invite: data as TeamInviteMutationResult,
+  };
+}
+
 export async function createCompanyTeamInviteAction(
   previousState: CompanyTeamInviteActionState = COMPANY_TEAM_INVITE_IDLE_STATE,
   formData: FormData
@@ -764,8 +881,42 @@ export async function createCompanyTeamInviteAction(
   );
 
   const createdInviteRow = createdInviteRows?.[0] ?? null;
+  let createdInvite: TeamInviteMutationResult | null = createdInviteRow
+    ? toTeamInviteMutationResult(createdInviteRow)
+    : null;
 
-  if (error || !createdInviteRow) {
+  if (error || !createdInvite) {
+    const fallbackMessage = error?.message ?? "Invite mutation returned no row.";
+    const shouldAttemptKnownUserFallback =
+      input.inviteMethod === "email" &&
+      input.inviteEmail !== null &&
+      fallbackMessage.toLowerCase().includes("invite email is invalid");
+
+    if (shouldAttemptKnownUserFallback) {
+      const knownUserFallback = await createInviteForKnownUserByEmailFallback({
+        organizationId: managerContext.organization.id,
+        actorUserId: managerContext.profile.id,
+        inviteRole: input.role,
+        inviteEmail: input.inviteEmail!,
+      });
+
+      if (knownUserFallback.ok) {
+        createdInvite = knownUserFallback.invite;
+      } else {
+        console.error("[Company][TeamInvite] email fallback failed", {
+          organization_id: managerContext.organization.id,
+          actor_user_id: managerContext.profile.id,
+          membership_role: managerContext.membershipRole,
+          invite_method: input.inviteMethod,
+          invite_role: input.role,
+          error_code: knownUserFallback.errorCode,
+          error_message: knownUserFallback.errorMessage,
+        });
+      }
+    }
+  }
+
+  if (!createdInvite) {
     const fallbackMessage = error?.message ?? "Invite mutation returned no row.";
 
     console.error("[Company][TeamInvite] create failed", {
@@ -819,8 +970,6 @@ export async function createCompanyTeamInviteAction(
       message: mappedErrorMessage,
     };
   }
-
-  const createdInvite = toTeamInviteMutationResult(createdInviteRow);
 
   await recordSecurityAuditEvent({
     supabase,
