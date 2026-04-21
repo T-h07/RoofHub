@@ -41,6 +41,7 @@ import {
   recordSecurityAuditEvent,
 } from "@/lib/security/audit";
 import { enforceTrafficControl, TRAFFIC_CONTROL_RULES } from "@/lib/security/traffic-control";
+import { notifyCompanyInviteReceived } from "@/lib/notifications";
 import { createServerSupabaseClient } from "@/lib/supabase";
 import type { Tables } from "@/types/database";
 
@@ -767,6 +768,16 @@ export async function createCompanyTeamInviteAction(
         ...requestFingerprint,
       },
     },
+  });
+
+  await notifyCompanyInviteReceived({
+    recipientUserId: createdInvite.target_user_id,
+    organizationId: managerContext.organization.id,
+    organizationName: managerContext.organization.name,
+    inviteId: createdInvite.id,
+    inviteToken: createdInvite.invite_token,
+    role: createdInvite.role,
+    actorUserId: managerContext.profile.id,
   });
 
   revalidateCompanyTeamPaths({ organizationSlug: managerContext.organization.slug });

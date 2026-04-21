@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { AlertTriangle, ChevronDown, Sparkles } from "lucide-react";
+import { AlertTriangle, Bell, ChevronDown, Sparkles } from "lucide-react";
 
 import { SignOutButton } from "@/components/auth/sign-out-button";
 import { buttonVariants } from "@/components/ui/button";
@@ -21,6 +21,7 @@ type HeaderAccountMenuProps = {
   role: AppRole | null;
   providerAccountType: ProviderAccountType | null;
   profileError: string | null;
+  unreadNotificationCount: number;
   cta: {
     label: string;
     href: string;
@@ -33,11 +34,13 @@ export function HeaderAccountMenu({
   role,
   providerAccountType,
   profileError,
+  unreadNotificationCount,
   cta,
   links,
 }: HeaderAccountMenuProps) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
+  const unreadLabel = unreadNotificationCount > 99 ? "99+" : String(unreadNotificationCount);
 
   useEffect(() => {
     if (!open) {
@@ -92,6 +95,14 @@ export function HeaderAccountMenu({
                 : "Signed-in account"}
             </span>
           </span>
+        <span className="text-nav-muted inline-flex size-4 items-center justify-center">
+          <Bell className="size-3.5" aria-hidden="true" />
+        </span>
+        {unreadNotificationCount > 0 ? (
+          <span className="bg-primary text-primary-foreground inline-flex min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-semibold leading-4">
+            {unreadLabel}
+          </span>
+        ) : null}
         {profileError ? (
           <span className="text-destructive inline-flex size-4 items-center justify-center">
             <AlertTriangle className="size-3.5" />

@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 
 import { getCurrentUserProfile } from "@/lib/auth/profile";
 import type { AppRole, ProviderAccountType } from "@/lib/auth/roles";
+import { getUnreadNotificationCountForUser } from "@/lib/notifications";
 import { createServerSupabaseClient } from "@/lib/supabase";
 
 import { SiteFooter } from "./site-footer";
@@ -18,6 +19,7 @@ type HeaderAuthState = {
   role: AppRole | null;
   providerAccountType: ProviderAccountType | null;
   profileError: string | null;
+  unreadNotificationCount: number;
 };
 
 async function getHeaderAuthState(): Promise<HeaderAuthState> {
@@ -35,8 +37,14 @@ async function getHeaderAuthState(): Promise<HeaderAuthState> {
         role: null,
         providerAccountType: null,
         profileError: null,
+        unreadNotificationCount: 0,
       };
     }
+
+    const unreadNotificationCount = await getUnreadNotificationCountForUser({
+      supabase,
+      userId: user.id,
+    });
 
     const profileResult = await getCurrentUserProfile(supabase);
 
@@ -48,6 +56,7 @@ async function getHeaderAuthState(): Promise<HeaderAuthState> {
         role: null,
         providerAccountType: null,
         profileError: profileResult.message,
+        unreadNotificationCount,
       };
     }
 
@@ -58,6 +67,7 @@ async function getHeaderAuthState(): Promise<HeaderAuthState> {
       role: profileResult.profile.role,
       providerAccountType: profileResult.profile.provider_account_type,
       profileError: null,
+      unreadNotificationCount,
     };
   } catch {
     return {
@@ -67,6 +77,7 @@ async function getHeaderAuthState(): Promise<HeaderAuthState> {
       role: null,
       providerAccountType: null,
       profileError: "Profile state could not be loaded.",
+      unreadNotificationCount: 0,
     };
   }
 }

@@ -40,6 +40,7 @@ type SiteHeaderProps = {
     role: AppRole | null;
     providerAccountType: ProviderAccountType | null;
     profileError: string | null;
+    unreadNotificationCount: number;
   };
 };
 
@@ -117,6 +118,7 @@ export function SiteHeader({ authState }: SiteHeaderProps) {
                   role={authState.role}
                   providerAccountType={authState.providerAccountType}
                   profileError={authState.profileError}
+                  unreadNotificationCount={authState.unreadNotificationCount}
                   cta={cta}
                   links={accountMenuNav}
                 />

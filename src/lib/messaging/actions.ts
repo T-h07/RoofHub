@@ -4,6 +4,10 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 import { AUDIT_EVENT_TYPES, recordSecurityAuditEvent } from "@/lib/security/audit";
 import { enforceTrafficControl, TRAFFIC_CONTROL_RULES } from "@/lib/security/traffic-control";
+import {
+  notifyConversationMessageReceived,
+  notifyConversationRoutingChanged,
+} from "@/lib/notifications";
 import type { Database, Tables } from "@/types/database";
 
 import {
@@ -507,6 +511,20 @@ export async function sendConversationMessageAction(
     },
   });
 
+  await notifyConversationMessageReceived({
+    conversationId: conversation.id,
+    listingId: conversation.listing_id,
+    ownerMode: conversation.owner_mode,
+    organizationId: conversation.organization_id,
+    providerUserId: conversation.provider_id,
+    seekerUserId: conversation.seeker_id,
+    assignedMemberUserId: conversation.assigned_member_user_id,
+    senderUserId: profile.id,
+    senderDisplayName: profile.display_name,
+    messageId: data.id,
+    messageBody: normalizedBody,
+  });
+
   return {
     ok: true,
     data: {
@@ -761,6 +779,16 @@ export async function updateConversationRoutingAction(
         membership_role: membership.role,
       },
     },
+  });
+
+  await notifyConversationRoutingChanged({
+    conversationId: record.conversation.id,
+    listingId: record.listing.id,
+    organizationId: organization.id,
+    actorUserId: profile.id,
+    previousAssigneeUserId,
+    nextAssigneeUserId: requestedAssignee?.userId ?? null,
+    eventType,
   });
 
   return {

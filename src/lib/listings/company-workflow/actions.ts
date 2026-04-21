@@ -7,6 +7,7 @@ import {
   getCompanyAdminClient,
   requireCurrentUserScopedCompanyAccess,
 } from "@/lib/company/server-authorization";
+import { notifyListingWorkflowTransition } from "@/lib/notifications";
 import { buildWizardValuesFromDraft } from "@/lib/listings/provider-wizard/mapping";
 import {
   evaluateProviderPublishReadiness,
@@ -706,6 +707,15 @@ export async function transitionCompanyListingWorkflowAction(
         note_present: normalizedNote.length > 0,
       },
     },
+  });
+
+  await notifyListingWorkflowTransition({
+    listingId: listing.id,
+    organizationId: scopedAccess.organization.id,
+    action: input.action,
+    actorUserId: profileResult.profile.id,
+    createdByUserId: listing.created_by_user_id,
+    assignedAgentUserId: listing.assigned_agent_user_id,
   });
 
   await revalidateListingWorkflowPaths({
