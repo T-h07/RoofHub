@@ -51,6 +51,7 @@ export type TransitionCompanyListingWorkflowResult = {
 
 type WorkflowTransitionListingRow = {
   id: string;
+  title: string;
   organization_id: string;
   created_by_user_id: string;
   assigned_agent_user_id: string | null;
@@ -509,7 +510,7 @@ export async function transitionCompanyListingWorkflowAction(
   const { data: listingData, error: listingError } = await adminSupabase
     .from("listings")
     .select(
-      "id, organization_id, created_by_user_id, assigned_agent_user_id, listing_status, published_at, published_by_user_id, slug"
+      "id, title, organization_id, created_by_user_id, assigned_agent_user_id, listing_status, published_at, published_by_user_id, slug"
     )
     .eq("id", input.listingId)
     .eq("organization_id", scopedAccess.organization.id)
@@ -711,6 +712,7 @@ export async function transitionCompanyListingWorkflowAction(
 
   await notifyListingWorkflowTransition({
     listingId: listing.id,
+    listingTitle: listing.title,
     organizationId: scopedAccess.organization.id,
     action: input.action,
     actorUserId: profileResult.profile.id,

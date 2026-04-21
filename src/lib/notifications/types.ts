@@ -8,6 +8,7 @@ export const NOTIFICATION_TYPES = {
   conversationUnassigned: "messaging.conversation.unassigned",
   companyInviteReceived: "organization.invite.received",
   listingSubmittedForReview: "listing.workflow.submitted_for_review",
+  listingApprovalNeeded: "listing.workflow.approval_needed",
   listingNeedsChanges: "listing.workflow.needs_changes",
   listingApproved: "listing.workflow.approved",
   listingPublished: "listing.workflow.published",

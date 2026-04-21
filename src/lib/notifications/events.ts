@@ -516,6 +516,7 @@ export async function notifyConversationRoutingChanged(input: {
 
 export async function notifyListingWorkflowTransition(input: {
   listingId: string;
+  listingTitle: string;
   organizationId: string;
   action: "submit_for_review" | "needs_changes" | "approve" | "publish" | "unpublish";
   actorUserId: string;
@@ -523,67 +524,138 @@ export async function notifyListingWorkflowTransition(input: {
   assignedAgentUserId: string | null;
 }) {
   try {
-    let recipients: string[] = [];
+    const listingLabel = trimTo(input.listingTitle, 72) || "this listing";
+    const actionUrl = `/dashboard/listings/${input.listingId}/workflow`;
+    const notifications: Array<CreateNotificationInput & { type: KnownNotificationType }> = [];
+
+    const creatorAndAssigneeRecipients = uniqueRecipients(
+      [input.createdByUserId, input.assignedAgentUserId],
+      input.actorUserId
+    );
 
     if (input.action === "submit_for_review") {
-      recipients = await loadActiveOrganizationUserIds({
+      const reviewerRecipients = await loadActiveOrganizationUserIds({
         organizationId: input.organizationId,
         roles: ["owner", "admin", "manager"],
       });
+      const reviewerRecipientSet = new Set(reviewerRecipients);
+      const approvalRecipients = uniqueRecipients(reviewerRecipients, input.actorUserId);
+      const submittedRecipients = creatorAndAssigneeRecipients.filter(
+        (recipientUserId) => !reviewerRecipientSet.has(recipientUserId)
+      );
+
+      notifications.push(
+        ...approvalRecipients.map((recipientUserId) => ({
+          userId: recipientUserId,
+          organizationId: input.organizationId,
+          type: NOTIFICATION_TYPES.listingApprovalNeeded,
+          title: "Approval needed",
+          body: `${listingLabel} is waiting for company review.`,
+          entityType: "listing",
+          entityId: input.listingId,
+          actionUrl,
+          priority: 3 as const,
+          actorUserId: input.actorUserId,
+          metadata: {
+            listing_id: input.listingId,
+            action: input.action,
+            created_by_user_id: input.createdByUserId,
+            assigned_agent_user_id: input.assignedAgentUserId,
+            workflow_attention: "approval_needed",
+          },
+        }))
+      );
+
+      notifications.push(
+        ...submittedRecipients.map((recipientUserId) => ({
+          userId: recipientUserId,
+          organizationId: input.organizationId,
+          type: NOTIFICATION_TYPES.listingSubmittedForReview,
+          title: "Listing submitted for review",
+          body: `${listingLabel} was moved into the company review queue.`,
+          entityType: "listing",
+          entityId: input.listingId,
+          actionUrl,
+          priority: 2 as const,
+          actorUserId: input.actorUserId,
+          metadata: {
+            listing_id: input.listingId,
+            action: input.action,
+            created_by_user_id: input.createdByUserId,
+            assigned_agent_user_id: input.assignedAgentUserId,
+          },
+        }))
+      );
     } else {
-      recipients = [input.createdByUserId, input.assignedAgentUserId].filter(
-        (value): value is string => Boolean(value)
+      const workflowOutcomeAction = input.action as Exclude<
+        typeof input.action,
+        "submit_for_review"
+      >;
+
+      const typeByAction = {
+        needs_changes: NOTIFICATION_TYPES.listingNeedsChanges,
+        approve: NOTIFICATION_TYPES.listingApproved,
+        publish: NOTIFICATION_TYPES.listingPublished,
+        unpublish: NOTIFICATION_TYPES.listingUnpublished,
+      } as const;
+
+      const titleByAction = {
+        needs_changes: "Listing needs changes",
+        approve: "Listing approved",
+        publish: "Listing published",
+        unpublish: "Listing unpublished",
+      } as const;
+
+      const bodyByAction = {
+        needs_changes: `${listingLabel} was returned with requested updates.`,
+        approve: `${listingLabel} was approved and can now be published.`,
+        publish: `${listingLabel} is now live on RoofHub.`,
+        unpublish: `${listingLabel} is no longer visible in public discovery.`,
+      } as const;
+
+      notifications.push(
+        ...creatorAndAssigneeRecipients.map((recipientUserId) => ({
+          userId: recipientUserId,
+          organizationId: input.organizationId,
+          type: typeByAction[workflowOutcomeAction],
+          title: titleByAction[workflowOutcomeAction],
+          body: bodyByAction[workflowOutcomeAction],
+          entityType: "listing",
+          entityId: input.listingId,
+          actionUrl,
+          priority: workflowOutcomeAction === "needs_changes" ? (3 as const) : (2 as const),
+          actorUserId: input.actorUserId,
+          metadata: {
+            listing_id: input.listingId,
+            action: workflowOutcomeAction,
+            created_by_user_id: input.createdByUserId,
+            assigned_agent_user_id: input.assignedAgentUserId,
+          },
+        }))
       );
     }
 
-    const targetRecipients = uniqueRecipients(recipients, input.actorUserId);
-    if (targetRecipients.length === 0) {
+    const dedupedNotifications = new Map<
+      string,
+      CreateNotificationInput & { type: KnownNotificationType }
+    >();
+    for (const notification of notifications) {
+      if (
+        notification.userId === input.actorUserId ||
+        dedupedNotifications.has(`${notification.userId}:${notification.type}`)
+      ) {
+        continue;
+      }
+
+      dedupedNotifications.set(`${notification.userId}:${notification.type}`, notification);
+    }
+
+    if (dedupedNotifications.size === 0) {
       return { ok: true as const, createdCount: 0 };
     }
 
-    const typeByAction = {
-      submit_for_review: NOTIFICATION_TYPES.listingSubmittedForReview,
-      needs_changes: NOTIFICATION_TYPES.listingNeedsChanges,
-      approve: NOTIFICATION_TYPES.listingApproved,
-      publish: NOTIFICATION_TYPES.listingPublished,
-      unpublish: NOTIFICATION_TYPES.listingUnpublished,
-    } as const;
-
-    const titleByAction = {
-      submit_for_review: "Listing submitted for review",
-      needs_changes: "Listing needs changes",
-      approve: "Listing approved",
-      publish: "Listing published",
-      unpublish: "Listing unpublished",
-    } as const;
-
-    const bodyByAction = {
-      submit_for_review: "A listing is ready for company review.",
-      needs_changes: "A listing was returned with requested changes.",
-      approve: "A listing has been approved and is ready to publish.",
-      publish: "A listing is now live on RoofHub.",
-      unpublish: "A listing was removed from public discovery.",
-    } as const;
-
     return createNotifications({
-      notifications: targetRecipients.map((recipientUserId) => ({
-        userId: recipientUserId,
-        organizationId: input.organizationId,
-        type: typeByAction[input.action],
-        title: titleByAction[input.action],
-        body: bodyByAction[input.action],
-        entityType: "listing",
-        entityId: input.listingId,
-        actionUrl: `/dashboard/listings/${input.listingId}/workflow`,
-        priority: input.action === "submit_for_review" || input.action === "needs_changes" ? 3 : 2,
-        actorUserId: input.actorUserId,
-        metadata: {
-          listing_id: input.listingId,
-          action: input.action,
-          created_by_user_id: input.createdByUserId,
-          assigned_agent_user_id: input.assignedAgentUserId,
-        },
-      })),
+      notifications: [...dedupedNotifications.values()],
     });
   } catch {
     return { ok: false as const, message: "notification_workflow_delivery_failed" };
