@@ -1,15 +1,6 @@
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 
-import {
-  DEFAULT_APP_ROLE,
-  isPreferredContactMethod,
-  isProviderAccountType,
-} from "@/lib/auth/roles";
-import {
-  createSchemaDriftMessage,
-  isSupabaseSchemaDriftError,
-  logSupabaseSchemaDrift,
-} from "@/lib/supabase/schema-drift";
+import { DEFAULT_APP_ROLE } from "@/lib/auth/roles";
 import type { Database, Tables } from "@/types/database";
 
 const PROFILE_SELECT =
@@ -33,13 +24,13 @@ type EnsureProfileResult =
         | "profile_conflict_refetch_failed";
       details?: {
         errorCode?: string | null;
-        fetchReasonCategory?: "schema_drift" | "query_failed";
+        fetchReasonCategory?: "query_failed";
       };
     };
 
 type ProfileFetchFailureDetails = {
   errorCode: string | null;
-  reasonCategory: "schema_drift" | "query_failed";
+  fetchReasonCategory: "query_failed";
 };
 
 type ProfileFetchResult =
@@ -80,42 +71,21 @@ function logProfileBootstrapFailure(
   });
 }
 
-function normalizeProfileRow(row: AppProfile): AppProfile {
-  const normalizedPreferredMethod = isPreferredContactMethod(row.preferred_contact_method)
-    ? row.preferred_contact_method
-    : null;
-  const normalizedContactMethods = Array.isArray(row.contact_methods)
-    ? row.contact_methods.filter((method): method is AppProfile["contact_methods"][number] =>
-        isPreferredContactMethod(method)
-      )
-    : [];
-  const fallbackContactMethods: AppProfile["contact_methods"] =
-    normalizedContactMethods.length > 0
-      ? normalizedContactMethods
-      : normalizedPreferredMethod
-        ? [normalizedPreferredMethod]
-        : ["in_app"];
+function normalizeNullableString(value: string | null) {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : null;
+}
 
+function normalizeProfileRow(row: AppProfile): AppProfile {
   return {
     ...row,
     active_organization_id: row.active_organization_id ?? null,
-    provider_account_type: isProviderAccountType(row.provider_account_type)
-      ? row.provider_account_type
-      : "individual",
-    preferred_contact_method: normalizedPreferredMethod,
-    contact_methods: fallbackContactMethods,
-    contact_email:
-      typeof row.contact_email === "string" && row.contact_email.trim().length > 0
-        ? row.contact_email.trim().toLowerCase()
-        : null,
-    whatsapp_phone:
-      typeof row.whatsapp_phone === "string" && row.whatsapp_phone.trim().length > 0
-        ? row.whatsapp_phone.trim()
-        : null,
-    viber_phone:
-      typeof row.viber_phone === "string" && row.viber_phone.trim().length > 0
-        ? row.viber_phone.trim()
-        : null,
+    display_name: row.display_name.trim(),
+    bio: normalizeNullableString(row.bio),
+    phone: normalizeNullableString(row.phone),
+    contact_email: normalizeNullableString(row.contact_email)?.toLowerCase() ?? null,
+    whatsapp_phone: normalizeNullableString(row.whatsapp_phone),
+    viber_phone: normalizeNullableString(row.viber_phone),
   };
 }
 
@@ -149,31 +119,19 @@ async function fetchProfileByUserId(
     };
   }
 
-  const isSchemaDrift = isSupabaseSchemaDriftError(error, [
-    "profiles",
-    "provider_account_type",
-    "active_organization_id",
-    "contact_methods",
-    "contact_email",
-    "whatsapp_phone",
-    "viber_phone",
-  ]);
-
-  if (isSchemaDrift) {
-    logSupabaseSchemaDrift("profiles", error, {
-      user_id: userId,
-      select: PROFILE_SELECT,
-    });
-  }
+  console.error("[Auth][Profile] fetch failed", {
+    user_id: userId,
+    error_code: error.code ?? null,
+    error_message: error.message,
+    select: PROFILE_SELECT,
+  });
 
   return {
     ok: false,
-    message: isSchemaDrift
-      ? createSchemaDriftMessage("Profile")
-      : "Could not load your profile. Please refresh and try again.",
+    message: "Could not load your profile. Please refresh and try again.",
     details: {
       errorCode: error.code ?? null,
-      reasonCategory: isSchemaDrift ? "schema_drift" : "query_failed",
+      fetchReasonCategory: "query_failed",
     },
   };
 }
@@ -197,7 +155,6 @@ export async function ensureProfileForCurrentUser(
   if (!existing.ok) {
     logProfileBootstrapFailure("profile_fetch_failed", {
       user_id: user.id,
-      fetch_reason_category: existing.details.reasonCategory,
       error_code: existing.details.errorCode,
     });
     return {
@@ -206,7 +163,7 @@ export async function ensureProfileForCurrentUser(
       reason: "profile_fetch_failed",
       details: {
         errorCode: existing.details.errorCode,
-        fetchReasonCategory: existing.details.reasonCategory,
+        fetchReasonCategory: existing.details.fetchReasonCategory,
       },
     };
   }
@@ -232,7 +189,6 @@ export async function ensureProfileForCurrentUser(
     if (!createdProfile.ok || !createdProfile.profile) {
       logProfileBootstrapFailure("profile_insert_verification_failed", {
         user_id: user.id,
-        fetch_reason_category: createdProfile.ok ? "query_failed" : createdProfile.details.reasonCategory,
         error_code: createdProfile.ok ? null : createdProfile.details.errorCode,
       });
       return {
@@ -243,9 +199,9 @@ export async function ensureProfileForCurrentUser(
         details: createdProfile.ok
           ? undefined
           : {
-              errorCode: createdProfile.details.errorCode,
-              fetchReasonCategory: createdProfile.details.reasonCategory,
-            },
+            errorCode: createdProfile.details.errorCode,
+            fetchReasonCategory: createdProfile.details.fetchReasonCategory,
+          },
       };
     }
 
@@ -260,9 +216,6 @@ export async function ensureProfileForCurrentUser(
 
     logProfileBootstrapFailure("profile_conflict_refetch_failed", {
       user_id: user.id,
-      fetch_reason_category: conflictedProfile.ok
-        ? "query_failed"
-        : conflictedProfile.details.reasonCategory,
       error_code: conflictedProfile.ok ? null : conflictedProfile.details.errorCode,
     });
     return {
@@ -274,7 +227,7 @@ export async function ensureProfileForCurrentUser(
         ? undefined
         : {
             errorCode: conflictedProfile.details.errorCode,
-            fetchReasonCategory: conflictedProfile.details.reasonCategory,
+            fetchReasonCategory: conflictedProfile.details.fetchReasonCategory,
           },
     };
   }
@@ -282,6 +235,7 @@ export async function ensureProfileForCurrentUser(
   logProfileBootstrapFailure("profile_insert_failed", {
     user_id: user.id,
     error_code: error.code ?? null,
+    error_message: error.message,
   });
   return {
     ok: false,
@@ -289,6 +243,7 @@ export async function ensureProfileForCurrentUser(
     reason: "profile_insert_failed",
     details: {
       errorCode: error.code ?? null,
+      fetchReasonCategory: "query_failed",
     },
   };
 }
