@@ -23,4 +23,18 @@ export {
 } from "./events";
 
 export { NOTIFICATION_TYPES } from "./types";
+export {
+  applyNotificationFilters,
+  countUnreadNotifications,
+  formatNotificationTimestampLabel,
+  formatNotificationTimestampTitle,
+  getNotificationActionHref,
+  getNotificationCategory,
+  getNotificationCategoryLabel,
+  getNotificationTypeLabel,
+  isNotificationUnread,
+  NOTIFICATION_CATEGORY_FILTERS,
+  NOTIFICATION_SCOPE_FILTERS,
+} from "./presentation";
 export type * from "./types";
+export type { NotificationCategoryFilter, NotificationScopeFilter } from "./presentation";
