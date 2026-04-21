@@ -49,8 +49,12 @@ import {
   notifyCompanyMemberRoleChanged,
   notifyCompanyMemberSuspended,
 } from "@/lib/notifications";
+import {
+  createSchemaDriftMessage,
+  isSupabaseSchemaDriftError,
+} from "@/lib/supabase/schema-drift";
 import { createServerSupabaseClient } from "@/lib/supabase";
-import type { Tables } from "@/types/database";
+import type { Database, Tables } from "@/types/database";
 
 type TeamMutationMembershipRow = Pick<
   Tables<"organization_members">,
@@ -66,6 +70,9 @@ type TeamInviteMutationResult = Pick<
   Tables<"organization_member_invites">,
   "id" | "organization_id" | "role" | "invite_status" | "invite_token" | "invite_email" | "target_user_id"
 >;
+
+type TeamInviteCreateRpcResult =
+  Database["public"]["Functions"]["create_organization_member_invite"]["Returns"][number];
 
 type TeamMembershipRoleMutationResult = Pick<
   Tables<"organization_members">,
@@ -90,6 +97,20 @@ type TeamManagerContextResult =
       message: string;
     };
 
+function toTeamInviteMutationResult(
+  row: TeamInviteCreateRpcResult
+): TeamInviteMutationResult {
+  return {
+    id: row.invite_id,
+    organization_id: row.organization_id,
+    role: row.invite_role,
+    invite_status: row.invite_status,
+    invite_token: row.invite_token,
+    invite_email: row.invite_email ?? null,
+    target_user_id: row.target_user_id ?? null,
+  };
+}
+
 function toInviteValidationErrorState(
   errors: CompanyTeamInviteActionState["errors"]
 ): CompanyTeamInviteActionState {
@@ -109,6 +130,19 @@ function toGenericErrorState(message: string): CompanyTeamMutationActionState {
 
 function mapInviteCreateError(message: string) {
   const normalized = message.toLowerCase();
+
+  if (
+    normalized.includes("schema cache") ||
+    normalized.includes("undefined function") ||
+    normalized.includes("could not find the function") ||
+    (
+      normalized.includes("create_organization_member_invite") &&
+      (normalized.includes("does not exist") || normalized.includes("not found"))
+    ) ||
+    normalized.includes("relation") && normalized.includes("organization_member_invites")
+  ) {
+    return createSchemaDriftMessage("Company invite");
+  }
 
   if (normalized.includes("already an active company member")) {
     return "This user is already an active member of the company workspace.";
@@ -133,13 +167,18 @@ function mapInviteCreateError(message: string) {
   if (
     normalized.includes("only owner") ||
     normalized.includes("permission") ||
-    normalized.includes("authentication")
+    normalized.includes("authentication") ||
+    normalized.includes("row-level security")
   ) {
     return "You do not have permission to invite team members from this workspace.";
   }
 
   if (normalized.includes("email is invalid")) {
     return "Enter a valid email address before sending the invite.";
+  }
+
+  if (normalized.includes("target requires email or roofhub user id")) {
+    return "Choose either email or RoofHub user ID before sending the invite.";
   }
 
   if (normalized.includes("roofhub user id is invalid")) {
@@ -714,22 +753,45 @@ export async function createCompanyTeamInviteAction(
     };
   }
 
-  const { data, error } = await supabase
-    .from("organization_member_invites")
-    .insert({
-      organization_id: managerContext.organization.id,
-      invited_by_user_id: managerContext.profile.id,
-      invite_email: input.inviteMethod === "email" ? input.inviteEmail : null,
-      target_user_id: input.inviteMethod === "userId" ? input.targetUserId : null,
-      role: input.role,
-      invite_status: "pending",
-    })
-    .select(
-      "id, organization_id, role, invite_status, invite_token, invite_email, target_user_id"
-    )
-    .maybeSingle();
+  const { data: createdInviteRows, error } = await supabase.rpc(
+    "create_organization_member_invite",
+    {
+      p_organization_id: managerContext.organization.id,
+      p_role: input.role,
+      p_invite_email: input.inviteMethod === "email" ? (input.inviteEmail ?? undefined) : undefined,
+      p_target_user_id: input.inviteMethod === "userId" ? (input.targetUserId ?? undefined) : undefined,
+    }
+  );
 
-  if (error || !data) {
+  const createdInviteRow = createdInviteRows?.[0] ?? null;
+
+  if (error || !createdInviteRow) {
+    const fallbackMessage = error?.message ?? "Invite mutation returned no row.";
+
+    console.error("[Company][TeamInvite] create failed", {
+      organization_id: managerContext.organization.id,
+      actor_user_id: managerContext.profile.id,
+      membership_role: managerContext.membershipRole,
+      invite_method: input.inviteMethod,
+      invite_role: input.role,
+      error_code: error?.code ?? null,
+      error_message: fallbackMessage,
+      error_details: error?.details ?? null,
+      error_hint: error?.hint ?? null,
+    });
+
+    const mappedErrorMessage = isSupabaseSchemaDriftError(
+      {
+        code: error?.code ?? null,
+        message: fallbackMessage,
+        details: error?.details ?? null,
+        hint: error?.hint ?? null,
+      },
+      ["create_organization_member_invite", "organization_member_invites"]
+    )
+      ? createSchemaDriftMessage("Company invite")
+      : mapInviteCreateError(fallbackMessage);
+
     await recordSecurityAuditEvent({
       supabase,
       event: {
@@ -744,7 +806,9 @@ export async function createCompanyTeamInviteAction(
           invite_method: input.inviteMethod,
           invite_role: input.role,
           error_code: error?.code ?? null,
-          error_message: error?.message ?? "unknown_invite_create_error",
+          error_message: fallbackMessage,
+          error_details: error?.details ?? null,
+          error_hint: error?.hint ?? null,
           ...requestFingerprint,
         },
       },
@@ -752,11 +816,11 @@ export async function createCompanyTeamInviteAction(
 
     return {
       status: "error",
-      message: mapInviteCreateError(error?.message ?? ""),
+      message: mappedErrorMessage,
     };
   }
 
-  const createdInvite = data as TeamInviteMutationResult;
+  const createdInvite = toTeamInviteMutationResult(createdInviteRow);
 
   await recordSecurityAuditEvent({
     supabase,

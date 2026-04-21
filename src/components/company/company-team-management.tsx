@@ -1,7 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useMemo, useState, useTransition, type FormEvent } from "react";
+import {
+  useActionState,
+  useEffect,
+  useMemo,
+  useState,
+  useTransition,
+  type FormEvent,
+} from "react";
 import { useRouter } from "next/navigation";
 import {
   Copy,
@@ -149,6 +156,12 @@ export function CompanyTeamManagement({
   const [memberRemovalDialog, setMemberRemovalDialog] = useState<MemberRemovalDialogState | null>(null);
   const [inviteRevocationDialog, setInviteRevocationDialog] =
     useState<InviteRevocationDialogState | null>(null);
+
+  useEffect(() => {
+    if (inviteState.status === "success") {
+      router.refresh();
+    }
+  }, [inviteState.status, router]);
 
   const activeMembers = useMemo(
     () => members.filter((member) => member.member_status === "active"),
