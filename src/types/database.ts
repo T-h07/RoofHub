@@ -502,12 +502,52 @@ export type Database = {
           },
         ]
       }
+      notification_preferences: {
+        Row: {
+          account_mode: string
+          company_mode: string
+          created_at: string
+          listings_mode: string
+          messages_mode: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          account_mode?: string
+          company_mode?: string
+          created_at?: string
+          listings_mode?: string
+          messages_mode?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          account_mode?: string
+          company_mode?: string
+          created_at?: string
+          listings_mode?: string
+          messages_mode?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_preferences_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notifications: {
         Row: {
           action_url: string | null
           actor_user_id: string | null
+          archived_at: string | null
           body: string
           created_at: string
+          dismissed_at: string | null
           entity_id: string | null
           entity_type: string | null
           id: string
@@ -524,8 +564,10 @@ export type Database = {
         Insert: {
           action_url?: string | null
           actor_user_id?: string | null
+          archived_at?: string | null
           body?: string
           created_at?: string
+          dismissed_at?: string | null
           entity_id?: string | null
           entity_type?: string | null
           id?: string
@@ -542,8 +584,10 @@ export type Database = {
         Update: {
           action_url?: string | null
           actor_user_id?: string | null
+          archived_at?: string | null
           body?: string
           created_at?: string
+          dismissed_at?: string | null
           entity_id?: string | null
           entity_type?: string | null
           id?: string
@@ -1454,4 +1498,3 @@ export const Constants = {
     },
   },
 } as const
-

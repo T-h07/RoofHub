@@ -59,7 +59,11 @@ export function NotificationBell({ initialUnreadCount, compact = false, classNam
     setIsLoading(true);
     setErrorMessage(null);
 
-    void loadCurrentUserNotificationsAction({ limit: 8 }).then((result) => {
+    void loadCurrentUserNotificationsAction({
+      limit: 8,
+      scope: "active",
+      order: "priority_then_recent",
+    }).then((result) => {
       if (cancelled) {
         return;
       }
@@ -269,6 +273,7 @@ export function NotificationBell({ initialUnreadCount, compact = false, classNam
                     key={notification.id}
                     notification={notification}
                     compact
+                    showManagementActions={false}
                     onNavigate={() => setOpen(false)}
                     onMarkRead={markSingleRead}
                     isMarkReadPending={pendingNotificationId === notification.id}

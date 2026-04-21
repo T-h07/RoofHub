@@ -330,7 +330,7 @@ export async function notifyCompanyInviteAccepted(input: {
         entityType: "organization_invite",
         entityId: input.inviteId,
         actionUrl: "/profile/company/team",
-        priority: 2,
+        priority: 1,
         actorUserId: input.actorUserId,
         metadata: {
           organization_id: input.organizationId,
@@ -358,7 +358,7 @@ export async function notifyCompanyInviteAccepted(input: {
         entityType: "organization_invite",
         entityId: input.inviteId,
         actionUrl: "/profile/company/team",
-        priority: 2,
+        priority: 1,
         actorUserId: input.actorUserId,
         metadata: {
           organization_id: input.organizationId,
@@ -433,7 +433,7 @@ export async function notifyCompanyMemberAdded(input: {
         entityType: "organization_member",
         entityId: input.memberUserId,
         actionUrl: "/profile/company/team",
-        priority: 2,
+        priority: 1,
         actorUserId: input.actorUserId,
         metadata: {
           organization_id: input.organizationId,
@@ -508,7 +508,7 @@ export async function notifyCompanyMemberRoleChanged(input: {
         entityType: "organization_member",
         entityId: input.memberUserId,
         actionUrl: "/profile/company/team",
-        priority: 2,
+        priority: 1,
         actorUserId: input.actorUserId,
         metadata: {
           organization_id: input.organizationId,
@@ -742,7 +742,7 @@ export async function notifyConversationRoutingChanged(input: {
           entityType: "conversation",
           entityId: input.conversationId,
           actionUrl: `/messages?conversationId=${input.conversationId}`,
-          priority: 2,
+          priority: 1,
           actorUserId: input.actorUserId,
           metadata: {
             conversation_id: input.conversationId,
@@ -789,7 +789,7 @@ export async function notifyConversationRoutingChanged(input: {
           entityType: "conversation",
           entityId: input.conversationId,
           actionUrl: `/messages?conversationId=${input.conversationId}`,
-          priority: 2,
+          priority: 1,
           actorUserId: input.actorUserId,
           metadata: {
             conversation_id: input.conversationId,
@@ -819,7 +819,7 @@ export async function notifyConversationRoutingChanged(input: {
           entityType: "conversation",
           entityId: input.conversationId,
           actionUrl: `/messages?conversationId=${input.conversationId}`,
-          priority: 2,
+          priority: 1,
           actorUserId: input.actorUserId,
           metadata: {
             conversation_id: input.conversationId,
@@ -841,7 +841,7 @@ export async function notifyConversationRoutingChanged(input: {
           entityType: "conversation",
           entityId: input.conversationId,
           actionUrl: `/messages?conversationId=${input.conversationId}`,
-          priority: 2,
+          priority: 1,
           actorUserId: input.actorUserId,
           metadata: {
             conversation_id: input.conversationId,
@@ -870,7 +870,7 @@ export async function notifyConversationRoutingChanged(input: {
           entityType: "conversation",
           entityId: input.conversationId,
           actionUrl: `/messages?conversationId=${input.conversationId}`,
-          priority: 2,
+          priority: 1,
           actorUserId: input.actorUserId,
           metadata: {
             conversation_id: input.conversationId,

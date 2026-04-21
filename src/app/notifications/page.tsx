@@ -6,7 +6,10 @@ import { PageIntro, PageState } from "@/components/layout/page-shell";
 import { NotificationCenter } from "@/components/notifications/notification-center";
 import { Badge } from "@/components/ui/badge";
 import { toSignInPath } from "@/lib/auth/routing";
-import { listCurrentUserNotifications } from "@/lib/notifications";
+import {
+  getCurrentUserNotificationPreferences,
+  listCurrentUserNotifications,
+} from "@/lib/notifications";
 import { createServerSupabaseClient } from "@/lib/supabase";
 
 export default async function NotificationsPage() {
@@ -20,7 +23,8 @@ export default async function NotificationsPage() {
   }
 
   const notificationsResult = await listCurrentUserNotifications({
-    limit: 200,
+    limit: 250,
+    scope: "all",
   });
 
   if (!notificationsResult.ok) {
@@ -39,6 +43,24 @@ export default async function NotificationsPage() {
     );
   }
 
+  const preferenceResult = await getCurrentUserNotificationPreferences();
+
+  if (!preferenceResult.ok) {
+    if (preferenceResult.requiresAuth) {
+      redirect(toSignInPath("/notifications"));
+    }
+
+    return (
+      <MainContainer size="content">
+        <PageState
+          icon={Bell}
+          title="Notification preferences unavailable"
+          description={preferenceResult.message}
+        />
+      </MainContainer>
+    );
+  }
+
   return (
     <MainContainer size="wide" className="space-y-6">
       <PageIntro
@@ -47,7 +69,10 @@ export default async function NotificationsPage() {
         description="Review your latest RoofHub messages, listing workflow events, and company updates without losing role-aware context."
       />
 
-      <NotificationCenter initialNotifications={notificationsResult.data.notifications} />
+      <NotificationCenter
+        initialNotifications={notificationsResult.data.notifications}
+        initialPreferences={preferenceResult.data.preferences}
+      />
     </MainContainer>
   );
 }
