@@ -17,6 +17,11 @@ export {
 
 export {
   notifyCompanyInviteReceived,
+  notifyCompanyInviteAccepted,
+  notifyCompanyMemberAdded,
+  notifyCompanyMemberRoleChanged,
+  notifyCompanyMemberSuspended,
+  notifyCompanyMemberRemoved,
   notifyConversationInquiryCreated,
   notifyConversationMessageReceived,
   notifyConversationRoutingChanged,

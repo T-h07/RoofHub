@@ -30,6 +30,10 @@ function toRoleLabel(role: string) {
   }
 }
 
+function toMemberLabel(value: string | null | undefined) {
+  return trimTo(value ?? "", 60) || "A team member";
+}
+
 async function loadActiveOrganizationUserIds(input: {
   organizationId: string;
   roles?: Array<"owner" | "admin" | "manager" | "agent">;
@@ -53,6 +57,13 @@ async function loadActiveOrganizationUserIds(input: {
   return data.map((row) => row.user_id);
 }
 
+async function loadManagerAwareRecipientIds(organizationId: string) {
+  return loadActiveOrganizationUserIds({
+    organizationId,
+    roles: ["owner", "admin", "manager"],
+  });
+}
+
 function uniqueRecipients(recipientIds: Array<string | null | undefined>, actorUserId?: string | null) {
   const deduped = new Set<string>();
 
@@ -69,6 +80,21 @@ function uniqueRecipients(recipientIds: Array<string | null | undefined>, actorU
 
 type KnownNotificationType =
   (typeof NOTIFICATION_TYPES)[keyof typeof NOTIFICATION_TYPES];
+
+function dedupeNotificationsByUserAndType(
+  notifications: Array<CreateNotificationInput & { type: KnownNotificationType }>
+) {
+  const dedupedNotifications = new Map<
+    string,
+    CreateNotificationInput & { type: KnownNotificationType }
+  >();
+
+  for (const notification of notifications) {
+    dedupedNotifications.set(`${notification.userId}:${notification.type}`, notification);
+  }
+
+  return [...dedupedNotifications.values()];
+}
 
 export async function notifyConversationInquiryCreated(input: {
   conversationId: string;
@@ -276,6 +302,379 @@ export async function notifyCompanyInviteReceived(input: {
     });
   } catch {
     return { ok: false as const, message: "notification_invite_delivery_failed" };
+  }
+}
+
+export async function notifyCompanyInviteAccepted(input: {
+  organizationId: string;
+  organizationName: string;
+  inviteId: string;
+  acceptedUserId: string;
+  acceptedUserDisplayName: string | null;
+  acceptedRole: "owner" | "admin" | "manager" | "agent";
+  actorUserId: string;
+  invitedByUserId: string | null;
+}) {
+  try {
+    const acceptedMemberLabel = toMemberLabel(input.acceptedUserDisplayName);
+    const managerRecipientIds = await loadManagerAwareRecipientIds(input.organizationId);
+    const notifications: Array<CreateNotificationInput & { type: KnownNotificationType }> = [];
+
+    if (input.invitedByUserId && input.invitedByUserId !== input.actorUserId) {
+      notifications.push({
+        userId: input.invitedByUserId,
+        organizationId: input.organizationId,
+        type: NOTIFICATION_TYPES.companyInviteAccepted,
+        title: "Invite accepted",
+        body: `${acceptedMemberLabel} joined ${input.organizationName} as ${toRoleLabel(input.acceptedRole)}.`,
+        entityType: "organization_invite",
+        entityId: input.inviteId,
+        actionUrl: "/profile/company/team",
+        priority: 2,
+        actorUserId: input.actorUserId,
+        metadata: {
+          organization_id: input.organizationId,
+          invite_id: input.inviteId,
+          accepted_user_id: input.acceptedUserId,
+          accepted_role: input.acceptedRole,
+        },
+      });
+    }
+
+    for (const managerRecipientId of managerRecipientIds) {
+      if (
+        managerRecipientId === input.actorUserId ||
+        managerRecipientId === input.invitedByUserId
+      ) {
+        continue;
+      }
+
+      notifications.push({
+        userId: managerRecipientId,
+        organizationId: input.organizationId,
+        type: NOTIFICATION_TYPES.companyInviteAccepted,
+        title: "Team invite accepted",
+        body: `${acceptedMemberLabel} joined ${input.organizationName} as ${toRoleLabel(input.acceptedRole)}.`,
+        entityType: "organization_invite",
+        entityId: input.inviteId,
+        actionUrl: "/profile/company/team",
+        priority: 2,
+        actorUserId: input.actorUserId,
+        metadata: {
+          organization_id: input.organizationId,
+          invite_id: input.inviteId,
+          accepted_user_id: input.acceptedUserId,
+          accepted_role: input.acceptedRole,
+        },
+      });
+    }
+
+    const dedupedNotifications = dedupeNotificationsByUserAndType(notifications);
+    if (dedupedNotifications.length === 0) {
+      return { ok: true as const, createdCount: 0 };
+    }
+
+    return createNotifications({
+      notifications: dedupedNotifications,
+    });
+  } catch {
+    return { ok: false as const, message: "notification_invite_accept_delivery_failed" };
+  }
+}
+
+export async function notifyCompanyMemberAdded(input: {
+  organizationId: string;
+  organizationName: string;
+  memberUserId: string;
+  memberDisplayName: string | null;
+  memberRole: "owner" | "admin" | "manager" | "agent";
+  actorUserId: string;
+  includeSelfNotification?: boolean;
+}) {
+  try {
+    const memberLabel = toMemberLabel(input.memberDisplayName);
+    const managerRecipientIds = await loadManagerAwareRecipientIds(input.organizationId);
+    const notifications: Array<CreateNotificationInput & { type: KnownNotificationType }> = [];
+
+    if (input.includeSelfNotification || input.memberUserId !== input.actorUserId) {
+      notifications.push({
+        userId: input.memberUserId,
+        organizationId: input.organizationId,
+        type: NOTIFICATION_TYPES.companyMemberAdded,
+        title: "Added to company workspace",
+        body: `You now have ${toRoleLabel(input.memberRole)} access in ${input.organizationName}.`,
+        entityType: "organization_member",
+        entityId: input.memberUserId,
+        actionUrl: "/profile/company",
+        priority: 2,
+        actorUserId: input.actorUserId,
+        metadata: {
+          organization_id: input.organizationId,
+          member_user_id: input.memberUserId,
+          member_role: input.memberRole,
+        },
+      });
+    }
+
+    for (const managerRecipientId of managerRecipientIds) {
+      if (
+        managerRecipientId === input.actorUserId ||
+        managerRecipientId === input.memberUserId
+      ) {
+        continue;
+      }
+
+      notifications.push({
+        userId: managerRecipientId,
+        organizationId: input.organizationId,
+        type: NOTIFICATION_TYPES.companyMemberAdded,
+        title: "Team member added",
+        body: `${memberLabel} joined ${input.organizationName} as ${toRoleLabel(input.memberRole)}.`,
+        entityType: "organization_member",
+        entityId: input.memberUserId,
+        actionUrl: "/profile/company/team",
+        priority: 2,
+        actorUserId: input.actorUserId,
+        metadata: {
+          organization_id: input.organizationId,
+          member_user_id: input.memberUserId,
+          member_role: input.memberRole,
+        },
+      });
+    }
+
+    const dedupedNotifications = dedupeNotificationsByUserAndType(notifications);
+    if (dedupedNotifications.length === 0) {
+      return { ok: true as const, createdCount: 0 };
+    }
+
+    return createNotifications({
+      notifications: dedupedNotifications,
+    });
+  } catch {
+    return { ok: false as const, message: "notification_member_added_delivery_failed" };
+  }
+}
+
+export async function notifyCompanyMemberRoleChanged(input: {
+  organizationId: string;
+  organizationName: string;
+  memberUserId: string;
+  memberDisplayName: string | null;
+  previousRole: "owner" | "admin" | "manager" | "agent";
+  nextRole: "owner" | "admin" | "manager" | "agent";
+  actorUserId: string;
+}) {
+  try {
+    const memberLabel = toMemberLabel(input.memberDisplayName);
+    const managerRecipientIds = await loadManagerAwareRecipientIds(input.organizationId);
+    const notifications: Array<CreateNotificationInput & { type: KnownNotificationType }> = [];
+
+    if (input.memberUserId !== input.actorUserId) {
+      notifications.push({
+        userId: input.memberUserId,
+        organizationId: input.organizationId,
+        type: NOTIFICATION_TYPES.companyMemberRoleChanged,
+        title: "Company role updated",
+        body: `Your role in ${input.organizationName} is now ${toRoleLabel(input.nextRole)}.`,
+        entityType: "organization_member",
+        entityId: input.memberUserId,
+        actionUrl: "/profile/company",
+        priority: 3,
+        actorUserId: input.actorUserId,
+        metadata: {
+          organization_id: input.organizationId,
+          member_user_id: input.memberUserId,
+          previous_role: input.previousRole,
+          next_role: input.nextRole,
+        },
+      });
+    }
+
+    for (const managerRecipientId of managerRecipientIds) {
+      if (
+        managerRecipientId === input.actorUserId ||
+        managerRecipientId === input.memberUserId
+      ) {
+        continue;
+      }
+
+      notifications.push({
+        userId: managerRecipientId,
+        organizationId: input.organizationId,
+        type: NOTIFICATION_TYPES.companyMemberRoleChanged,
+        title: "Team role changed",
+        body: `${memberLabel} is now ${toRoleLabel(input.nextRole)} in ${input.organizationName}.`,
+        entityType: "organization_member",
+        entityId: input.memberUserId,
+        actionUrl: "/profile/company/team",
+        priority: 2,
+        actorUserId: input.actorUserId,
+        metadata: {
+          organization_id: input.organizationId,
+          member_user_id: input.memberUserId,
+          previous_role: input.previousRole,
+          next_role: input.nextRole,
+        },
+      });
+    }
+
+    const dedupedNotifications = dedupeNotificationsByUserAndType(notifications);
+    if (dedupedNotifications.length === 0) {
+      return { ok: true as const, createdCount: 0 };
+    }
+
+    return createNotifications({
+      notifications: dedupedNotifications,
+    });
+  } catch {
+    return { ok: false as const, message: "notification_member_role_change_delivery_failed" };
+  }
+}
+
+export async function notifyCompanyMemberSuspended(input: {
+  organizationId: string;
+  organizationName: string;
+  memberUserId: string;
+  memberDisplayName: string | null;
+  memberRole: "owner" | "admin" | "manager" | "agent";
+  actorUserId: string;
+}) {
+  try {
+    const memberLabel = toMemberLabel(input.memberDisplayName);
+    const managerRecipientIds = await loadManagerAwareRecipientIds(input.organizationId);
+    const notifications: Array<CreateNotificationInput & { type: KnownNotificationType }> = [];
+
+    if (input.memberUserId !== input.actorUserId) {
+      notifications.push({
+        userId: input.memberUserId,
+        organizationId: input.organizationId,
+        type: NOTIFICATION_TYPES.companyMemberSuspended,
+        title: "Company access suspended",
+        body: `Your access to ${input.organizationName} is currently suspended.`,
+        entityType: "organization_member",
+        entityId: input.memberUserId,
+        actionUrl: "/profile/company",
+        priority: 3,
+        actorUserId: input.actorUserId,
+        metadata: {
+          organization_id: input.organizationId,
+          member_user_id: input.memberUserId,
+          member_role: input.memberRole,
+        },
+      });
+    }
+
+    for (const managerRecipientId of managerRecipientIds) {
+      if (
+        managerRecipientId === input.actorUserId ||
+        managerRecipientId === input.memberUserId
+      ) {
+        continue;
+      }
+
+      notifications.push({
+        userId: managerRecipientId,
+        organizationId: input.organizationId,
+        type: NOTIFICATION_TYPES.companyMemberSuspended,
+        title: "Team member suspended",
+        body: `${memberLabel} was suspended in ${input.organizationName}.`,
+        entityType: "organization_member",
+        entityId: input.memberUserId,
+        actionUrl: "/profile/company/team",
+        priority: 2,
+        actorUserId: input.actorUserId,
+        metadata: {
+          organization_id: input.organizationId,
+          member_user_id: input.memberUserId,
+          member_role: input.memberRole,
+        },
+      });
+    }
+
+    const dedupedNotifications = dedupeNotificationsByUserAndType(notifications);
+    if (dedupedNotifications.length === 0) {
+      return { ok: true as const, createdCount: 0 };
+    }
+
+    return createNotifications({
+      notifications: dedupedNotifications,
+    });
+  } catch {
+    return { ok: false as const, message: "notification_member_suspended_delivery_failed" };
+  }
+}
+
+export async function notifyCompanyMemberRemoved(input: {
+  organizationId: string;
+  organizationName: string;
+  memberUserId: string;
+  memberDisplayName: string | null;
+  memberRole: "owner" | "admin" | "manager" | "agent";
+  actorUserId: string;
+}) {
+  try {
+    const memberLabel = toMemberLabel(input.memberDisplayName);
+    const managerRecipientIds = await loadManagerAwareRecipientIds(input.organizationId);
+    const notifications: Array<CreateNotificationInput & { type: KnownNotificationType }> = [];
+
+    if (input.memberUserId !== input.actorUserId) {
+      notifications.push({
+        userId: input.memberUserId,
+        organizationId: input.organizationId,
+        type: NOTIFICATION_TYPES.companyMemberRemoved,
+        title: "Removed from company workspace",
+        body: `You no longer have access to ${input.organizationName}.`,
+        entityType: "organization_member",
+        entityId: input.memberUserId,
+        actionUrl: "/profile/company",
+        priority: 3,
+        actorUserId: input.actorUserId,
+        metadata: {
+          organization_id: input.organizationId,
+          member_user_id: input.memberUserId,
+          member_role: input.memberRole,
+        },
+      });
+    }
+
+    for (const managerRecipientId of managerRecipientIds) {
+      if (
+        managerRecipientId === input.actorUserId ||
+        managerRecipientId === input.memberUserId
+      ) {
+        continue;
+      }
+
+      notifications.push({
+        userId: managerRecipientId,
+        organizationId: input.organizationId,
+        type: NOTIFICATION_TYPES.companyMemberRemoved,
+        title: "Team member removed",
+        body: `${memberLabel} was removed from ${input.organizationName}.`,
+        entityType: "organization_member",
+        entityId: input.memberUserId,
+        actionUrl: "/profile/company/team",
+        priority: 2,
+        actorUserId: input.actorUserId,
+        metadata: {
+          organization_id: input.organizationId,
+          member_user_id: input.memberUserId,
+          member_role: input.memberRole,
+        },
+      });
+    }
+
+    const dedupedNotifications = dedupeNotificationsByUserAndType(notifications);
+    if (dedupedNotifications.length === 0) {
+      return { ok: true as const, createdCount: 0 };
+    }
+
+    return createNotifications({
+      notifications: dedupedNotifications,
+    });
+  } catch {
+    return { ok: false as const, message: "notification_member_removed_delivery_failed" };
   }
 }
 

@@ -41,7 +41,14 @@ import {
   recordSecurityAuditEvent,
 } from "@/lib/security/audit";
 import { enforceTrafficControl, TRAFFIC_CONTROL_RULES } from "@/lib/security/traffic-control";
-import { notifyCompanyInviteReceived } from "@/lib/notifications";
+import {
+  notifyCompanyInviteAccepted,
+  notifyCompanyInviteReceived,
+  notifyCompanyMemberAdded,
+  notifyCompanyMemberRemoved,
+  notifyCompanyMemberRoleChanged,
+  notifyCompanyMemberSuspended,
+} from "@/lib/notifications";
 import { createServerSupabaseClient } from "@/lib/supabase";
 import type { Tables } from "@/types/database";
 
@@ -440,6 +447,7 @@ async function acceptCompanyInviteWithTrustedServerPath(input: {
             memberId: acceptedMembership.id,
             membershipRole: acceptedMembership.role,
             acceptanceOutcome: "already_accepted",
+            invitedByUserId: invite.invited_by_user_id,
           }
         : {
             ok: false as const,
@@ -589,6 +597,7 @@ async function acceptCompanyInviteWithTrustedServerPath(input: {
     memberId,
     membershipRole,
     acceptanceOutcome,
+    invitedByUserId: invite.invited_by_user_id,
   };
 }
 
@@ -1027,6 +1036,16 @@ export async function updateCompanyTeamMemberRoleAction(
     },
   });
 
+  await notifyCompanyMemberRoleChanged({
+    organizationId: managerContext.organization.id,
+    organizationName: managerContext.organization.name,
+    memberUserId: updatedMembershipRole.user_id,
+    memberDisplayName: null,
+    previousRole,
+    nextRole: updatedMembershipRole.role,
+    actorUserId: managerContext.profile.id,
+  });
+
   revalidateCompanyTeamPaths({ organizationSlug: managerContext.organization.slug });
 
   return {
@@ -1167,6 +1186,17 @@ export async function updateCompanyTeamMemberStatusAction(
     },
   });
 
+  if (updatedMembershipStatus.member_status === "inactive") {
+    await notifyCompanyMemberSuspended({
+      organizationId: managerContext.organization.id,
+      organizationName: managerContext.organization.name,
+      memberUserId: updatedMembershipStatus.user_id,
+      memberDisplayName: null,
+      memberRole: updatedMembershipStatus.role,
+      actorUserId: managerContext.profile.id,
+    });
+  }
+
   revalidateCompanyTeamPaths({ organizationSlug: managerContext.organization.slug });
 
   return {
@@ -1298,6 +1328,15 @@ export async function removeCompanyTeamMemberAction(
     },
   });
 
+  await notifyCompanyMemberRemoved({
+    organizationId: managerContext.organization.id,
+    organizationName: managerContext.organization.name,
+    memberUserId: removedUserId,
+    memberDisplayName: null,
+    memberRole: removedRole,
+    actorUserId: managerContext.profile.id,
+  });
+
   revalidateCompanyTeamPaths({ organizationSlug: managerContext.organization.slug });
 
   return {
@@ -1380,7 +1419,7 @@ export async function acceptCompanyTeamInviteAction(
 
   const { data: organizationRow } = await supabase
     .from("organizations")
-    .select("slug")
+    .select("name, slug")
     .eq("id", acceptedInvite.organizationId)
     .maybeSingle();
 
@@ -1401,6 +1440,34 @@ export async function acceptCompanyTeamInviteAction(
       },
     },
   });
+
+  if (acceptedInvite.acceptanceOutcome !== "already_accepted") {
+    await notifyCompanyInviteAccepted({
+      organizationId: acceptedInvite.organizationId,
+      organizationName: organizationRow?.name ?? "this company workspace",
+      inviteId: acceptedInvite.inviteId,
+      acceptedUserId: profileResult.profile.id,
+      acceptedUserDisplayName: profileResult.profile.display_name,
+      acceptedRole: acceptedInvite.membershipRole,
+      actorUserId: profileResult.profile.id,
+      invitedByUserId: acceptedInvite.invitedByUserId ?? null,
+    });
+
+    if (
+      acceptedInvite.acceptanceOutcome === "joined" ||
+      acceptedInvite.acceptanceOutcome === "reactivated_member"
+    ) {
+      await notifyCompanyMemberAdded({
+        organizationId: acceptedInvite.organizationId,
+        organizationName: organizationRow?.name ?? "this company workspace",
+        memberUserId: profileResult.profile.id,
+        memberDisplayName: profileResult.profile.display_name,
+        memberRole: acceptedInvite.membershipRole,
+        actorUserId: profileResult.profile.id,
+        includeSelfNotification: true,
+      });
+    }
+  }
 
   revalidatePath("/", "layout");
   revalidatePath("/profile");
