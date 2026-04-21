@@ -64,6 +64,10 @@ Audit and observability execution details are defined in `docs/audit-observabili
   - actor role (`owner` / `admin` / `manager`)
   - target conversation organization
   - target assignee active membership in the same organization
+- In-app notifications are user-scoped records and must enforce:
+  - server-trusted recipient resolution on domain event paths
+  - authenticated user ownership checks for read/unread mutations
+  - no client-authored notification inserts for privileged company workflow events
 - Company invite acceptance must be bound to authenticated user identity (target user id match or invite-email match), never client-asserted claims.
 - Invite-email identity matching must use server-trusted email resolution (`auth.users` / trusted helper), not mutable client metadata assumptions.
 - Protect owner continuity for company membership mutations (at least one active owner must remain).

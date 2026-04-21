@@ -167,6 +167,12 @@ Route protection improves UX but is not an authorization substitute.
   - `routing_status = 'assigned_member'` means company-owned with an active handler
 - Reassignment changes handler state only; it does not change company ownership of the inquiry context.
 
+### NM-PT41 notification foundations
+
+- Notifications are persisted in `public.notifications` with user ownership (`notifications.user_id`) as the primary access boundary.
+- Notification reads and read-state mutations are constrained to the authenticated owner (`user_id = auth.uid()`) via RLS and server-side scoped filters.
+- Cross-user notification creation (messaging, invite, and workflow recipients) is resolved on trusted server paths from persisted conversation/listing/membership data, never from client-supplied recipient claims.
+
 ### Favorites
 
 - Favorite create/delete/read operations are scoped to the authenticated user id.
