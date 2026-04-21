@@ -68,7 +68,6 @@ export function ListingImageGallery({ title, images }: ListingImageGalleryProps)
               src={activeImage.signedUrl}
               alt={`Listing image ${activeIndex + 1} for ${title}`}
               fill
-              unoptimized
               sizes="(min-width: 1280px) 68vw, (min-width: 1024px) 62vw, 100vw"
               className="h-full w-full object-cover"
               priority
@@ -142,7 +141,6 @@ export function ListingImageGallery({ title, images }: ListingImageGalleryProps)
                     src={image.signedUrl}
                     alt=""
                     fill
-                    unoptimized
                     sizes="96px"
                     className="h-full w-full object-cover"
                   />

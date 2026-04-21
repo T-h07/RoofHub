@@ -100,7 +100,6 @@ export function ListingDetailSummary({ listing }: ListingDetailSummaryProps) {
                   src={listing.company.logoUrl}
                   alt={`${listing.company.name} logo`}
                   fill
-                  unoptimized
                   sizes="24px"
                   className="h-full w-full object-cover"
                 />

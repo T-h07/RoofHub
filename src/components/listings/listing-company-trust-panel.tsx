@@ -51,7 +51,6 @@ export function ListingCompanyTrustPanel({
                 src={company.logoUrl}
                 alt={`${company.name} logo`}
                 fill
-                unoptimized
                 sizes="48px"
                 className="h-full w-full object-cover"
               />
@@ -96,7 +95,6 @@ export function ListingCompanyTrustPanel({
                     src={assignedAgent.avatarUrl}
                     alt={`Avatar for ${assignedAgent.displayName}`}
                     fill
-                    unoptimized
                     sizes="32px"
                     className="h-full w-full object-cover"
                   />

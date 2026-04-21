@@ -618,7 +618,7 @@ export function PublicListingsMap({ mapStyleUrl, listings, appliedBounds }: Publ
 
         {selectedListing ? (
           <Popup
-            className="nestmap-map-popup"
+            className="roofhub-map-popup"
             closeButton
             closeOnClick={false}
             focusAfterOpen={false}
@@ -636,7 +636,6 @@ export function PublicListingsMap({ mapStyleUrl, listings, appliedBounds }: Publ
                     src={selectedListing.coverImageUrl}
                     alt={`Cover image for ${selectedListing.title}`}
                     fill
-                    unoptimized
                     sizes="320px"
                     className="h-full w-full object-cover"
                   />

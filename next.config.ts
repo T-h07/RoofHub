@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import type { RemotePattern } from "next/dist/shared/lib/image-config";
 
 const allowedDevOrigins = (
   process.env.NEXT_DEV_ALLOWED_ORIGINS ??
@@ -9,6 +10,26 @@ const allowedDevOrigins = (
   .filter(Boolean);
 
 const isProduction = process.env.NODE_ENV === "production";
+const supabaseImagePattern = buildSupabaseImagePattern();
+
+function buildSupabaseImagePattern(): RemotePattern | null {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
+  if (!supabaseUrl) {
+    return null;
+  }
+
+  try {
+    const parsedUrl = new URL(supabaseUrl);
+    return {
+      protocol: parsedUrl.protocol.replace(":", "") as RemotePattern["protocol"],
+      hostname: parsedUrl.hostname,
+      port: parsedUrl.port,
+      pathname: "/storage/v1/object/**",
+    };
+  } catch {
+    return null;
+  }
+}
 
 function buildContentSecurityPolicy() {
   const directives = [
@@ -76,6 +97,9 @@ function buildSecurityHeaders() {
 const nextConfig: NextConfig = {
   allowedDevOrigins,
   poweredByHeader: false,
+  images: {
+    remotePatterns: supabaseImagePattern ? [supabaseImagePattern] : [],
+  },
   turbopack: {
     root: process.cwd(),
   },

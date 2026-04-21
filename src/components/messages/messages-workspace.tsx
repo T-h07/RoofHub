@@ -106,6 +106,42 @@ function clearSummaryUnreadCount(
   });
 }
 
+function applyConversationRoutingUpdate(
+  summary: MessagingConversationSummary,
+  input: {
+    conversationId: string;
+    assignedMemberUserId: string | null;
+    assignedMemberDisplayName: string | null;
+    assignedMemberActive: boolean;
+    assignedAt: string | null;
+    routingStatus: MessagingConversationSummary["conversation"]["routing_status"];
+  }
+) {
+  if (
+    summary.conversation.id !== input.conversationId ||
+    !summary.companyRouting
+  ) {
+    return summary;
+  }
+
+  return {
+    ...summary,
+    conversation: {
+      ...summary.conversation,
+      assigned_member_user_id: input.assignedMemberUserId,
+      assigned_at: input.assignedAt,
+      routing_status: input.routingStatus,
+    },
+    companyRouting: {
+      ...summary.companyRouting,
+      assignedMemberUserId: input.assignedMemberUserId,
+      assignedMemberDisplayName: input.assignedMemberDisplayName,
+      assignedMemberActive: input.assignedMemberActive,
+      routingStatus: input.routingStatus,
+    },
+  };
+}
+
 function upsertThreadMessage(
   messages: MessagingClientMessage[],
   message: MessagingMessageRecord,
@@ -186,7 +222,8 @@ export function MessagesWorkspace({
   const [isFallbackRefreshing, setIsFallbackRefreshing] = useState(false);
   const [subscriptionVersion, setSubscriptionVersion] = useState(0);
 
-  const refreshInFlightRef = useRef(false);
+  const summaryRefreshInFlightRef = useRef(false);
+  const threadRefreshInFlightRef = useRef(false);
   const markReadInFlightRef = useRef(false);
   const shouldResyncOnReconnectRef = useRef(false);
 
@@ -208,14 +245,13 @@ export function MessagesWorkspace({
   const showConversationListOnMobile = !hasConversationSelection;
   const showThreadOnMobile = hasConversationSelection;
 
-  const refreshWorkspaceFromServer = useCallback(
+  const refreshConversationSummariesFromServer = useCallback(
     async (mode: "manual" | "fallback" | "resync") => {
-      if (refreshInFlightRef.current) {
+      if (summaryRefreshInFlightRef.current) {
         return;
       }
 
-      refreshInFlightRef.current = true;
-      setIsFallbackRefreshing(mode !== "manual");
+      summaryRefreshInFlightRef.current = true;
 
       try {
         const summariesResult = await loadMessagingConversationSummariesAction({
@@ -228,27 +264,70 @@ export function MessagesWorkspace({
         } else if (mode === "manual") {
           toast.error(summariesResult.message);
         }
-
-        if (selectedConversationId) {
-          const threadResult = await loadMessagingThreadAction({
-            conversationId: selectedConversationId,
-            limit: 400,
-          });
-
-          if (threadResult.ok) {
-            setThread(toClientThread(threadResult.data));
-          }
-        }
       } catch {
         if (mode === "manual") {
           toast.error("Inbox refresh failed. Please retry.");
         }
       } finally {
-        refreshInFlightRef.current = false;
-        setIsFallbackRefreshing(false);
+        summaryRefreshInFlightRef.current = false;
+      }
+    },
+    []
+  );
+
+  const refreshSelectedThreadFromServer = useCallback(
+    async (
+      mode: "manual" | "fallback" | "resync",
+      conversationId: string | null = selectedConversationId
+    ) => {
+      if (!conversationId || threadRefreshInFlightRef.current) {
+        return;
+      }
+
+      threadRefreshInFlightRef.current = true;
+
+      try {
+        const threadResult = await loadMessagingThreadAction({
+          conversationId,
+          limit: 400,
+        });
+
+        if (threadResult.ok) {
+          setThread(toClientThread(threadResult.data));
+        } else if (mode === "manual") {
+          toast.error(threadResult.message);
+        }
+      } catch {
+        if (mode === "manual") {
+          toast.error("Thread refresh failed. Please retry.");
+        }
+      } finally {
+        threadRefreshInFlightRef.current = false;
       }
     },
     [selectedConversationId]
+  );
+
+  const refreshWorkspaceFromServer = useCallback(
+    async (mode: "manual" | "fallback" | "resync") => {
+      setIsFallbackRefreshing(mode !== "manual");
+
+      try {
+        await Promise.all([
+          refreshConversationSummariesFromServer(mode),
+          selectedConversationId
+            ? refreshSelectedThreadFromServer(mode, selectedConversationId)
+            : Promise.resolve(),
+        ]);
+      } finally {
+        setIsFallbackRefreshing(false);
+      }
+    },
+    [
+      refreshConversationSummariesFromServer,
+      refreshSelectedThreadFromServer,
+      selectedConversationId,
+    ]
   );
 
   const markCurrentConversationRead = useCallback(async () => {
@@ -284,6 +363,28 @@ export function MessagesWorkspace({
       markReadInFlightRef.current = false;
     }
   }, [selectedConversationId]);
+
+  useEffect(() => {
+    if (
+      !selectedConversationId ||
+      !thread ||
+      thread.conversation.id !== selectedConversationId
+    ) {
+      return;
+    }
+
+    const currentSummary = summaries.find(
+      (summary) => summary.conversation.id === selectedConversationId
+    );
+    const hasUnread =
+      thread.unreadCount > 0 || (currentSummary?.unreadCount ?? 0) > 0;
+
+    if (!hasUnread) {
+      return;
+    }
+
+    void markCurrentConversationRead();
+  }, [markCurrentConversationRead, selectedConversationId, summaries, thread]);
 
   const handleRealtimeMessageInsert = useCallback(
     (messageRow: Database["public"]["Tables"]["messages"]["Row"]) => {
@@ -451,8 +552,20 @@ export function MessagesWorkspace({
             table: "conversations",
             filter: `organization_id=eq.${inbox.workspaceOrganizationId}`,
           },
-          () => {
-            void refreshWorkspaceFromServer("resync");
+          (payload) => {
+            const conversationId =
+              typeof payload.new === "object" &&
+              payload.new !== null &&
+              "id" in payload.new &&
+              typeof payload.new.id === "string"
+                ? payload.new.id
+                : null;
+
+            void refreshConversationSummariesFromServer("resync");
+
+            if (conversationId && conversationId === selectedConversationId) {
+              void refreshSelectedThreadFromServer("resync", conversationId);
+            }
           }
         )
         .on(
@@ -463,8 +576,20 @@ export function MessagesWorkspace({
             table: "conversations",
             filter: `organization_id=eq.${inbox.workspaceOrganizationId}`,
           },
-          () => {
-            void refreshWorkspaceFromServer("resync");
+          (payload) => {
+            const conversationId =
+              typeof payload.new === "object" &&
+              payload.new !== null &&
+              "id" in payload.new &&
+              typeof payload.new.id === "string"
+                ? payload.new.id
+                : null;
+
+            void refreshConversationSummariesFromServer("resync");
+
+            if (conversationId && conversationId === selectedConversationId) {
+              void refreshSelectedThreadFromServer("resync", conversationId);
+            }
           }
         );
     } else {
@@ -478,7 +603,7 @@ export function MessagesWorkspace({
             filter: `provider_id=eq.${viewerUserId}`,
           },
           () => {
-            void refreshWorkspaceFromServer("resync");
+            void refreshConversationSummariesFromServer("resync");
           }
         )
         .on(
@@ -490,7 +615,7 @@ export function MessagesWorkspace({
             filter: `seeker_id=eq.${viewerUserId}`,
           },
           () => {
-            void refreshWorkspaceFromServer("resync");
+            void refreshConversationSummariesFromServer("resync");
           }
         );
     }
@@ -508,10 +633,13 @@ export function MessagesWorkspace({
     handleRealtimeMessageUpdate,
     inbox.mode,
     inbox.workspaceOrganizationId,
+    refreshConversationSummariesFromServer,
+    refreshSelectedThreadFromServer,
     refreshWorkspaceFromServer,
     subscriptionVersion,
     supabase,
     viewerUserId,
+    selectedConversationId,
   ]);
 
   useEffect(() => {
@@ -683,7 +811,7 @@ export function MessagesWorkspace({
   }
 
   async function handleConversationRoutingChange(assigneeUserId: string | null) {
-    if (!thread) {
+    if (!thread || !thread.companyRouting) {
       return false;
     }
 
@@ -697,7 +825,55 @@ export function MessagesWorkspace({
       return false;
     }
 
-    await refreshWorkspaceFromServer("manual");
+    const assignedMember = assigneeUserId
+      ? thread.companyRouting.assignableMembers.find(
+          (member) => member.userId === assigneeUserId
+        ) ?? null
+      : null;
+    const assignedMemberDisplayName = assignedMember?.displayName ?? null;
+
+    setThread((current) => {
+      if (
+        !current ||
+        current.conversation.id !== result.data.conversationId ||
+        !current.companyRouting
+      ) {
+        return current;
+      }
+
+      return {
+        ...current,
+        conversation: {
+          ...current.conversation,
+          assigned_member_user_id: result.data.assignedMemberUserId,
+          assigned_at: result.data.assignedAt,
+          routing_status: result.data.routingStatus,
+        },
+        companyRouting: {
+          ...current.companyRouting,
+          assignedMemberUserId: result.data.assignedMemberUserId,
+          assignedMemberDisplayName,
+          assignedMemberActive: Boolean(assignedMember),
+          routingStatus: result.data.routingStatus,
+        },
+      };
+    });
+
+    setSummaries((current) =>
+      sortSummariesByRecentActivity(
+        current.map((summary) =>
+          applyConversationRoutingUpdate(summary, {
+            conversationId: result.data.conversationId,
+            assignedMemberUserId: result.data.assignedMemberUserId,
+            assignedMemberDisplayName,
+            assignedMemberActive: Boolean(assignedMember),
+            assignedAt: result.data.assignedAt,
+            routingStatus: result.data.routingStatus,
+          })
+        )
+      )
+    );
+
     return true;
   }
 
@@ -727,20 +903,20 @@ export function MessagesWorkspace({
           <div className="flex shrink-0 items-center gap-2">
             <button
               type="button"
-            onClick={refreshNow}
-            className={cn(
-              "border-border bg-card/72 hover:bg-accent/70 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors"
-            )}
-          >
-            Refresh now
+              onClick={refreshNow}
+              className={cn(
+                "border-border bg-card/72 hover:bg-accent/70 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors"
+              )}
+            >
+              Refresh now
             </button>
             <button
               type="button"
-            onClick={retryLiveSync}
-            className={cn(
-              "border-border bg-card/72 hover:bg-accent/70 inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors"
-            )}
-          >
+              onClick={retryLiveSync}
+              className={cn(
+                "border-border bg-card/72 hover:bg-accent/70 inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors"
+              )}
+            >
               <RotateCcw className="size-3.5" aria-hidden="true" />
               Retry live sync
             </button>
@@ -765,7 +941,7 @@ export function MessagesWorkspace({
         <div className={cn(showThreadOnMobile ? "block" : "hidden", "lg:block")}>
           {hasConversationSelection && thread && viewerUserId ? (
             <MessagesThreadPanel
-              key={`${thread.conversation.id}:${thread.companyRouting?.assignedMemberUserId ?? "unassigned"}`}
+              key={thread.conversation.id}
               thread={thread}
               viewerUserId={viewerUserId}
               isSending={isSending}

@@ -125,7 +125,6 @@ export function MapResultsPane({
                         src={listing.coverImageUrl}
                         alt={`Cover image for ${listing.title}`}
                         fill
-                        unoptimized
                         sizes="120px"
                         className="h-full w-full object-cover"
                       />

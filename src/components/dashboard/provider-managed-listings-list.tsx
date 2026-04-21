@@ -86,7 +86,6 @@ function renderPreviewImage(listing: ProviderManagedListing) {
         src={listing.coverImageUrl}
         alt={`Cover image for ${listing.title}`}
         fill
-        unoptimized
         sizes="(min-width: 1280px) 140px, (min-width: 768px) 100px, 100vw"
         className="h-full w-full object-cover"
       />

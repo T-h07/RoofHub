@@ -102,7 +102,6 @@ export function ListingCard({ listing, isAuthenticated, className }: ListingCard
             src={listing.coverImageUrl}
             alt={`Cover image for ${listing.title}`}
             fill
-            unoptimized
             sizes="(min-width: 1280px) 30vw, (min-width: 640px) 50vw, 100vw"
             className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
           />
@@ -173,7 +172,6 @@ export function ListingCard({ listing, isAuthenticated, className }: ListingCard
                     src={listing.company.logoUrl}
                     alt={`${listing.company.name} logo`}
                     fill
-                    unoptimized
                     sizes="20px"
                     className="h-full w-full object-cover"
                   />

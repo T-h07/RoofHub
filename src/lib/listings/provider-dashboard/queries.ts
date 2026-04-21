@@ -108,12 +108,11 @@ function parseCoordinate(value: number | string | null) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-async function countProviderListingsByStatus(
+async function loadProviderListingStatusCounts(
   supabase: SupabaseClient<Database>,
   input: {
     userId: string;
     organizationId?: string | null;
-    status?: ProviderListingStatus;
   }
 ) {
   const workspaceScope = createProviderListingWorkspaceScope({
@@ -121,21 +120,28 @@ async function countProviderListingsByStatus(
     organizationId: input.organizationId,
   });
 
-  let query = applyProviderListingWorkspaceScope(
-    supabase.from("listings").select("id", { count: "exact", head: true }),
+  const { data, error } = await applyProviderListingWorkspaceScope(
+    supabase.from("listings").select("listing_status"),
     workspaceScope
   );
 
-  if (input.status) {
-    query = query.eq("listing_status", input.status);
-  }
-
-  const { count, error } = await query;
-
   if (!error) {
+    const counts = new Map<ProviderListingStatus, number>();
+
+    for (const row of data ?? []) {
+      const status = row.listing_status as ProviderListingStatus;
+      counts.set(status, (counts.get(status) ?? 0) + 1);
+    }
+
+    const total = Array.from(counts.values()).reduce(
+      (sum, value) => sum + value,
+      0
+    );
+
     return {
       ok: true as const,
-      count: count ?? 0,
+      total,
+      counts,
     };
   }
 
@@ -151,19 +157,16 @@ async function countProviderListingsByStatus(
     logSupabaseSchemaDrift("provider_dashboard_metrics", error, {
       user_id: input.userId,
       organization_id: input.organizationId ?? null,
-      status: input.status ?? null,
     });
     return {
       ok: false as const,
       message: createSchemaDriftMessage("Listing metrics"),
-      count: 0,
     };
   }
 
   return {
     ok: false as const,
     message: "Listing metrics are temporarily unavailable.",
-    count: 0,
   };
 }
 
@@ -179,55 +182,15 @@ export async function loadProviderListingOverviewMetrics(
     organizationId: input.organizationId ?? null,
   };
 
-  const [
-    totalResult,
-    publishedResult,
-    draftResult,
-    submittedForReviewResult,
-    needsChangesResult,
-    approvedResult,
-    unpublishedResult,
-    pausedResult,
-    archivedResult,
-    soldResult,
-    rentedResult,
-    hiddenByAdminResult,
-    unreadResult,
-  ] = await Promise.all([
-    countProviderListingsByStatus(supabase, scopedInput),
-    countProviderListingsByStatus(supabase, { ...scopedInput, status: "published" }),
-    countProviderListingsByStatus(supabase, { ...scopedInput, status: "draft" }),
-    countProviderListingsByStatus(supabase, { ...scopedInput, status: "submitted_for_review" }),
-    countProviderListingsByStatus(supabase, { ...scopedInput, status: "needs_changes" }),
-    countProviderListingsByStatus(supabase, { ...scopedInput, status: "approved" }),
-    countProviderListingsByStatus(supabase, { ...scopedInput, status: "unpublished" }),
-    countProviderListingsByStatus(supabase, { ...scopedInput, status: "paused" }),
-    countProviderListingsByStatus(supabase, { ...scopedInput, status: "archived" }),
-    countProviderListingsByStatus(supabase, { ...scopedInput, status: "sold" }),
-    countProviderListingsByStatus(supabase, { ...scopedInput, status: "rented" }),
-    countProviderListingsByStatus(supabase, { ...scopedInput, status: "hidden_by_admin" }),
+  const [statusCountsResult, unreadResult] = await Promise.all([
+    loadProviderListingStatusCounts(supabase, scopedInput),
     loadProviderUnreadLeadCount(supabase, scopedInput.userId),
   ]);
 
-  const failedResult = [
-    totalResult,
-    publishedResult,
-    draftResult,
-    submittedForReviewResult,
-    needsChangesResult,
-    approvedResult,
-    unpublishedResult,
-    pausedResult,
-    archivedResult,
-    soldResult,
-    rentedResult,
-    hiddenByAdminResult,
-  ].find((result) => !result.ok);
-
-  if (failedResult && !failedResult.ok) {
+  if (!statusCountsResult.ok) {
     return {
       ok: false as const,
-      message: failedResult.message,
+      message: statusCountsResult.message,
       metrics: {
         total: 0,
         published: 0,
@@ -246,21 +209,24 @@ export async function loadProviderListingOverviewMetrics(
     };
   }
 
+  const getStatusCount = (status: ProviderListingStatus) =>
+    statusCountsResult.counts.get(status) ?? 0;
+
   return {
     ok: true as const,
     metrics: {
-      total: totalResult.count,
-      published: publishedResult.count,
-      draft: draftResult.count,
-      submittedForReview: submittedForReviewResult.count,
-      needsChanges: needsChangesResult.count,
-      approved: approvedResult.count,
-      unpublished: unpublishedResult.count,
-      paused: pausedResult.count,
-      archived: archivedResult.count,
-      sold: soldResult.count,
-      rented: rentedResult.count,
-      hiddenByAdmin: hiddenByAdminResult.count,
+      total: statusCountsResult.total,
+      published: getStatusCount("published"),
+      draft: getStatusCount("draft"),
+      submittedForReview: getStatusCount("submitted_for_review"),
+      needsChanges: getStatusCount("needs_changes"),
+      approved: getStatusCount("approved"),
+      unpublished: getStatusCount("unpublished"),
+      paused: getStatusCount("paused"),
+      archived: getStatusCount("archived"),
+      sold: getStatusCount("sold"),
+      rented: getStatusCount("rented"),
+      hiddenByAdmin: getStatusCount("hidden_by_admin"),
       unreadLeadsCount: unreadResult.ok ? unreadResult.count : 0,
     } satisfies ProviderListingOverviewMetrics,
   };

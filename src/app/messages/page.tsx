@@ -10,7 +10,6 @@ import {
   createOrGetConversationForListingAction,
   loadMessagingConversationSummariesQuery,
   loadMessagingThreadQuery,
-  markConversationReadAction,
 } from "@/lib/messaging";
 import { isUuid } from "@/lib/messaging/validation";
 
@@ -47,10 +46,6 @@ export default async function MessagesPage({ searchParams }: MessagesPageProps) 
     } else {
       redirect(`/messages?conversationId=${createResult.data.conversation.id}`);
     }
-  }
-
-  if (conversationId && isUuid(conversationId)) {
-    await markConversationReadAction({ conversationId });
   }
 
   const summariesResult = await loadMessagingConversationSummariesQuery({

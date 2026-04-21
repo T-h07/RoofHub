@@ -186,7 +186,6 @@ export function MessagesThreadPanel({
                   src={thread.listingCoverImageUrl}
                   alt={thread.listing?.title ? `Cover image for ${thread.listing.title}` : "Listing cover image"}
                   fill
-                  unoptimized
                   sizes="48px"
                   className="h-full w-full object-cover"
                 />

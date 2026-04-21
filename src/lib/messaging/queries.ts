@@ -130,29 +130,38 @@ async function loadLatestMessagesMap(
   supabase: SupabaseClient<Database>,
   conversationIds: string[]
 ): Promise<Map<string, MessagingMessageRecord>> {
-  const latestRows = await Promise.all(
-    conversationIds.map(async (conversationId) => {
-      const { data, error } = await supabase
-        .from("messages")
-        .select(MESSAGE_SELECT)
-        .eq("conversation_id", conversationId)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+  const latestMessageMap = new Map<string, MessagingMessageRecord>();
+  if (conversationIds.length === 0) {
+    return latestMessageMap;
+  }
 
-      if (error || !data) {
-        return null;
-      }
+  const { data, error } = await supabase
+    .from("messages")
+    .select(MESSAGE_SELECT)
+    .in("conversation_id", conversationIds)
+    .order("conversation_id", { ascending: true })
+    .order("created_at", { ascending: false });
 
-      return toConversationSummaryMessage(data as MessageRow);
-    })
-  );
+  if (error || !data) {
+    return latestMessageMap;
+  }
 
-  return new Map(
-    latestRows
-      .filter((value): value is MessagingMessageRecord => Boolean(value))
-      .map((message) => [message.conversation_id, message])
-  );
+  for (const row of data as MessageRow[]) {
+    if (latestMessageMap.has(row.conversation_id)) {
+      continue;
+    }
+
+    latestMessageMap.set(
+      row.conversation_id,
+      toConversationSummaryMessage(row)
+    );
+
+    if (latestMessageMap.size === conversationIds.length) {
+      break;
+    }
+  }
+
+  return latestMessageMap;
 }
 
 async function loadListingSnippetMap(

@@ -46,7 +46,6 @@ export function CompanyLogoAvatar({
           src={logoUrl}
           alt={`${name} logo`}
           fill
-          unoptimized
           sizes="160px"
           className={cn("h-full w-full object-cover", imageClassName)}
           onError={() => setIsBroken(true)}

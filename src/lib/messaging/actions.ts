@@ -702,11 +702,16 @@ export async function updateConversationRoutingAction(
       data: {
         conversationId: record.conversation.id,
         assignedMemberUserId: requestedAssignee?.userId ?? null,
+        assignedAt: record.conversation.assigned_at,
+        routingStatus: record.conversation.routing_status,
       },
     };
   }
 
   const nextAssignedAt = requestedAssignee?.userId ? new Date().toISOString() : null;
+  const nextRoutingStatus = requestedAssignee?.userId
+    ? "assigned_member"
+    : "shared_queue";
   const { error } = await supabase
     .from("conversations")
     .update({
@@ -752,7 +757,7 @@ export async function updateConversationRoutingAction(
         assigned_member_user_id: requestedAssignee?.userId ?? null,
         assigned_member_display_name: requestedAssignee?.displayName ?? null,
         previous_routing_status: record.conversation.routing_status,
-        next_routing_status: requestedAssignee?.userId ? "assigned_member" : "shared_queue",
+        next_routing_status: nextRoutingStatus,
         membership_role: membership.role,
       },
     },
@@ -763,6 +768,8 @@ export async function updateConversationRoutingAction(
     data: {
       conversationId: record.conversation.id,
       assignedMemberUserId: requestedAssignee?.userId ?? null,
+      assignedAt: nextAssignedAt,
+      routingStatus: nextRoutingStatus,
     },
   };
 }

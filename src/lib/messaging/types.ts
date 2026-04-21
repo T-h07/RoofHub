@@ -173,6 +173,8 @@ export type UpdateConversationRoutingInput = {
 export type UpdateConversationRoutingResult = {
   conversationId: string;
   assignedMemberUserId: string | null;
+  assignedAt: string | null;
+  routingStatus: MessagingConversationRoutingStatus;
 };
 
 export type LoadConversationSummariesInput = {
