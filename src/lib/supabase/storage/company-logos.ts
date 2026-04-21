@@ -1,13 +1,13 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { Database } from "@/types/database";
-import { isAllowedListingImageMimeType } from "@/lib/storage/listing-images";
 import {
   COMPANY_LOGOS_BUCKET,
   createCompanyLogoObjectPath,
   detectCompanyLogoMimeType,
   extractCompanyLogoPathFromUrl,
   isCompanyLogoPathForOrganization,
+  normalizeCompanyLogoDeclaredMimeType,
   validateCompanyLogoFile,
 } from "@/lib/storage/company-logo";
 
@@ -28,11 +28,8 @@ export async function uploadCompanyLogo(
     throw new Error("Unsupported logo signature. Allowed: JPEG, PNG, WEBP.");
   }
 
-  if (
-    input.file.type &&
-    isAllowedListingImageMimeType(input.file.type) &&
-    input.file.type !== sniffedMimeType
-  ) {
+  const declaredMimeType = normalizeCompanyLogoDeclaredMimeType(input.file.type);
+  if (declaredMimeType && declaredMimeType !== sniffedMimeType) {
     throw new Error("Company logo MIME type does not match file contents.");
   }
 

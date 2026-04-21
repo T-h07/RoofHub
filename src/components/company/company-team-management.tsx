@@ -55,6 +55,7 @@ import {
 import { cn } from "@/lib/utils";
 
 type CompanyTeamManagementProps = {
+  organizationId: string;
   viewerMembershipRole: "owner" | "admin";
   members: CompanyTeamMemberWithProfile[];
   pendingInvites: CompanyInviteWithRelations[];
@@ -132,6 +133,7 @@ function getStatusBadgeVariant(status: CompanyTeamMemberWithProfile["member_stat
 }
 
 export function CompanyTeamManagement({
+  organizationId,
   viewerMembershipRole,
   members,
   pendingInvites,
@@ -203,6 +205,7 @@ export function CompanyTeamManagement({
     }
 
     const formData = new FormData();
+    formData.set("organizationId", organizationId);
     formData.set("membershipId", memberStatusDialog.membershipId);
     formData.set("nextStatus", memberStatusDialog.nextStatus);
 
@@ -216,6 +219,7 @@ export function CompanyTeamManagement({
     }
 
     const formData = new FormData();
+    formData.set("organizationId", organizationId);
     formData.set("membershipId", memberRemovalDialog.membershipId);
 
     runMutationAction(removeCompanyTeamMemberAction, formData);
@@ -228,6 +232,7 @@ export function CompanyTeamManagement({
     }
 
     const formData = new FormData();
+    formData.set("organizationId", organizationId);
     formData.set("inviteId", inviteRevocationDialog.inviteId);
 
     runMutationAction(revokeCompanyTeamInviteAction, formData);
@@ -284,6 +289,7 @@ export function CompanyTeamManagement({
           ) : null}
 
           <form action={inviteFormAction} className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_14rem_auto]">
+            <input type="hidden" name="organizationId" value={organizationId} />
             <input type="hidden" name="inviteMethod" value={inviteMethod} />
 
             {inviteMethod === "email" ? (
@@ -430,6 +436,7 @@ export function CompanyTeamManagement({
 
                     <div className="grid gap-2 sm:grid-cols-[minmax(10rem,1fr)_auto_auto] sm:items-end">
                       <form onSubmit={onRoleSubmit} className="space-y-1.5">
+                        <input type="hidden" name="organizationId" value={organizationId} />
                         <input type="hidden" name="membershipId" value={member.id} />
                         <Label className="text-xs" htmlFor={`member-role-${member.id}`}>
                           Role

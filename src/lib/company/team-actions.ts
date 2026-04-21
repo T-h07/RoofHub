@@ -261,9 +261,11 @@ function revalidateCompanyTeamPaths(input: { organizationSlug: string }) {
 }
 
 async function loadTeamManagerContext(
-  supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>
+  supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>,
+  organizationId?: string | null
 ): Promise<TeamManagerContextResult> {
   const companyAccess = await requireCurrentUserScopedCompanyAccess(supabase, {
+    organizationId,
     permission: "team_management",
     selectionRequiredMessage:
       "Select an active company workspace before managing team access.",
@@ -652,7 +654,7 @@ export async function createCompanyTeamInviteAction(
   }
 
   const supabase = await createServerSupabaseClient();
-  const managerContext = await loadTeamManagerContext(supabase);
+  const managerContext = await loadTeamManagerContext(supabase, input.organizationId);
   if (!managerContext.ok) {
     return {
       status: "error",
@@ -790,7 +792,7 @@ export async function revokeCompanyTeamInviteAction(
   const inviteId = input.inviteId!;
 
   const supabase = await createServerSupabaseClient();
-  const managerContext = await loadTeamManagerContext(supabase);
+  const managerContext = await loadTeamManagerContext(supabase, input.organizationId);
   if (!managerContext.ok) {
     return toGenericErrorState(managerContext.message);
   }
@@ -901,7 +903,7 @@ export async function updateCompanyTeamMemberRoleAction(
   const membershipId = input.membershipId!;
 
   const supabase = await createServerSupabaseClient();
-  const managerContext = await loadTeamManagerContext(supabase);
+  const managerContext = await loadTeamManagerContext(supabase, input.organizationId);
   if (!managerContext.ok) {
     return toGenericErrorState(managerContext.message);
   }
@@ -1036,7 +1038,7 @@ export async function updateCompanyTeamMemberStatusAction(
   const membershipId = input.membershipId!;
 
   const supabase = await createServerSupabaseClient();
-  const managerContext = await loadTeamManagerContext(supabase);
+  const managerContext = await loadTeamManagerContext(supabase, input.organizationId);
   if (!managerContext.ok) {
     return toGenericErrorState(managerContext.message);
   }
@@ -1179,7 +1181,7 @@ export async function removeCompanyTeamMemberAction(
   const membershipId = input.membershipId!;
 
   const supabase = await createServerSupabaseClient();
-  const managerContext = await loadTeamManagerContext(supabase);
+  const managerContext = await loadTeamManagerContext(supabase, input.organizationId);
   if (!managerContext.ok) {
     return toGenericErrorState(managerContext.message);
   }

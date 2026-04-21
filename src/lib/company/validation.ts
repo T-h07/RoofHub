@@ -16,6 +16,7 @@ const COMPANY_COVERAGE_AREA_MAX = 220;
 
 const EMAIL_PATTERN = /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i;
 const PHONE_PATTERN = /^[0-9+()\-\s]{7,32}$/;
+const SCHEME_PATTERN = /^[a-z][a-z0-9+.-]*:\/\//i;
 
 function normalizeTrimmed(value: FormDataEntryValue | null) {
   return typeof value === "string" ? value.trim() : "";
@@ -49,6 +50,19 @@ export function validateCompanyWorkspaceInput(input: CompanyWorkspaceCreateInput
   return errors;
 }
 
+function normalizePhone(value: string | null) {
+  if (!value) {
+    return null;
+  }
+
+  const normalized = value
+    .replace(/[./\u2010-\u2015]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return normalized.length > 0 ? normalized : null;
+}
+
 function normalizeWebsiteUrl(value: string | null) {
   if (!value) {
     return null;
@@ -59,7 +73,7 @@ function normalizeWebsiteUrl(value: string | null) {
     return null;
   }
 
-  return normalized;
+  return SCHEME_PATTERN.test(normalized) ? normalized : `https://${normalized}`;
 }
 
 export function readCompanyProfileInput(formData: FormData): CompanyProfileUpdateInput {
@@ -67,7 +81,7 @@ export function readCompanyProfileInput(formData: FormData): CompanyProfileUpdat
   const description = toNullable(normalizeTrimmed(formData.get("description")));
   const contactEmail =
     toNullable(normalizeTrimmed(formData.get("contactEmail")))?.toLowerCase() ?? null;
-  const contactPhone = toNullable(normalizeTrimmed(formData.get("contactPhone")));
+  const contactPhone = normalizePhone(toNullable(normalizeTrimmed(formData.get("contactPhone"))));
   const websiteUrl = normalizeWebsiteUrl(toNullable(normalizeTrimmed(formData.get("websiteUrl"))));
   const coverageArea = toNullable(normalizeTrimmed(formData.get("coverageArea")));
 
@@ -118,7 +132,7 @@ export function validateCompanyProfileInput(input: CompanyProfileUpdateInput) {
       !input.websiteUrl.toLowerCase().startsWith("http://") &&
       !input.websiteUrl.toLowerCase().startsWith("https://")
     ) {
-      errors.websiteUrl = "Website URL must start with http:// or https://";
+      errors.websiteUrl = "Website URL must use http or https.";
     } else {
       try {
         const parsedUrl = new URL(input.websiteUrl);

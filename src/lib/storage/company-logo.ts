@@ -36,6 +36,20 @@ export type CompanyLogoValidationIssue = {
 
 export type CompanyLogoMimeType = ListingImageMimeType;
 
+export function normalizeCompanyLogoDeclaredMimeType(mimeType: string) {
+  const normalized = mimeType.trim().toLowerCase();
+
+  if (!normalized) {
+    return null;
+  }
+
+  if (normalized === "image/jpg") {
+    return "image/jpeg" as const;
+  }
+
+  return isAllowedListingImageMimeType(normalized) ? normalized : null;
+}
+
 function assertUuid(value: string, fieldName: string) {
   if (!UUID_PATTERN.test(value)) {
     throw new Error(`Invalid ${fieldName} UUID.`);
@@ -52,7 +66,7 @@ export function validateCompanyLogoFile(file: File): CompanyLogoValidationIssue[
     });
   }
 
-  if (!isAllowedListingImageMimeType(file.type)) {
+  if (file.type && !normalizeCompanyLogoDeclaredMimeType(file.type)) {
     issues.push({
       code: "invalid-type",
       message: "Unsupported logo type. Allowed: JPEG, PNG, WEBP.",

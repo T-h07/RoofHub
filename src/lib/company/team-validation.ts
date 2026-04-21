@@ -43,12 +43,14 @@ function normalizeRole(value: string): OrganizationMemberRole {
 }
 
 export function readCompanyTeamInviteInput(formData: FormData): CompanyTeamInviteInput {
+  const organizationId = toNullable(normalizeTrimmed(formData.get("organizationId")));
   const inviteMethod = normalizeInviteMethod(normalizeTrimmed(formData.get("inviteMethod")));
   const inviteEmail = toNullable(normalizeTrimmed(formData.get("inviteEmail")))?.toLowerCase() ?? null;
   const targetUserId = toNullable(normalizeTrimmed(formData.get("targetUserId")));
   const role = normalizeRole(normalizeTrimmed(formData.get("role")));
 
   return {
+    organizationId,
     inviteMethod,
     inviteEmail,
     targetUserId,
@@ -58,6 +60,10 @@ export function readCompanyTeamInviteInput(formData: FormData): CompanyTeamInvit
 
 export function validateCompanyTeamInviteInput(input: CompanyTeamInviteInput) {
   const errors: CompanyTeamInviteFormErrors = {};
+
+  if (!isUuid(input.organizationId)) {
+    errors.organizationId = "Company workspace reference is invalid.";
+  }
 
   if (!ORGANIZATION_INVITABLE_ROLE_VALUES.includes(input.role)) {
     errors.role = "Choose admin, manager, or agent for this invite.";
@@ -84,15 +90,21 @@ export function validateCompanyTeamInviteInput(input: CompanyTeamInviteInput) {
 
 export function readMembershipRoleChangeInput(formData: FormData) {
   return {
+    organizationId: toNullable(normalizeTrimmed(formData.get("organizationId"))),
     membershipId: toNullable(normalizeTrimmed(formData.get("membershipId"))),
     newRole: normalizeRole(normalizeTrimmed(formData.get("newRole"))),
   };
 }
 
 export function validateMembershipRoleChangeInput(input: {
+  organizationId: string | null;
   membershipId: string | null;
   newRole: OrganizationMemberRole;
 }) {
+  if (!isUuid(input.organizationId)) {
+    return "Company workspace reference is invalid.";
+  }
+
   if (!input.membershipId || !isUuid(input.membershipId)) {
     return "Member reference is invalid.";
   }
@@ -108,15 +120,21 @@ export function readMembershipStatusInput(formData: FormData) {
   const nextStatusRaw = normalizeTrimmed(formData.get("nextStatus"));
 
   return {
+    organizationId: toNullable(normalizeTrimmed(formData.get("organizationId"))),
     membershipId: toNullable(normalizeTrimmed(formData.get("membershipId"))),
     nextStatus: nextStatusRaw === "inactive" ? "inactive" : "active",
   } as const;
 }
 
 export function validateMembershipStatusInput(input: {
+  organizationId: string | null;
   membershipId: string | null;
   nextStatus: "active" | "inactive";
 }) {
+  if (!isUuid(input.organizationId)) {
+    return "Company workspace reference is invalid.";
+  }
+
   if (!input.membershipId || !isUuid(input.membershipId)) {
     return "Member reference is invalid.";
   }
@@ -130,11 +148,19 @@ export function validateMembershipStatusInput(input: {
 
 export function readMemberRemovalInput(formData: FormData) {
   return {
+    organizationId: toNullable(normalizeTrimmed(formData.get("organizationId"))),
     membershipId: toNullable(normalizeTrimmed(formData.get("membershipId"))),
   };
 }
 
-export function validateMemberRemovalInput(input: { membershipId: string | null }) {
+export function validateMemberRemovalInput(input: {
+  organizationId: string | null;
+  membershipId: string | null;
+}) {
+  if (!isUuid(input.organizationId)) {
+    return "Company workspace reference is invalid.";
+  }
+
   if (!input.membershipId || !isUuid(input.membershipId)) {
     return "Member reference is invalid.";
   }
@@ -144,11 +170,19 @@ export function validateMemberRemovalInput(input: { membershipId: string | null 
 
 export function readInviteRevocationInput(formData: FormData) {
   return {
+    organizationId: toNullable(normalizeTrimmed(formData.get("organizationId"))),
     inviteId: toNullable(normalizeTrimmed(formData.get("inviteId"))),
   };
 }
 
-export function validateInviteRevocationInput(input: { inviteId: string | null }) {
+export function validateInviteRevocationInput(input: {
+  organizationId: string | null;
+  inviteId: string | null;
+}) {
+  if (!isUuid(input.organizationId)) {
+    return "Company workspace reference is invalid.";
+  }
+
   if (!input.inviteId || !isUuid(input.inviteId)) {
     return "Invite reference is invalid.";
   }

@@ -40,6 +40,7 @@ export const ORGANIZATION_INVITE_STATUS_LABELS: Record<OrganizationInviteStatus,
 export type CompanyTeamInviteMethod = "email" | "userId";
 
 export type CompanyTeamInviteInput = {
+  organizationId: string | null;
   inviteMethod: CompanyTeamInviteMethod;
   inviteEmail: string | null;
   targetUserId: string | null;
@@ -47,6 +48,7 @@ export type CompanyTeamInviteInput = {
 };
 
 export type CompanyTeamInviteFieldName =
+  | "organizationId"
   | "inviteMethod"
   | "inviteEmail"
   | "targetUserId"

@@ -135,6 +135,7 @@ export default async function CompanyTeamPage() {
       />
 
       <CompanyTeamManagement
+        organizationId={organization.id}
         viewerMembershipRole={viewerMembershipRole}
         members={workspaceResult.members}
         pendingInvites={workspaceResult.pendingInvites}
