@@ -4,6 +4,7 @@ import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 
 import { createNotifications } from "./service";
 import { NOTIFICATION_TYPES } from "./types";
+import type { CreateNotificationInput } from "./types";
 
 function trimTo(value: string, maxLength: number) {
   const normalized = value.trim();
@@ -69,6 +70,103 @@ function uniqueRecipients(recipientIds: Array<string | null | undefined>, actorU
 type KnownNotificationType =
   (typeof NOTIFICATION_TYPES)[keyof typeof NOTIFICATION_TYPES];
 
+export async function notifyConversationInquiryCreated(input: {
+  conversationId: string;
+  listingId: string;
+  listingTitle: string;
+  ownerMode: "individual_provider" | "company_workspace";
+  organizationId: string | null;
+  providerUserId: string;
+  seekerUserId: string;
+  assignedMemberUserId: string | null;
+}) {
+  try {
+    const listingLabel = trimTo(input.listingTitle, 70) || "this listing";
+    const notifications: CreateNotificationInput[] = [];
+
+    if (input.ownerMode === "individual_provider") {
+      notifications.push({
+        userId: input.providerUserId,
+        organizationId: null,
+        type: NOTIFICATION_TYPES.inquiryReceived,
+        title: "New inquiry received",
+        body: `A seeker opened a new conversation on ${listingLabel}.`,
+        entityType: "conversation",
+        entityId: input.conversationId,
+        actionUrl: `/messages?conversationId=${input.conversationId}`,
+        priority: 3,
+        actorUserId: input.seekerUserId,
+        metadata: {
+          conversation_id: input.conversationId,
+          listing_id: input.listingId,
+          owner_mode: input.ownerMode,
+          routing_status: "direct_provider",
+        },
+      });
+    } else if (input.assignedMemberUserId) {
+      notifications.push({
+        userId: input.assignedMemberUserId,
+        organizationId: input.organizationId,
+        type: NOTIFICATION_TYPES.inquiryReceived,
+        title: "New inquiry assigned to you",
+        body: `A new inquiry was routed to you for ${listingLabel}.`,
+        entityType: "conversation",
+        entityId: input.conversationId,
+        actionUrl: `/messages?conversationId=${input.conversationId}`,
+        priority: 3,
+        actorUserId: input.seekerUserId,
+        metadata: {
+          conversation_id: input.conversationId,
+          listing_id: input.listingId,
+          owner_mode: input.ownerMode,
+          routing_status: "assigned_member",
+          assigned_member_user_id: input.assignedMemberUserId,
+        },
+      });
+    } else if (input.organizationId) {
+      const managerRecipientIds = await loadActiveOrganizationUserIds({
+        organizationId: input.organizationId,
+        roles: ["owner", "admin", "manager"],
+      });
+
+      notifications.push(
+        ...managerRecipientIds.map<CreateNotificationInput>((recipientUserId) => ({
+          userId: recipientUserId,
+          organizationId: input.organizationId,
+          type: NOTIFICATION_TYPES.inquiryReceived,
+          title: "New inquiry in shared queue",
+          body: `A new inquiry is waiting in the shared queue for ${listingLabel}.`,
+          entityType: "conversation",
+          entityId: input.conversationId,
+          actionUrl: `/messages?conversationId=${input.conversationId}`,
+          priority: 3,
+          actorUserId: input.seekerUserId,
+          metadata: {
+            conversation_id: input.conversationId,
+            listing_id: input.listingId,
+            owner_mode: input.ownerMode,
+            routing_status: "shared_queue",
+          },
+        }))
+      );
+    }
+
+    const dedupedNotifications = notifications.filter(
+      (notification) => notification.userId !== input.seekerUserId
+    );
+
+    if (dedupedNotifications.length === 0) {
+      return { ok: true as const, createdCount: 0 };
+    }
+
+    return createNotifications({
+      notifications: dedupedNotifications,
+    });
+  } catch {
+    return { ok: false as const, message: "notification_inquiry_delivery_failed" };
+  }
+}
+
 export async function notifyConversationMessageReceived(input: {
   conversationId: string;
   listingId: string;
@@ -81,8 +179,13 @@ export async function notifyConversationMessageReceived(input: {
   senderDisplayName: string | null;
   messageId: string;
   messageBody: string;
+  isFirstMessageInConversation: boolean;
 }) {
   try {
+    if (input.isFirstMessageInConversation && input.senderUserId === input.seekerUserId) {
+      return { ok: true as const, createdCount: 0 };
+    }
+
     const senderLabel = trimTo(input.senderDisplayName ?? "A user", 60) || "A user";
     let recipients: string[] = [];
 
@@ -182,54 +285,37 @@ export async function notifyConversationRoutingChanged(input: {
   organizationId: string;
   actorUserId: string;
   previousAssigneeUserId: string | null;
+  previousAssigneeDisplayName: string | null;
   nextAssigneeUserId: string | null;
+  nextAssigneeDisplayName: string | null;
   eventType:
     | "messaging.conversation.assigned"
     | "messaging.conversation.reassigned"
     | "messaging.conversation.unassigned";
 }) {
   try {
-    let recipients: string[] = [];
-    let type: KnownNotificationType = NOTIFICATION_TYPES.conversationAssigned;
-    let title = "Conversation assigned";
-    let body = "A company conversation was assigned to you.";
+    const notifications: CreateNotificationInput[] = [];
+    const managerRecipientIds = await loadActiveOrganizationUserIds({
+      organizationId: input.organizationId,
+      roles: ["owner", "admin", "manager"],
+    });
+    const managerRecipientSet = new Set(managerRecipientIds);
 
-    if (input.eventType === "messaging.conversation.unassigned") {
-      recipients = input.previousAssigneeUserId ? [input.previousAssigneeUserId] : [];
-      type = NOTIFICATION_TYPES.conversationUnassigned;
-      title = "Conversation unassigned";
-      body = "A company conversation was moved back to the shared queue.";
-    } else if (input.eventType === "messaging.conversation.reassigned") {
-      recipients = uniqueRecipients(
-        [input.previousAssigneeUserId, input.nextAssigneeUserId],
-        input.actorUserId
-      );
-      type = NOTIFICATION_TYPES.conversationReassigned;
-      title = "Conversation reassigned";
-      body = "A company conversation assignment was updated.";
-    } else {
-      recipients = input.nextAssigneeUserId ? [input.nextAssigneeUserId] : [];
-      type = NOTIFICATION_TYPES.conversationAssigned;
-      title = "Conversation assigned";
-      body = "A new company conversation was assigned to you.";
-    }
+    const nextAssigneeLabel = trimTo(input.nextAssigneeDisplayName ?? "", 60) || "a team member";
+    const previousAssigneeLabel =
+      trimTo(input.previousAssigneeDisplayName ?? "", 60) || "the previous assignee";
 
-    const targetRecipients = uniqueRecipients(recipients, input.actorUserId);
-    if (targetRecipients.length === 0) {
-      return { ok: true as const, createdCount: 0 };
-    }
-
-    return createNotifications({
-      notifications: targetRecipients.map((recipientUserId) => ({
-        userId: recipientUserId,
+    if (input.eventType === "messaging.conversation.assigned" && input.nextAssigneeUserId) {
+      notifications.push({
+        userId: input.nextAssigneeUserId,
         organizationId: input.organizationId,
-        type,
-        title,
-        body,
+        type: NOTIFICATION_TYPES.conversationAssigned,
+        title: "Conversation assigned to you",
+        body: "A shared inquiry was assigned to you and needs follow-up.",
         entityType: "conversation",
         entityId: input.conversationId,
         actionUrl: `/messages?conversationId=${input.conversationId}`,
-        priority: 2,
+        priority: 3,
         actorUserId: input.actorUserId,
         metadata: {
           conversation_id: input.conversationId,
@@ -238,7 +324,190 @@ export async function notifyConversationRoutingChanged(input: {
           next_assignee_user_id: input.nextAssigneeUserId,
           event_type: input.eventType,
         },
-      })),
+      });
+
+      for (const managerRecipientId of managerRecipientSet) {
+        if (
+          managerRecipientId === input.nextAssigneeUserId ||
+          managerRecipientId === input.actorUserId
+        ) {
+          continue;
+        }
+
+        notifications.push({
+          userId: managerRecipientId,
+          organizationId: input.organizationId,
+          type: NOTIFICATION_TYPES.conversationAssigned,
+          title: "Conversation assigned",
+          body: `A company conversation was assigned to ${nextAssigneeLabel}.`,
+          entityType: "conversation",
+          entityId: input.conversationId,
+          actionUrl: `/messages?conversationId=${input.conversationId}`,
+          priority: 2,
+          actorUserId: input.actorUserId,
+          metadata: {
+            conversation_id: input.conversationId,
+            listing_id: input.listingId,
+            previous_assignee_user_id: input.previousAssigneeUserId,
+            next_assignee_user_id: input.nextAssigneeUserId,
+            event_type: input.eventType,
+          },
+        });
+      }
+    } else if (input.eventType === "messaging.conversation.reassigned") {
+      if (input.nextAssigneeUserId) {
+        notifications.push({
+          userId: input.nextAssigneeUserId,
+          organizationId: input.organizationId,
+          type: NOTIFICATION_TYPES.conversationReassigned,
+          title: "Conversation reassigned to you",
+          body: "A company inquiry was reassigned to you and needs attention.",
+          entityType: "conversation",
+          entityId: input.conversationId,
+          actionUrl: `/messages?conversationId=${input.conversationId}`,
+          priority: 3,
+          actorUserId: input.actorUserId,
+          metadata: {
+            conversation_id: input.conversationId,
+            listing_id: input.listingId,
+            previous_assignee_user_id: input.previousAssigneeUserId,
+            next_assignee_user_id: input.nextAssigneeUserId,
+            event_type: input.eventType,
+          },
+        });
+      }
+
+      if (
+        input.previousAssigneeUserId &&
+        input.previousAssigneeUserId !== input.nextAssigneeUserId
+      ) {
+        notifications.push({
+          userId: input.previousAssigneeUserId,
+          organizationId: input.organizationId,
+          type: NOTIFICATION_TYPES.conversationUnassigned,
+          title: "Conversation reassigned",
+          body: "This conversation was reassigned to another company member.",
+          entityType: "conversation",
+          entityId: input.conversationId,
+          actionUrl: `/messages?conversationId=${input.conversationId}`,
+          priority: 2,
+          actorUserId: input.actorUserId,
+          metadata: {
+            conversation_id: input.conversationId,
+            listing_id: input.listingId,
+            previous_assignee_user_id: input.previousAssigneeUserId,
+            next_assignee_user_id: input.nextAssigneeUserId,
+            event_type: input.eventType,
+          },
+        });
+      }
+
+      for (const managerRecipientId of managerRecipientSet) {
+        if (
+          managerRecipientId === input.actorUserId ||
+          managerRecipientId === input.previousAssigneeUserId ||
+          managerRecipientId === input.nextAssigneeUserId
+        ) {
+          continue;
+        }
+
+        notifications.push({
+          userId: managerRecipientId,
+          organizationId: input.organizationId,
+          type: NOTIFICATION_TYPES.conversationReassigned,
+          title: "Conversation reassigned",
+          body: `A company conversation was reassigned from ${previousAssigneeLabel} to ${nextAssigneeLabel}.`,
+          entityType: "conversation",
+          entityId: input.conversationId,
+          actionUrl: `/messages?conversationId=${input.conversationId}`,
+          priority: 2,
+          actorUserId: input.actorUserId,
+          metadata: {
+            conversation_id: input.conversationId,
+            listing_id: input.listingId,
+            previous_assignee_user_id: input.previousAssigneeUserId,
+            next_assignee_user_id: input.nextAssigneeUserId,
+            event_type: input.eventType,
+          },
+        });
+      }
+    } else if (input.eventType === "messaging.conversation.unassigned") {
+      if (input.previousAssigneeUserId) {
+        notifications.push({
+          userId: input.previousAssigneeUserId,
+          organizationId: input.organizationId,
+          type: NOTIFICATION_TYPES.conversationUnassigned,
+          title: "Conversation moved to shared queue",
+          body: "This company conversation is no longer assigned to you.",
+          entityType: "conversation",
+          entityId: input.conversationId,
+          actionUrl: `/messages?conversationId=${input.conversationId}`,
+          priority: 2,
+          actorUserId: input.actorUserId,
+          metadata: {
+            conversation_id: input.conversationId,
+            listing_id: input.listingId,
+            previous_assignee_user_id: input.previousAssigneeUserId,
+            next_assignee_user_id: input.nextAssigneeUserId,
+            event_type: input.eventType,
+          },
+        });
+      }
+
+      for (const managerRecipientId of managerRecipientSet) {
+        if (
+          managerRecipientId === input.actorUserId ||
+          managerRecipientId === input.previousAssigneeUserId
+        ) {
+          continue;
+        }
+
+        notifications.push({
+          userId: managerRecipientId,
+          organizationId: input.organizationId,
+          type: NOTIFICATION_TYPES.conversationUnassigned,
+          title: "Conversation moved to shared queue",
+          body: "A company conversation was returned to the shared queue.",
+          entityType: "conversation",
+          entityId: input.conversationId,
+          actionUrl: `/messages?conversationId=${input.conversationId}`,
+          priority: 2,
+          actorUserId: input.actorUserId,
+          metadata: {
+            conversation_id: input.conversationId,
+            listing_id: input.listingId,
+            previous_assignee_user_id: input.previousAssigneeUserId,
+            next_assignee_user_id: input.nextAssigneeUserId,
+            event_type: input.eventType,
+          },
+        });
+      }
+    }
+
+    const dedupedNotifications = new Map<
+      string,
+      CreateNotificationInput & { type: KnownNotificationType }
+    >();
+    for (const notification of notifications) {
+      if (
+        notification.userId === input.actorUserId ||
+        dedupedNotifications.has(`${notification.userId}:${notification.type}`)
+      ) {
+        continue;
+      }
+
+      dedupedNotifications.set(`${notification.userId}:${notification.type}`, {
+        ...notification,
+        type: notification.type as KnownNotificationType,
+      });
+    }
+
+    if (dedupedNotifications.size === 0) {
+      return { ok: true as const, createdCount: 0 };
+    }
+
+    return createNotifications({
+      notifications: [...dedupedNotifications.values()],
     });
   } catch {
     return { ok: false as const, message: "notification_routing_delivery_failed" };

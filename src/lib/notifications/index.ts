@@ -17,6 +17,7 @@ export {
 
 export {
   notifyCompanyInviteReceived,
+  notifyConversationInquiryCreated,
   notifyConversationMessageReceived,
   notifyConversationRoutingChanged,
   notifyListingWorkflowTransition,

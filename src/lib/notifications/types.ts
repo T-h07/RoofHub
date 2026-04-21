@@ -1,6 +1,7 @@
 import type { Tables } from "@/types/database";
 
 export const NOTIFICATION_TYPES = {
+  inquiryReceived: "messaging.inquiry.received",
   messageReceived: "messaging.message.received",
   conversationAssigned: "messaging.conversation.assigned",
   conversationReassigned: "messaging.conversation.reassigned",

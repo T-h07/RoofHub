@@ -27,6 +27,7 @@ const CATEGORY_LABELS: Record<NotificationCategory, string> = {
 };
 
 const TYPE_LABELS: Record<string, string> = {
+  [NOTIFICATION_TYPES.inquiryReceived]: "New inquiry",
   [NOTIFICATION_TYPES.messageReceived]: "Message",
   [NOTIFICATION_TYPES.conversationAssigned]: "Assigned",
   [NOTIFICATION_TYPES.conversationReassigned]: "Reassigned",

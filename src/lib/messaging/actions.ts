@@ -5,6 +5,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { AUDIT_EVENT_TYPES, recordSecurityAuditEvent } from "@/lib/security/audit";
 import { enforceTrafficControl, TRAFFIC_CONTROL_RULES } from "@/lib/security/traffic-control";
 import {
+  notifyConversationInquiryCreated,
   notifyConversationMessageReceived,
   notifyConversationRoutingChanged,
 } from "@/lib/notifications";
@@ -49,7 +50,12 @@ const MESSAGE_SELECT = "id, conversation_id, sender_id, body, read_at, created_a
 
 type ConversationEligibilityRow = Pick<
   Tables<"listings">,
-  "id" | "owner_id" | "listing_status" | "organization_id" | "assigned_agent_user_id"
+  | "id"
+  | "owner_id"
+  | "title"
+  | "listing_status"
+  | "organization_id"
+  | "assigned_agent_user_id"
 >;
 
 type AccessibleConversationRow = Pick<
@@ -126,7 +132,7 @@ async function loadConversationEligibilityListing(
 ) {
   const { data, error } = await supabase
     .from("listings")
-    .select("id, owner_id, listing_status, organization_id, assigned_agent_user_id")
+    .select("id, owner_id, title, listing_status, organization_id, assigned_agent_user_id")
     .eq("id", listingId)
     .maybeSingle();
 
@@ -317,6 +323,17 @@ export async function createOrGetConversationForListingAction(
       },
     });
 
+    await notifyConversationInquiryCreated({
+      conversationId: data.id,
+      listingId: listing.id,
+      listingTitle: listing.title,
+      ownerMode: data.owner_mode,
+      organizationId: data.organization_id,
+      providerUserId: data.provider_id,
+      seekerUserId: data.seeker_id,
+      assignedMemberUserId: data.assigned_member_user_id,
+    });
+
     return {
       ok: true,
       data: {
@@ -466,6 +483,13 @@ export async function sendConversationMessageAction(
     return toTrafficFailure(messagePerUserLimit);
   }
 
+  const existingMessageCountResult = await supabase
+    .from("messages")
+    .select("id", { count: "exact", head: true })
+    .eq("conversation_id", conversation.id);
+  const isFirstMessageInConversation =
+    !existingMessageCountResult.error && (existingMessageCountResult.count ?? 0) === 0;
+
   const { data, error } = await supabase
     .from("messages")
     .insert({
@@ -523,6 +547,7 @@ export async function sendConversationMessageAction(
     senderDisplayName: profile.display_name,
     messageId: data.id,
     messageBody: normalizedBody,
+    isFirstMessageInConversation,
   });
 
   return {
@@ -787,7 +812,9 @@ export async function updateConversationRoutingAction(
     organizationId: organization.id,
     actorUserId: profile.id,
     previousAssigneeUserId,
+    previousAssigneeDisplayName,
     nextAssigneeUserId: requestedAssignee?.userId ?? null,
+    nextAssigneeDisplayName: requestedAssignee?.displayName ?? null,
     eventType,
   });
 
