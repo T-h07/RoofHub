@@ -5,18 +5,14 @@ import { cookies } from "next/headers";
 
 import { getCurrentUserProfile } from "@/lib/auth/profile";
 import {
-  type AppRole,
   isAdminRole,
+  isEditableAppRole,
+  type AppRole,
   type PreferredContactMethod,
   type ProviderAccountType,
 } from "@/lib/auth/roles";
 import { AUDIT_EVENT_TYPES, recordSecurityAuditEvent } from "@/lib/security/audit";
 import { createServerSupabaseClient } from "@/lib/supabase";
-import {
-  createSchemaDriftMessage,
-  isSupabaseSchemaDriftError,
-  logSupabaseSchemaDrift,
-} from "@/lib/supabase/schema-drift";
 import {
   isMissingSupabaseAdminUrlError,
   isMissingSupabaseServiceRoleError,
@@ -31,45 +27,47 @@ import {
 } from "@/lib/supabase/storage/profile-avatars";
 
 import type {
-  ProfileActionState,
+  AccountModeActionState,
+  ContactPreferencesActionState,
   ProfileAvatarActionState,
   ProfileDeleteActionState,
+  PublicProfileActionState,
 } from "./types";
-import { readProfileFormInput, validateProfileFormInput } from "./validation";
+import {
+  readAccountModeFormInput,
+  readContactPreferencesFormInput,
+  readPublicProfileFormInput,
+  validateAccountModeFormInput,
+  validateContactPreferencesFormInput,
+  validatePublicProfileFormInput,
+} from "./validation";
 
 type ProfileUpdatePayload = {
-  display_name: string;
-  bio: string | null;
-  phone: string | null;
-  preferred_contact_method: PreferredContactMethod | null;
-  role: AppRole;
+  display_name?: string;
+  bio?: string | null;
+  phone?: string | null;
+  preferred_contact_method?: PreferredContactMethod | null;
+  role?: AppRole;
   provider_account_type?: ProviderAccountType;
   contact_methods?: PreferredContactMethod[];
   contact_email?: string | null;
   whatsapp_phone?: string | null;
   viber_phone?: string | null;
+  avatar_url?: string | null;
 };
 
-function toValidationErrorState(errors: ProfileActionState["errors"]): ProfileActionState {
-  return {
-    status: "error",
-    errors,
-    message: "Check the highlighted profile fields and try again.",
-  };
-}
-
-function toProfileSaveError(message: string) {
+function toProfileUpdateError(message: string, fallbackMessage: string) {
   const normalized = message.toLowerCase();
 
   if (normalized.includes("row-level security") || normalized.includes("permission denied")) {
-    return "You do not have permission to update this profile.";
+    return "You do not have permission to update this account setting.";
   }
 
   if (normalized.includes("check constraint")) {
-    return "One or more profile values are invalid. Review your inputs and try again.";
+    return "One or more values are invalid. Review the section and try again.";
   }
 
-  return "Profile update failed. Please try again.";
+  return fallbackMessage;
 }
 
 function toAvatarUploadError(message: string) {
@@ -88,7 +86,7 @@ function toAvatarUploadError(message: string) {
   }
 
   if (normalized.includes("bucket") && normalized.includes("not found")) {
-    return "Profile photo storage is not configured yet. Run the latest Supabase migrations and retry.";
+    return "Profile photo storage is not configured yet. Apply the latest Supabase migrations and retry.";
   }
 
   if (
@@ -200,45 +198,132 @@ async function clearAuthCookies() {
   }
 }
 
-export async function updateProfileAction(
-  _: ProfileActionState,
-  formData: FormData
-): Promise<ProfileActionState> {
+async function getProfileMutationContext() {
   const supabase = await createServerSupabaseClient();
   const profileResult = await getCurrentUserProfile(supabase);
 
   if (!profileResult.ok) {
     return {
-      status: "error",
+      ok: false as const,
       message: profileResult.message,
     };
   }
 
-  const currentProfile = profileResult.profile;
-  const input = readProfileFormInput(formData, currentProfile.role);
-  const validationErrors = validateProfileFormInput(input);
+  return {
+    ok: true as const,
+    supabase,
+    profile: profileResult.profile,
+    user: profileResult.user,
+  };
+}
 
-  if (Object.keys(validationErrors).length > 0) {
-    return toValidationErrorState(validationErrors);
-  }
+async function persistProfileUpdate(
+  userId: string,
+  payload: ProfileUpdatePayload
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const supabase = await createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("profiles")
+    .update(payload)
+    .eq("id", userId)
+    .select("id")
+    .limit(1)
+    .maybeSingle();
 
-  const ownsCompanyWorkspace = currentProfile.provider_account_type === "company";
-
-  if (ownsCompanyWorkspace && input.role !== "provider") {
-    return toValidationErrorState({
-      role: "Company workspace owners must keep provider role enabled.",
+  if (error) {
+    console.error("[Profile] update failed", {
+      user_id: userId,
+      error_code: error.code ?? null,
+      error_message: error.message,
+      payload_keys: Object.keys(payload),
     });
+
+    return {
+      ok: false,
+      message: error.message,
+    };
   }
 
-  const nextRole = isAdminRole(currentProfile.role) ? currentProfile.role : input.role;
-  const nextProviderAccountType: ProviderAccountType =
-    nextRole === "provider"
-      ? ownsCompanyWorkspace
-        ? "company"
-        : "individual"
-      : "individual";
-  const normalizedContactMethods: PreferredContactMethod[] =
-    input.contactMethods.length > 0 ? input.contactMethods : ["in_app"];
+  if (!data) {
+    return {
+      ok: false,
+      message: "Profile update was rejected for this account. Refresh and retry.",
+    };
+  }
+
+  return { ok: true };
+}
+
+function revalidateProfileSurface() {
+  revalidatePath("/", "layout");
+  revalidatePath("/profile");
+}
+
+export async function updatePublicProfileAction(
+  _: PublicProfileActionState,
+  formData: FormData
+): Promise<PublicProfileActionState> {
+  const context = await getProfileMutationContext();
+  if (!context.ok) {
+    return {
+      status: "error",
+      message: context.message,
+    };
+  }
+
+  const input = readPublicProfileFormInput(formData);
+  const validationErrors = validatePublicProfileFormInput(input);
+  if (Object.keys(validationErrors).length > 0) {
+    return {
+      status: "error",
+      errors: validationErrors,
+      message: "Check the highlighted public profile fields and try again.",
+    };
+  }
+
+  const result = await persistProfileUpdate(context.profile.id, {
+    display_name: input.displayName,
+    bio: input.bio,
+  });
+
+  if (!result.ok) {
+    return {
+      status: "error",
+      message: toProfileUpdateError(result.message, "Public profile update failed. Please try again."),
+    };
+  }
+
+  revalidateProfileSurface();
+
+  return {
+    status: "success",
+    message: "Public profile saved.",
+  };
+}
+
+export async function updateContactPreferencesAction(
+  _: ContactPreferencesActionState,
+  formData: FormData
+): Promise<ContactPreferencesActionState> {
+  const context = await getProfileMutationContext();
+  if (!context.ok) {
+    return {
+      status: "error",
+      message: context.message,
+    };
+  }
+
+  const input = readContactPreferencesFormInput(formData);
+  const validationErrors = validateContactPreferencesFormInput(input);
+  if (Object.keys(validationErrors).length > 0) {
+    return {
+      status: "error",
+      errors: validationErrors,
+      message: "Check the highlighted contact preference fields and try again.",
+    };
+  }
+
+  const normalizedContactMethods = input.contactMethods;
   const normalizedPreferredContactMethod =
     input.preferredContactMethod && normalizedContactMethods.includes(input.preferredContactMethod)
       ? input.preferredContactMethod
@@ -248,91 +333,117 @@ export async function updateProfileAction(
   const normalizedViberPhone =
     input.viberPhone ?? (normalizedContactMethods.includes("viber") ? input.phone : null);
 
-  const baseUpdatePayload = {
-    display_name: input.displayName,
-    bio: input.bio,
+  const result = await persistProfileUpdate(context.profile.id, {
     phone: input.phone,
     preferred_contact_method: normalizedPreferredContactMethod,
-    role: nextRole,
-  } satisfies ProfileUpdatePayload;
-  const extendedUpdatePayload = {
-    ...baseUpdatePayload,
-    provider_account_type: nextProviderAccountType,
     contact_methods: normalizedContactMethods,
     contact_email: input.contactEmail,
     whatsapp_phone: normalizedWhatsappPhone,
     viber_phone: normalizedViberPhone,
-  } satisfies ProfileUpdatePayload;
+  });
 
-  const { data: updatedProfile, error } = await supabase
-    .from("profiles")
-    .update(extendedUpdatePayload)
-    .eq("id", currentProfile.id)
-    .select("id")
-    .limit(1)
-    .maybeSingle();
-
-  if (error) {
-    const isSchemaDrift = isSupabaseSchemaDriftError(error, [
-      "profiles",
-      "provider_account_type",
-      "contact_methods",
-      "contact_email",
-      "whatsapp_phone",
-      "viber_phone",
-      "preferred_contact_method",
-    ]);
-
-    if (isSchemaDrift) {
-      logSupabaseSchemaDrift("profiles", error, {
-        user_id: currentProfile.id,
-        action: "update_profile",
-      });
-    }
-
-    console.error("[Profile] update failed", {
-      user_id: currentProfile.id,
-      error_code: error.code ?? null,
-      error_message: error.message,
-      reason_category: isSchemaDrift ? "schema_drift" : "query_failed",
-    });
-
+  if (!result.ok) {
     return {
       status: "error",
-      message: isSchemaDrift ? createSchemaDriftMessage("Profile") : toProfileSaveError(error.message),
+      message: toProfileUpdateError(result.message, "Contact preferences update failed. Please try again."),
     };
   }
 
-  if (!updatedProfile) {
+  revalidateProfileSurface();
+
+  return {
+    status: "success",
+    message: "Contact preferences saved.",
+  };
+}
+
+export async function updateAccountModeAction(
+  _: AccountModeActionState,
+  formData: FormData
+): Promise<AccountModeActionState> {
+  const context = await getProfileMutationContext();
+  if (!context.ok) {
     return {
       status: "error",
-      message: "Profile update was rejected for this account. Refresh and retry.",
+      message: context.message,
     };
   }
 
-  if (nextRole !== currentProfile.role) {
+  const input = readAccountModeFormInput(formData);
+  const validationErrors = validateAccountModeFormInput(input);
+  if (Object.keys(validationErrors).length > 0) {
+    return {
+      status: "error",
+      errors: validationErrors,
+      message: "Check the account mode selection and try again.",
+    };
+  }
+
+  if (!isEditableAppRole(input.role) && !isAdminRole(context.profile.role)) {
+    return {
+      status: "error",
+      errors: {
+        role: "Role selection is invalid.",
+      },
+      message: "Check the account mode selection and try again.",
+    };
+  }
+
+  const ownsCompanyWorkspace = context.profile.provider_account_type === "company";
+  if (ownsCompanyWorkspace && input.role !== "provider") {
+    return {
+      status: "error",
+      errors: {
+        role: "Company workspace owners must keep provider role enabled.",
+      },
+      message: "Company-linked accounts must remain in provider mode.",
+    };
+  }
+
+  const nextRole = isAdminRole(context.profile.role)
+    ? context.profile.role
+    : (input.role as AppRole);
+  const nextProviderAccountType: ProviderAccountType =
+    nextRole === "provider"
+      ? ownsCompanyWorkspace
+        ? "company"
+        : "individual"
+      : "individual";
+
+  const result = await persistProfileUpdate(context.profile.id, {
+    role: nextRole,
+    provider_account_type: nextProviderAccountType,
+  });
+
+  if (!result.ok) {
+    return {
+      status: "error",
+      message: toProfileUpdateError(result.message, "Account mode update failed. Please try again."),
+    };
+  }
+
+  if (nextRole !== context.profile.role) {
     await recordSecurityAuditEvent({
-      supabase,
+      supabase: context.supabase,
       event: {
         eventType: AUDIT_EVENT_TYPES.profileRoleChanged,
-        actorUserId: currentProfile.id,
+        actorUserId: context.profile.id,
         actorRole: nextRole,
         targetType: "profile",
-        targetId: currentProfile.id,
+        targetId: context.profile.id,
         metadata: {
-          previous_role: currentProfile.role,
+          previous_role: context.profile.role,
           next_role: nextRole,
         },
       },
     });
   }
 
-  revalidatePath("/", "layout");
-  revalidatePath("/profile");
+  revalidateProfileSurface();
 
   return {
     status: "success",
-    message: "Profile saved successfully.",
+    message: "Account mode saved.",
   };
 }
 
@@ -340,13 +451,11 @@ export async function uploadProfileAvatarAction(
   _: ProfileAvatarActionState,
   formData: FormData
 ): Promise<ProfileAvatarActionState> {
-  const supabase = await createServerSupabaseClient();
-  const profileResult = await getCurrentUserProfile(supabase);
-
-  if (!profileResult.ok) {
+  const context = await getProfileMutationContext();
+  if (!context.ok) {
     return {
       status: "error",
-      message: profileResult.message,
+      message: context.message,
     };
   }
 
@@ -359,26 +468,20 @@ export async function uploadProfileAvatarAction(
   }
 
   try {
-    const uploaded = await uploadProfileAvatar(supabase, {
-      userId: profileResult.profile.id,
+    const uploaded = await uploadProfileAvatar(context.supabase, {
+      userId: context.profile.id,
       file,
     });
 
-    const previousAvatarUrl = profileResult.profile.avatar_url;
-    const { data: updatedProfile, error: updateError } = await supabase
-      .from("profiles")
-      .update({
-        avatar_url: uploaded.publicUrl,
-      })
-      .eq("id", profileResult.profile.id)
-      .select("id")
-      .limit(1)
-      .maybeSingle();
+    const previousAvatarUrl = context.profile.avatar_url;
+    const updateResult = await persistProfileUpdate(context.profile.id, {
+      avatar_url: uploaded.publicUrl,
+    });
 
-    if (updateError) {
+    if (!updateResult.ok) {
       try {
-        await removeProfileAvatarByPath(supabase, {
-          userId: profileResult.profile.id,
+        await removeProfileAvatarByPath(context.supabase, {
+          userId: context.profile.id,
           storagePath: uploaded.storagePath,
         });
       } catch {
@@ -387,30 +490,14 @@ export async function uploadProfileAvatarAction(
 
       return {
         status: "error",
-        message: toAvatarUploadError(updateError.message),
-      };
-    }
-
-    if (!updatedProfile) {
-      try {
-        await removeProfileAvatarByPath(supabase, {
-          userId: profileResult.profile.id,
-          storagePath: uploaded.storagePath,
-        });
-      } catch {
-        // Best effort rollback of uploaded object when profile row update fails.
-      }
-
-      return {
-        status: "error",
-        message: "Profile photo update was rejected for this account. Refresh and retry.",
+        message: toAvatarUploadError(updateResult.message),
       };
     }
 
     if (previousAvatarUrl && previousAvatarUrl !== uploaded.publicUrl) {
       try {
-        await removeProfileAvatarByUrl(supabase, {
-          userId: profileResult.profile.id,
+        await removeProfileAvatarByUrl(context.supabase, {
+          userId: context.profile.id,
           avatarUrl: previousAvatarUrl,
         });
       } catch {
@@ -418,8 +505,7 @@ export async function uploadProfileAvatarAction(
       }
     }
 
-    revalidatePath("/", "layout");
-    revalidatePath("/profile");
+    revalidateProfileSurface();
 
     return {
       status: "success",
@@ -434,20 +520,18 @@ export async function uploadProfileAvatarAction(
 }
 
 export async function removeProfileAvatarAction(
-  state: ProfileAvatarActionState
+  currentState: ProfileAvatarActionState
 ): Promise<ProfileAvatarActionState> {
-  void state;
-  const supabase = await createServerSupabaseClient();
-  const profileResult = await getCurrentUserProfile(supabase);
-
-  if (!profileResult.ok) {
+  void currentState;
+  const context = await getProfileMutationContext();
+  if (!context.ok) {
     return {
       status: "error",
-      message: profileResult.message,
+      message: context.message,
     };
   }
 
-  const currentAvatarUrl = profileResult.profile.avatar_url;
+  const currentAvatarUrl = context.profile.avatar_url;
   if (!currentAvatarUrl) {
     return {
       status: "success",
@@ -455,41 +539,27 @@ export async function removeProfileAvatarAction(
     };
   }
 
-  const { data: updatedProfile, error: updateError } = await supabase
-    .from("profiles")
-    .update({
-      avatar_url: null,
-    })
-    .eq("id", profileResult.profile.id)
-    .select("id")
-    .limit(1)
-    .maybeSingle();
+  const updateResult = await persistProfileUpdate(context.profile.id, {
+    avatar_url: null,
+  });
 
-  if (updateError) {
+  if (!updateResult.ok) {
     return {
       status: "error",
-      message: toAvatarRemoveError(updateError.message),
-    };
-  }
-
-  if (!updatedProfile) {
-    return {
-      status: "error",
-      message: "Profile photo removal was rejected for this account. Refresh and retry.",
+      message: toAvatarRemoveError(updateResult.message),
     };
   }
 
   try {
-    await removeProfileAvatarByUrl(supabase, {
-      userId: profileResult.profile.id,
+    await removeProfileAvatarByUrl(context.supabase, {
+      userId: context.profile.id,
       avatarUrl: currentAvatarUrl,
     });
   } catch {
     // Non-fatal cleanup; avatar is already detached from the profile row.
   }
 
-  revalidatePath("/", "layout");
-  revalidatePath("/profile");
+  revalidateProfileSurface();
 
   return {
     status: "success",
@@ -511,17 +581,15 @@ export async function deleteAccountAction(
     };
   }
 
-  const supabase = await createServerSupabaseClient();
-  const profileResult = await getCurrentUserProfile(supabase);
-
-  if (!profileResult.ok) {
+  const context = await getProfileMutationContext();
+  if (!context.ok) {
     return {
       status: "error",
-      message: profileResult.message,
+      message: context.message,
     };
   }
 
-  const userEmail = profileResult.user.email?.trim().toLowerCase() ?? null;
+  const userEmail = context.user.email?.trim().toLowerCase() ?? null;
   if (userEmail && confirmEmail !== userEmail) {
     return {
       status: "error",
@@ -531,12 +599,11 @@ export async function deleteAccountAction(
 
   try {
     await hardDeleteAccount({
-      userId: profileResult.profile.id,
+      userId: context.profile.id,
     });
 
     await clearAuthCookies();
-    revalidatePath("/", "layout");
-    revalidatePath("/profile");
+    revalidateProfileSurface();
 
     return {
       status: "success",
@@ -545,7 +612,7 @@ export async function deleteAccountAction(
     };
   } catch (error) {
     console.error("[Profile][DeleteAccount] hard delete failed", {
-      user_id: profileResult.profile.id,
+      user_id: context.profile.id,
       reason_category: getDeleteAccountReasonCategory(error),
     });
 

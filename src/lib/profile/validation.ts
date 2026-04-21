@@ -1,18 +1,28 @@
 import {
   isEditableAppRole,
   isPreferredContactMethod,
-  type AppRole,
   type PreferredContactMethod,
 } from "@/lib/auth/roles";
 
-import type { ProfileFormErrors, ProfileFormInput } from "./types";
+import type {
+  AccountModeActionState,
+  AccountModeFormInput,
+  ContactPreferencesActionState,
+  ContactPreferencesFormInput,
+  PublicProfileActionState,
+  PublicProfileFormInput,
+} from "./types";
 
 const DISPLAY_NAME_MIN = 2;
 const DISPLAY_NAME_MAX = 80;
 const BIO_MAX = 600;
 const PHONE_PATTERN = /^[+0-9().\-\s]{6,24}$/;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const PHONE_REQUIRED_CONTACT_METHODS = new Set(["phone", "whatsapp", "viber"]);
+const PHONE_REQUIRED_CONTACT_METHODS = new Set<PreferredContactMethod>([
+  "phone",
+  "whatsapp",
+  "viber",
+]);
 const CONTACT_METHOD_OPTIONS: PreferredContactMethod[] = [
   "in_app",
   "phone",
@@ -29,59 +39,15 @@ function toNullable(value: string) {
   return value.length > 0 ? value : null;
 }
 
-export function readProfileFormInput(formData: FormData, currentRole: AppRole): ProfileFormInput {
-  const displayName = normalizeTrimmed(formData.get("displayName"));
-  const bio = toNullable(normalizeTrimmed(formData.get("bio")));
-  const phone = toNullable(normalizeTrimmed(formData.get("phone")));
-  const contactEmail = toNullable(normalizeTrimmed(formData.get("contactEmail")))?.toLowerCase() ?? null;
-  const whatsappPhone = toNullable(normalizeTrimmed(formData.get("whatsappPhone")));
-  const viberPhone = toNullable(normalizeTrimmed(formData.get("viberPhone")));
-
-  const rawContactMethods = formData
-    .getAll("contactMethods")
-    .map((entry) => (typeof entry === "string" ? entry.trim() : ""))
-    .filter(Boolean);
-
-  const contactMethods = Array.from(
-    new Set(
-      rawContactMethods.filter((method): method is PreferredContactMethod =>
-        isPreferredContactMethod(method)
-      )
-    )
-  );
-
-  const preferredContactMethodValue = normalizeTrimmed(formData.get("preferredContactMethod"));
-  const preferredContactMethod = preferredContactMethodValue
-    ? isPreferredContactMethod(preferredContactMethodValue)
-      ? preferredContactMethodValue
-      : null
-    : null;
-  const effectiveContactMethods =
-    preferredContactMethod && !contactMethods.includes(preferredContactMethod)
-      ? Array.from(new Set([preferredContactMethod, ...contactMethods]))
-      : contactMethods;
-
-  const roleValue = normalizeTrimmed(formData.get("role"));
-  const role =
-    roleValue && isEditableAppRole(roleValue)
-      ? roleValue
-      : (currentRole as ProfileFormInput["role"]);
-
+export function readPublicProfileFormInput(formData: FormData): PublicProfileFormInput {
   return {
-    displayName,
-    bio,
-    phone,
-    contactMethods: effectiveContactMethods,
-    preferredContactMethod,
-    contactEmail,
-    whatsappPhone,
-    viberPhone,
-    role,
+    displayName: normalizeTrimmed(formData.get("displayName")),
+    bio: toNullable(normalizeTrimmed(formData.get("bio"))),
   };
 }
 
-export function validateProfileFormInput(input: ProfileFormInput) {
-  const errors: ProfileFormErrors = {};
+export function validatePublicProfileFormInput(input: PublicProfileFormInput) {
+  const errors: PublicProfileActionState["errors"] = {};
 
   if (
     !input.displayName ||
@@ -95,41 +61,82 @@ export function validateProfileFormInput(input: ProfileFormInput) {
     errors.bio = `Bio must be ${BIO_MAX} characters or fewer.`;
   }
 
-  if (input.phone && !PHONE_PATTERN.test(input.phone)) {
-    errors.phone =
-      "Phone should include digits and optional +, spaces, parentheses, dots, or dashes.";
-  }
+  return errors;
+}
 
-  if (!Array.isArray(input.contactMethods) || input.contactMethods.length === 0) {
+export function readContactPreferencesFormInput(
+  formData: FormData
+): ContactPreferencesFormInput {
+  const rawContactMethods = formData
+    .getAll("contactMethods")
+    .map((entry) => (typeof entry === "string" ? entry.trim() : ""))
+    .filter(Boolean);
+
+  const rawPreferredContactMethod = toNullable(
+    normalizeTrimmed(formData.get("preferredContactMethod"))
+  );
+
+  return {
+    phone: toNullable(normalizeTrimmed(formData.get("phone"))),
+    rawContactMethods,
+    contactMethods: Array.from(
+      new Set(
+        rawContactMethods.filter((method): method is PreferredContactMethod =>
+          isPreferredContactMethod(method)
+        )
+      )
+    ),
+    rawPreferredContactMethod,
+    preferredContactMethod:
+      rawPreferredContactMethod && isPreferredContactMethod(rawPreferredContactMethod)
+        ? rawPreferredContactMethod
+        : null,
+    contactEmail:
+      toNullable(normalizeTrimmed(formData.get("contactEmail")))?.toLowerCase() ?? null,
+    whatsappPhone: toNullable(normalizeTrimmed(formData.get("whatsappPhone"))),
+    viberPhone: toNullable(normalizeTrimmed(formData.get("viberPhone"))),
+  };
+}
+
+export function validateContactPreferencesFormInput(input: ContactPreferencesFormInput) {
+  const errors: ContactPreferencesActionState["errors"] = {};
+
+  if (input.rawContactMethods.length === 0) {
     errors.contactMethods = "Choose at least one contact channel.";
-  } else {
-    const hasInvalidContactMethod = input.contactMethods.some(
-      (method) => !CONTACT_METHOD_OPTIONS.includes(method)
-    );
-    if (hasInvalidContactMethod) {
-      errors.contactMethods = "Contact channels contain an invalid selection.";
-    }
   }
 
-  if (input.preferredContactMethod && !isPreferredContactMethod(input.preferredContactMethod)) {
+  if (input.rawContactMethods.length !== input.contactMethods.length) {
+    errors.contactMethods = "Contact channels contain an invalid selection.";
+  }
+
+  if (
+    input.rawPreferredContactMethod &&
+    !isPreferredContactMethod(input.rawPreferredContactMethod)
+  ) {
     errors.preferredContactMethod = "Select a valid contact method.";
   }
 
   if (
     input.preferredContactMethod &&
-    input.contactMethods.length > 0 &&
     !input.contactMethods.includes(input.preferredContactMethod)
   ) {
     errors.preferredContactMethod =
       "Primary contact method must also be enabled in contact channels.";
   }
 
+  if (input.phone && !PHONE_PATTERN.test(input.phone)) {
+    errors.phone =
+      "Phone should include digits and optional +, spaces, parentheses, dots, or dashes.";
+  }
+
   if (
     input.preferredContactMethod &&
     PHONE_REQUIRED_CONTACT_METHODS.has(input.preferredContactMethod) &&
-    !input.phone
+    !input.phone &&
+    !input.whatsappPhone &&
+    !input.viberPhone
   ) {
-    errors.phone = "Phone is required when phone, WhatsApp, or Viber is preferred.";
+    errors.phone = "Add at least one phone-based contact number for the primary channel.";
   }
 
   if (
@@ -167,9 +174,23 @@ export function validateProfileFormInput(input: ProfileFormInput) {
     errors.viberPhone = "Add a Viber number or fallback phone number.";
   }
 
+  return errors;
+}
+
+export function readAccountModeFormInput(formData: FormData): AccountModeFormInput {
+  return {
+    role: normalizeTrimmed(formData.get("role")),
+  };
+}
+
+export function validateAccountModeFormInput(input: AccountModeFormInput) {
+  const errors: AccountModeActionState["errors"] = {};
+
   if (!isEditableAppRole(input.role) && input.role !== "admin") {
     errors.role = "Role selection is invalid.";
   }
 
   return errors;
 }
+
+export { CONTACT_METHOD_OPTIONS };

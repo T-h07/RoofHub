@@ -1,43 +1,60 @@
-import type { AppRole, PreferredContactMethod } from "@/lib/auth/roles";
+export type ActionStatus = "idle" | "error" | "success";
 
-export type ProfileFieldName =
-  | "displayName"
-  | "bio"
+type ActionState<TFieldName extends string> = {
+  status: ActionStatus;
+  message?: string;
+  errors?: Partial<Record<TFieldName, string>>;
+};
+
+export type PublicProfileFieldName = "displayName" | "bio" | "form";
+export type ContactPreferencesFieldName =
   | "phone"
   | "contactMethods"
   | "preferredContactMethod"
   | "contactEmail"
   | "whatsappPhone"
   | "viberPhone"
-  | "role"
   | "form";
+export type AccountModeFieldName = "role" | "form";
 
-export type ProfileFormErrors = Partial<Record<ProfileFieldName, string>>;
+export type PublicProfileActionState = ActionState<PublicProfileFieldName>;
+export type ContactPreferencesActionState = ActionState<ContactPreferencesFieldName>;
+export type AccountModeActionState = ActionState<AccountModeFieldName>;
 
-export type ProfileActionState = {
-  status: "idle" | "error" | "success";
-  message?: string;
-  errors?: ProfileFormErrors;
-};
-
-export type ProfileFormInput = {
+export type PublicProfileFormInput = {
   displayName: string;
   bio: string | null;
+};
+
+export type ContactPreferencesFormInput = {
   phone: string | null;
-  contactMethods: PreferredContactMethod[];
-  preferredContactMethod: PreferredContactMethod | null;
+  rawContactMethods: string[];
+  contactMethods: import("@/lib/auth/roles").PreferredContactMethod[];
+  rawPreferredContactMethod: string | null;
+  preferredContactMethod: import("@/lib/auth/roles").PreferredContactMethod | null;
   contactEmail: string | null;
   whatsappPhone: string | null;
   viberPhone: string | null;
-  role: AppRole;
 };
 
-export const PROFILE_ACTION_IDLE_STATE: ProfileActionState = {
+export type AccountModeFormInput = {
+  role: string;
+};
+
+export const PUBLIC_PROFILE_ACTION_IDLE_STATE: PublicProfileActionState = {
+  status: "idle",
+};
+
+export const CONTACT_PREFERENCES_ACTION_IDLE_STATE: ContactPreferencesActionState = {
+  status: "idle",
+};
+
+export const ACCOUNT_MODE_ACTION_IDLE_STATE: AccountModeActionState = {
   status: "idle",
 };
 
 export type ProfileAvatarActionState = {
-  status: "idle" | "error" | "success";
+  status: ActionStatus;
   message?: string;
 };
 
@@ -46,7 +63,7 @@ export const PROFILE_AVATAR_ACTION_IDLE_STATE: ProfileAvatarActionState = {
 };
 
 export type ProfileDeleteActionState = {
-  status: "idle" | "error" | "success";
+  status: ActionStatus;
   message?: string;
   redirectTo?: string;
 };

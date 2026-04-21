@@ -6,9 +6,9 @@ import { ProviderManagedListingsList } from "@/components/dashboard/provider-man
 import { ProviderOverviewMetrics } from "@/components/dashboard/provider-overview-metrics";
 import { ProviderAccessRequired } from "@/components/dashboard/provider-access-required";
 import { MainContainer } from "@/components/layout/main-container";
+import { PageIntro, PageSection, PageShell, PageState } from "@/components/layout/page-shell";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
-import { EmptyState } from "@/components/ui/empty-state";
 import {
   PROVIDER_LISTING_FILTER_LABELS,
 } from "@/lib/listings/provider-dashboard/status";
@@ -102,7 +102,7 @@ export default async function DashboardListingsPage({ searchParams }: DashboardL
   if (!context.ok) {
     return (
       <MainContainer size="content">
-        <EmptyState icon={Rows3} title="My listings unavailable" description={context.message} />
+        <PageState icon={Rows3} title="My listings unavailable" description={context.message} />
       </MainContainer>
     );
   }
@@ -145,7 +145,7 @@ export default async function DashboardListingsPage({ searchParams }: DashboardL
   if (!listingCreationContext.ok && context.profile.provider_account_type === "company") {
     return (
       <MainContainer size="content">
-        <EmptyState
+        <PageState
           icon={Rows3}
           title="Company listing inventory requires an active workspace"
           description={listingCreationContext.message}
@@ -179,94 +179,102 @@ export default async function DashboardListingsPage({ searchParams }: DashboardL
 
   return (
     <MainContainer size="wide" className="space-y-5">
-      <section className="border-border/75 bg-card/60 space-y-3 rounded-xl border p-5 sm:p-6">
-        <Badge variant="primary">My listings</Badge>
-        <h1 className="type-page-title max-w-4xl">
-          Manage listings with status-aware lifecycle actions.
-        </h1>
-        <p className="type-body-muted max-w-3xl">
-          Filter by listing state, continue edits, and update lifecycle transitions across individual and
-          company-owned inventory.
-        </p>
-        <div className="flex flex-wrap gap-2">
-          <Link href="/dashboard/listings/new" className={buttonVariants({ size: "sm" })}>
-            <PlusSquare className="size-4" aria-hidden="true" />
-            New listing draft
-          </Link>
-          <Link href="/dashboard" className={buttonVariants({ variant: "outline", size: "sm" })}>
-            Back to dashboard
-          </Link>
-        </div>
-      </section>
-
-      {!overviewResult.ok ? (
-        <EmptyState
-          icon={TriangleAlert}
-          title="Listing metrics unavailable"
-          description={overviewResult.message}
-        />
-      ) : (
-        <ProviderOverviewMetrics metrics={overviewResult.metrics} />
-      )}
-
-      <section className="space-y-3">
-        <div className="flex items-center gap-2">
-          <Badge variant="outline">
-            <ListFilter className="size-3.5" aria-hidden="true" />
-            Status filter
-          </Badge>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {PROVIDER_LISTING_STATUS_FILTERS.map((filter) => {
-            const isActive = filter === statusFilter;
-            const count = overviewResult.ok
-              ? formatFilterCount(filter, overviewResult.metrics)
-              : null;
-
-            return (
-              <Link
-                key={filter}
-                href={buildFilterHref(filter)}
-                className={cn(
-                  buttonVariants({ variant: isActive ? "default" : "outline", size: "sm" }),
-                  "gap-1.5"
-                )}
-              >
-                {PROVIDER_LISTING_FILTER_LABELS[filter]}
-                {count !== null ? (
-                  <span
-                    className={cn(
-                      "rounded-full border px-1.5 py-0.5 text-[10px] leading-none",
-                      isActive
-                        ? "border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground"
-                        : "border-border/70 bg-muted/40 text-muted-foreground"
-                    )}
-                  >
-                    {count}
-                  </span>
-                ) : null}
+      <PageShell>
+        <PageIntro
+          eyebrow={<Badge variant="primary">My listings</Badge>}
+          title="Manage listings with status-aware lifecycle actions."
+          description="Filter by listing state, continue edits, and update lifecycle transitions across individual and company-owned inventory."
+          actions={
+            <>
+              <Link href="/dashboard/listings/new" className={buttonVariants({ size: "sm" })}>
+                <PlusSquare className="size-4" aria-hidden="true" />
+                New listing draft
               </Link>
-            );
-          })}
-        </div>
-      </section>
-
-      {!listingsResult.ok ? (
-        <EmptyState icon={Rows3} title="Managed listings unavailable" description={listingsResult.message} />
-      ) : listingsResult.listings.length === 0 ? (
-        <EmptyState
-          icon={Rows3}
-          title="No listings in this state"
-          description="Adjust filters or create a new listing draft to build your inventory."
-          action={
-            <Link href="/dashboard/listings/new" className={buttonVariants({ size: "sm" })}>
-              Start listing wizard
-            </Link>
+              <Link href="/dashboard" className={buttonVariants({ variant: "outline", size: "sm" })}>
+                Back to dashboard
+              </Link>
+            </>
           }
         />
-      ) : (
-        <ProviderManagedListingsList listings={listingsResult.listings} />
-      )}
+
+        {!overviewResult.ok ? (
+          <PageState
+            icon={TriangleAlert}
+            title="Listing metrics unavailable"
+            description={overviewResult.message}
+          />
+        ) : (
+          <ProviderOverviewMetrics metrics={overviewResult.metrics} />
+        )}
+
+        <PageSection
+          eyebrow={
+            <Badge variant="outline">
+              <ListFilter className="size-3.5" aria-hidden="true" />
+              Status filter
+            </Badge>
+          }
+          title="Inventory filters"
+          description="Keep the lifecycle queue readable by switching between published inventory, drafts, review states, and inactive listings."
+        >
+          <div className="flex flex-wrap gap-2">
+            {PROVIDER_LISTING_STATUS_FILTERS.map((filter) => {
+              const isActive = filter === statusFilter;
+              const count = overviewResult.ok
+                ? formatFilterCount(filter, overviewResult.metrics)
+                : null;
+
+              return (
+                <Link
+                  key={filter}
+                  href={buildFilterHref(filter)}
+                  className={cn(
+                    buttonVariants({ variant: isActive ? "default" : "outline", size: "sm" }),
+                    "gap-1.5"
+                  )}
+                >
+                  {PROVIDER_LISTING_FILTER_LABELS[filter]}
+                  {count !== null ? (
+                    <span
+                      className={cn(
+                        "rounded-full border px-1.5 py-0.5 text-[10px] leading-none",
+                        isActive
+                          ? "border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground"
+                          : "border-border/70 bg-muted/40 text-muted-foreground"
+                      )}
+                    >
+                      {count}
+                    </span>
+                  ) : null}
+                </Link>
+              );
+            })}
+          </div>
+        </PageSection>
+
+        <PageSection
+          eyebrow={<Badge variant="outline">Managed inventory</Badge>}
+          title="Listings in the current queue"
+          description="Review the listings that match the current lifecycle filter and continue directly into edit or workflow actions."
+        >
+          {!listingsResult.ok ? (
+            <PageState icon={Rows3} title="Managed listings unavailable" description={listingsResult.message} />
+          ) : listingsResult.listings.length === 0 ? (
+            <PageState
+              icon={Rows3}
+              title="No listings in this state"
+              description="Adjust filters or create a new listing draft to build your inventory."
+              action={
+                <Link href="/dashboard/listings/new" className={buttonVariants({ size: "sm" })}>
+                  Start listing wizard
+                </Link>
+              }
+            />
+          ) : (
+            <ProviderManagedListingsList listings={listingsResult.listings} />
+          )}
+        </PageSection>
+      </PageShell>
     </MainContainer>
   );
 }

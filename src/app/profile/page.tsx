@@ -5,9 +5,9 @@ import { Building2, TriangleAlert, UserRound } from "lucide-react";
 
 import { CompanyWorkspaceSwitcher } from "@/components/company/company-workspace-switcher";
 import { MainContainer } from "@/components/layout/main-container";
+import { PageSection, PageShell, PageState } from "@/components/layout/page-shell";
 import { ProfileForm, type ProfileExperience } from "@/components/profile/profile-form";
 import { buttonVariants } from "@/components/ui/button";
-import { EmptyState } from "@/components/ui/empty-state";
 import { toSignInPath } from "@/lib/auth/routing";
 import { getCurrentUserProfile } from "@/lib/auth/profile";
 import { isProviderRole, type PreferredContactMethod } from "@/lib/auth/roles";
@@ -228,7 +228,7 @@ export default async function ProfilePage() {
   if (!profileResult.ok) {
     return (
       <MainContainer size="content" className="space-y-6">
-        <EmptyState
+        <PageState
           icon={UserRound}
           title="Profile could not be loaded"
           description={profileResult.message}
@@ -250,64 +250,63 @@ export default async function ProfilePage() {
     ? await loadProviderProfileExperience(supabase, profile, providerOrganizationId)
     : await loadSeekerProfileExperience(supabase, profile);
 
-  const contactMethods: PreferredContactMethod[] =
-    profile.contact_methods.length > 0
-      ? profile.contact_methods
-      : profile.preferred_contact_method
-        ? [profile.preferred_contact_method]
-        : ["in_app"];
+  const contactMethods: PreferredContactMethod[] = profile.contact_methods;
 
   return (
     <MainContainer size="wide" className="space-y-6">
-      <ProfileForm
-        key={`${profile.updated_at}:${profile.avatar_url ?? "no-avatar"}:${profile.role}`}
-        profile={{
-          id: profile.id,
-          displayName: profile.display_name,
-          role: profile.role,
-          providerAccountType: profile.provider_account_type,
-          bio: profile.bio,
-          phone: profile.phone,
-          avatarUrl: profile.avatar_url,
-          preferredContactMethod: profile.preferred_contact_method,
-          contactMethods,
-          contactEmail: profile.contact_email,
-          whatsappPhone: profile.whatsapp_phone,
-          viberPhone: profile.viber_phone,
-        }}
-        account={{
-          email: profileResult.user.email ?? null,
-          createdAt: profile.created_at,
-          updatedAt: profile.updated_at,
-        }}
-        experience={roleExperience}
-      />
+      <PageShell className="space-y-6">
+        <ProfileForm
+          key={`${profile.updated_at}:${profile.avatar_url ?? "no-avatar"}:${profile.role}`}
+          profile={{
+            id: profile.id,
+            displayName: profile.display_name,
+            role: profile.role,
+            providerAccountType: profile.provider_account_type,
+            bio: profile.bio,
+            phone: profile.phone,
+            avatarUrl: profile.avatar_url,
+            preferredContactMethod: profile.preferred_contact_method,
+            contactMethods,
+            contactEmail: profile.contact_email,
+            whatsappPhone: profile.whatsapp_phone,
+            viberPhone: profile.viber_phone,
+          }}
+          account={{
+            email: profileResult.user.email ?? null,
+            createdAt: profile.created_at,
+            updatedAt: profile.updated_at,
+          }}
+          experience={roleExperience}
+        />
 
-      {companyContextResult.ok ? (
-        companyContextResult.company.workspaceState === "selection_required" ? (
-          <CompanyWorkspaceSwitcher
-            workspaceOptions={companyContextResult.company.workspaceOptions}
-            activeOrganizationId={companyContextResult.company.activeOrganizationId}
-            redirectTo="/profile/company"
-            title="Choose your active company workspace"
-            description="This account belongs to more than one RoofHub company workspace. Select the workspace you want profile, dashboard, and listing flows to use."
-          />
-        ) : companyContextResult.company.activeOrganization ? (
-          <section className="border-border bg-card relative overflow-hidden rounded-2xl border p-5 sm:p-6">
-            <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(118deg,color-mix(in_oklch,var(--primary)_10%,transparent)_0%,transparent_56%),linear-gradient(334deg,color-mix(in_oklch,var(--accent)_10%,transparent)_0%,transparent_72%)] opacity-52" />
-            <div className="relative space-y-3">
-              <div className="inline-flex items-center gap-2 text-sm font-semibold tracking-tight">
-                <Building2 className="text-primary size-4" />
-                Company workspace active
-              </div>
-              <h2 className="type-section-title">{companyContextResult.company.activeOrganization.name}</h2>
-              <p className="type-body-muted max-w-3xl">
-                Active role:{" "}
-                {companyContextResult.company.activeMembership
-                  ? ORGANIZATION_MEMBER_ROLE_LABELS[companyContextResult.company.activeMembership.role]
-                  : "Company member"}
-                . Continue in the workspace to manage the company context this account is currently operating in.
-              </p>
+        {companyContextResult.ok ? (
+          companyContextResult.company.workspaceState === "selection_required" ? (
+            <CompanyWorkspaceSwitcher
+              workspaceOptions={companyContextResult.company.workspaceOptions}
+              activeOrganizationId={companyContextResult.company.activeOrganizationId}
+              redirectTo="/profile/company"
+              title="Choose your active company workspace"
+              description="This account belongs to more than one RoofHub company workspace. Select the workspace you want profile, dashboard, and listing flows to use."
+            />
+          ) : companyContextResult.company.activeOrganization ? (
+            <PageSection
+              eyebrow={
+                <div className="inline-flex items-center gap-2 text-sm font-semibold tracking-tight">
+                  <Building2 className="text-primary size-4" />
+                  Company workspace active
+                </div>
+              }
+              title={companyContextResult.company.activeOrganization.name}
+              description={
+                <>
+                  Active role:{" "}
+                  {companyContextResult.company.activeMembership
+                    ? ORGANIZATION_MEMBER_ROLE_LABELS[companyContextResult.company.activeMembership.role]
+                    : "Company member"}
+                  . Continue in the workspace to manage the company context this account is currently operating in.
+                </>
+              }
+            >
               <div className="flex flex-wrap gap-2">
                 <Link href="/profile/company" className={buttonVariants({ size: "sm" })}>
                   Open company workspace
@@ -327,20 +326,18 @@ export default async function ProfilePage() {
                   View public company page
                 </Link>
               </div>
-            </div>
-          </section>
-        ) : (
-          <section className="border-border bg-card rounded-2xl border p-5 sm:p-6">
-            <div className="space-y-3">
-              <div className="inline-flex items-center gap-2 text-sm font-semibold tracking-tight">
-                <Building2 className="text-primary size-4" />
-                Company workspace
-              </div>
-              <h2 className="type-section-title">Create a company account foundation</h2>
-              <p className="type-body-muted max-w-3xl">
-                Set up a company workspace to operate as a company provider while keeping account
-                ownership and session handling anchored to trusted server-side membership records.
-              </p>
+            </PageSection>
+          ) : (
+            <PageSection
+              eyebrow={
+                <div className="inline-flex items-center gap-2 text-sm font-semibold tracking-tight">
+                  <Building2 className="text-primary size-4" />
+                  Company workspace
+                </div>
+              }
+              title="Create a company account foundation"
+              description="Set up a company workspace to operate as a company provider while keeping account ownership and session handling anchored to trusted server-side membership records."
+            >
               <div className="flex flex-wrap gap-2">
                 <Link href="/profile/company/new" className={buttonVariants({ size: "sm" })}>
                   Create company workspace
@@ -352,24 +349,24 @@ export default async function ProfilePage() {
                   Learn more
                 </Link>
               </div>
-            </div>
-          </section>
-        )
-      ) : (
-        <EmptyState
-          icon={Building2}
-          title="Company context is temporarily unavailable"
-          description={companyContextResult.message}
-        />
-      )}
+            </PageSection>
+          )
+        ) : (
+          <PageState
+            icon={Building2}
+            title="Company context is temporarily unavailable"
+            description={companyContextResult.message}
+          />
+        )}
 
-      {roleExperience.metrics.some((metric) => metric.value === "--") ? (
-        <EmptyState
-          icon={TriangleAlert}
-          title="Some profile insights are unavailable"
-          description="Operational metrics are partially unavailable right now. Profile editing remains fully functional."
-        />
-      ) : null}
+        {roleExperience.metrics.some((metric) => metric.value === "--") ? (
+          <PageState
+            icon={TriangleAlert}
+            title="Some profile insights are unavailable"
+            description="Operational metrics are partially unavailable right now. Profile editing remains fully functional."
+          />
+        ) : null}
+      </PageShell>
     </MainContainer>
   );
 }

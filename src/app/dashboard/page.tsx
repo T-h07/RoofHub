@@ -9,9 +9,9 @@ import { ProviderManagedListingsList } from "@/components/dashboard/provider-man
 import { ProviderOverviewMetrics } from "@/components/dashboard/provider-overview-metrics";
 import { ProviderUnreadLeadsPlaceholder } from "@/components/dashboard/provider-unread-leads-placeholder";
 import { MainContainer } from "@/components/layout/main-container";
+import { PageIntro, PageSection, PageShell, PageState } from "@/components/layout/page-shell";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
-import { EmptyState } from "@/components/ui/empty-state";
 import { loadCompanyDashboardWorkspace } from "@/lib/company/dashboard-queries";
 import { toCompanyLogoPublicUrl } from "@/lib/company/logo";
 import { getMapStyleUrl } from "@/lib/config/map";
@@ -30,7 +30,7 @@ export default async function DashboardPage() {
   if (!context.ok) {
     return (
       <MainContainer size="content">
-        <EmptyState icon={LayoutDashboard} title="Dashboard unavailable" description={context.message} />
+        <PageState icon={LayoutDashboard} title="Dashboard unavailable" description={context.message} />
       </MainContainer>
     );
   }
@@ -71,7 +71,7 @@ export default async function DashboardPage() {
   if (!listingCreationContext.ok && context.profile.provider_account_type === "company") {
     return (
       <MainContainer size="content">
-        <EmptyState
+        <PageState
           icon={LayoutDashboard}
           title="Company dashboard requires an active workspace"
           description={listingCreationContext.message}
@@ -102,7 +102,7 @@ export default async function DashboardPage() {
     if (!dashboardResult.ok) {
       return (
         <MainContainer size="content">
-          <EmptyState
+          <PageState
             icon={LayoutDashboard}
             title="Company dashboard unavailable"
             description={dashboardResult.message}
@@ -159,88 +159,92 @@ export default async function DashboardPage() {
 
   return (
     <MainContainer size="wide" className="space-y-5">
-      <section className="border-border/75 bg-card/60 space-y-3 rounded-xl border p-5 sm:p-6">
-        <Badge variant="primary">Provider workspace</Badge>
-        <h1 className="type-page-title max-w-4xl">Control your property inventory and lifecycle states.</h1>
-        <p className="type-body-muted max-w-3xl">
-          Review listing volume, manage status transitions, and continue editing listings without leaving the
-          provider dashboard.
-        </p>
-        <div className="flex flex-wrap gap-2">
-          <Link href="/dashboard/listings/new" className={buttonVariants({ size: "sm" })}>
-            <PlusSquare className="size-4" aria-hidden="true" />
-            New listing draft
-          </Link>
-          <Link href="/dashboard/listings" className={buttonVariants({ variant: "outline", size: "sm" })}>
-            <Rows3 className="size-4" aria-hidden="true" />
-            My listings
-          </Link>
-          <Link href="/profile/company" className={buttonVariants({ variant: "ghost", size: "sm" })}>
-            Company workspace
-          </Link>
-        </div>
-      </section>
-
-      {!overviewResult.ok ? (
-        <EmptyState
-          icon={TriangleAlert}
-          title="Overview metrics unavailable"
-          description={overviewResult.message}
-        />
-      ) : (
-        <ProviderOverviewMetrics metrics={overviewResult.metrics} />
-      )}
-
-      {inventoryMapResult.ok ? (
-        <ProviderInventoryMap
-          mapStyleUrl={mapStyleUrl}
-          listings={inventoryMapResult.listings}
-          totalCount={inventoryMapResult.totalCount}
-          title="Provider inventory map"
-          description="Track where your in-scope listings are concentrated and jump directly into listing actions."
-          emptyDescription="Listings with saved coordinates will appear here once you place map pins in the listing wizard."
-          inventoryHref="/dashboard/listings"
-        />
-      ) : (
-        <EmptyState
-          icon={TriangleAlert}
-          title="Inventory map unavailable"
-          description={inventoryMapResult.message}
-          action={
-            <Link href="/dashboard/listings" className={buttonVariants({ variant: "outline", size: "sm" })}>
-              Open listing inventory
-            </Link>
+      <PageShell>
+        <PageIntro
+          eyebrow={<Badge variant="primary">Provider workspace</Badge>}
+          title="Control your property inventory and lifecycle states."
+          description="Review listing volume, manage status transitions, and continue editing listings without leaving the provider dashboard."
+          actions={
+            <>
+              <Link href="/dashboard/listings/new" className={buttonVariants({ size: "sm" })}>
+                <PlusSquare className="size-4" aria-hidden="true" />
+                New listing draft
+              </Link>
+              <Link href="/dashboard/listings" className={buttonVariants({ variant: "outline", size: "sm" })}>
+                <Rows3 className="size-4" aria-hidden="true" />
+                My listings
+              </Link>
+              <Link href="/profile/company" className={buttonVariants({ variant: "ghost", size: "sm" })}>
+                Company workspace
+              </Link>
+            </>
           }
         />
-      )}
 
-      <section className="space-y-3">
-        <div className="flex items-center justify-between gap-3">
-          <h2 className="type-section-title">Recent listings</h2>
-          <Link href="/dashboard/listings" className={buttonVariants({ variant: "ghost", size: "sm" })}>
-            Open full list
-          </Link>
-        </div>
+        {!overviewResult.ok ? (
+          <PageState
+            icon={TriangleAlert}
+            title="Overview metrics unavailable"
+            description={overviewResult.message}
+          />
+        ) : (
+          <ProviderOverviewMetrics metrics={overviewResult.metrics} />
+        )}
 
-        {!recentListingsResult.ok ? (
-          <EmptyState icon={Rows3} title="Recent listings unavailable" description={recentListingsResult.message} />
-        ) : recentListingsResult.listings.length === 0 ? (
-          <EmptyState
-            icon={PlusSquare}
-            title="No listings yet"
-            description="Create your first draft to start managing listing statuses from this dashboard."
+        {inventoryMapResult.ok ? (
+          <ProviderInventoryMap
+            mapStyleUrl={mapStyleUrl}
+            listings={inventoryMapResult.listings}
+            totalCount={inventoryMapResult.totalCount}
+            title="Provider inventory map"
+            description="Track where your in-scope listings are concentrated and jump directly into listing actions."
+            emptyDescription="Listings with saved coordinates will appear here once you place map pins in the listing wizard."
+            inventoryHref="/dashboard/listings"
+          />
+        ) : (
+          <PageState
+            icon={TriangleAlert}
+            title="Inventory map unavailable"
+            description={inventoryMapResult.message}
             action={
-              <Link href="/dashboard/listings/new" className={buttonVariants({ size: "sm" })}>
-                Start listing wizard
+              <Link href="/dashboard/listings" className={buttonVariants({ variant: "outline", size: "sm" })}>
+                Open listing inventory
               </Link>
             }
           />
-        ) : (
-          <ProviderManagedListingsList listings={recentListingsResult.listings} />
         )}
-      </section>
 
-      <ProviderUnreadLeadsPlaceholder />
+        <PageSection
+          eyebrow={<Badge variant="outline">Inventory focus</Badge>}
+          title="Recent listings"
+          description="Continue high-signal edits and workflow actions from the most recent listings in your scope."
+          action={
+            <Link href="/dashboard/listings" className={buttonVariants({ variant: "ghost", size: "sm" })}>
+              Open full list
+            </Link>
+          }
+          contentClassName="pt-5"
+        >
+          {!recentListingsResult.ok ? (
+            <PageState icon={Rows3} title="Recent listings unavailable" description={recentListingsResult.message} />
+          ) : recentListingsResult.listings.length === 0 ? (
+            <PageState
+              icon={PlusSquare}
+              title="No listings yet"
+              description="Create your first draft to start managing listing statuses from this dashboard."
+              action={
+                <Link href="/dashboard/listings/new" className={buttonVariants({ size: "sm" })}>
+                  Start listing wizard
+                </Link>
+              }
+            />
+          ) : (
+            <ProviderManagedListingsList listings={recentListingsResult.listings} />
+          )}
+        </PageSection>
+
+        <ProviderUnreadLeadsPlaceholder />
+      </PageShell>
     </MainContainer>
   );
 }

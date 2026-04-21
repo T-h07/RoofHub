@@ -10,7 +10,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { PageSummaryCard, PageSummaryRow } from "@/components/layout/page-shell";
 import type { ProviderListingOverviewMetrics } from "@/lib/listings/provider-dashboard/types";
 
 type ProviderOverviewMetricsProps = {
@@ -107,32 +107,23 @@ export function ProviderOverviewMetrics({ metrics }: ProviderOverviewMetricsProp
   ];
 
   return (
-    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+    <PageSummaryRow className="xl:grid-cols-4">
       {cards.map((card) => (
-        <Card key={card.id} className="overflow-hidden">
-          <CardHeader className="pb-2">
-            <div className="text-muted-foreground inline-flex items-center gap-2 text-xs">
-              <card.icon className="size-3.5" aria-hidden="true" />
-              {card.label}
-            </div>
-            <CardTitle className="text-2xl">{card.value}</CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0 text-xs text-muted-foreground">{card.detail}</CardContent>
-        </Card>
+        <PageSummaryCard
+          key={card.id}
+          label={card.label}
+          value={card.value}
+          detail={card.detail}
+          icon={card.icon}
+        />
       ))}
 
-      <Card className="overflow-hidden">
-        <CardHeader className="pb-2">
-          <div className="text-muted-foreground inline-flex items-center gap-2 text-xs">
-            <MessagesSquare className="size-3.5" aria-hidden="true" />
-            Unread leads
-          </div>
-          <CardTitle className="text-2xl">{metrics.unreadLeadsCount}</CardTitle>
-        </CardHeader>
-        <CardContent className="pt-0 text-xs text-muted-foreground">
-          New inbound messages from seeker conversations that still need a provider response.
-        </CardContent>
-      </Card>
-    </div>
+      <PageSummaryCard
+        label="Unread leads"
+        value={metrics.unreadLeadsCount}
+        detail="New inbound messages from seeker conversations that still need a provider response."
+        icon={MessagesSquare}
+      />
+    </PageSummaryRow>
   );
 }

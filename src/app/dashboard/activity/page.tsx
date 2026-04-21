@@ -6,10 +6,9 @@ import { CompanyIdentityHeader } from "@/components/company/company-identity-hea
 import { CompanyWorkspaceSwitcher } from "@/components/company/company-workspace-switcher";
 import { ProviderAccessRequired } from "@/components/dashboard/provider-access-required";
 import { MainContainer } from "@/components/layout/main-container";
+import { PageSection, PageShell, PageState } from "@/components/layout/page-shell";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { EmptyState } from "@/components/ui/empty-state";
 import { toCompanyLogoPublicUrl } from "@/lib/company/logo";
 import { loadCompanyDashboardWorkspace } from "@/lib/company/dashboard-queries";
 import { resolveProviderListingCreationContext } from "@/lib/listings/ownership";
@@ -21,7 +20,7 @@ export default async function DashboardActivityPage() {
   if (!context.ok) {
     return (
       <MainContainer size="content">
-        <EmptyState icon={Activity} title="Activity log unavailable" description={context.message} />
+        <PageState icon={Activity} title="Activity log unavailable" description={context.message} />
       </MainContainer>
     );
   }
@@ -57,7 +56,7 @@ export default async function DashboardActivityPage() {
   if (!listingCreationContext.ok || listingCreationContext.context.ownershipMode !== "company") {
     return (
       <MainContainer size="content">
-        <EmptyState
+        <PageState
           icon={ShieldAlert}
           title="Company activity log requires an active company workspace"
           description={
@@ -83,7 +82,7 @@ export default async function DashboardActivityPage() {
   if (!dashboardWorkspaceResult.ok) {
     return (
       <MainContainer size="content">
-        <EmptyState
+        <PageState
           icon={Activity}
           title="Activity log unavailable"
           description={dashboardWorkspaceResult.message}
@@ -98,7 +97,7 @@ export default async function DashboardActivityPage() {
   if (!workspace.canViewActivityFeed) {
     return (
       <MainContainer size="content">
-        <EmptyState
+        <PageState
           icon={ShieldAlert}
           title="Activity visibility is role-limited"
           description={
@@ -117,51 +116,45 @@ export default async function DashboardActivityPage() {
 
   return (
     <MainContainer size="wide" className="space-y-5">
-      <CompanyIdentityHeader
-        company={{
-          name: workspace.organization.name,
-          slug: workspace.organization.slug,
-          description: workspace.organization.description,
-          logoUrl,
-          contactEmail: workspace.organization.contact_email,
-          contactPhone: workspace.organization.contact_phone,
-          websiteUrl: workspace.organization.website_url,
-          coverageArea: workspace.organization.coverage_area,
-        }}
-        contextLabel="Company activity log"
-        supportingLabel="Trace workflow decisions, publishing changes, and membership operations from one internal RoofHub timeline."
-        listingCount={workspace.overview.publishedCount}
-        actions={
-          <>
-            <Link href="/dashboard" className={buttonVariants({ variant: "outline", size: "sm" })}>
-              Dashboard
-            </Link>
-            <Link href="/dashboard/listings" className={buttonVariants({ variant: "ghost", size: "sm" })}>
-              Listings
-            </Link>
-            {workspace.isOwnerOrAdmin ? (
-              <Link href="/profile/company/team" className={buttonVariants({ variant: "ghost", size: "sm" })}>
-                Team
+      <PageShell>
+        <CompanyIdentityHeader
+          company={{
+            name: workspace.organization.name,
+            slug: workspace.organization.slug,
+            description: workspace.organization.description,
+            logoUrl,
+            contactEmail: workspace.organization.contact_email,
+            contactPhone: workspace.organization.contact_phone,
+            websiteUrl: workspace.organization.website_url,
+            coverageArea: workspace.organization.coverage_area,
+          }}
+          contextLabel="Company activity log"
+          supportingLabel="Trace workflow decisions, publishing changes, and membership operations from one internal RoofHub timeline."
+          listingCount={workspace.overview.publishedCount}
+          actions={
+            <>
+              <Link href="/dashboard" className={buttonVariants({ variant: "outline", size: "sm" })}>
+                Dashboard
               </Link>
-            ) : null}
-          </>
-        }
-      />
+              <Link href="/dashboard/listings" className={buttonVariants({ variant: "ghost", size: "sm" })}>
+                Listings
+              </Link>
+              {workspace.isOwnerOrAdmin ? (
+                <Link href="/profile/company/team" className={buttonVariants({ variant: "ghost", size: "sm" })}>
+                  Team
+                </Link>
+              ) : null}
+            </>
+          }
+        />
 
-      <Card className="border-border/80 bg-card/88">
-        <CardHeader className="border-border/70 border-b pb-4">
-          <div className="space-y-2">
-            <Badge variant="outline">Activity timeline</Badge>
-            <CardTitle className="text-xl">Operational history</CardTitle>
-            <p className="type-body-muted">
-              Persisted listing workflow, membership, invite, and company operations events for trusted
-              reviewer roles.
-            </p>
-          </div>
-        </CardHeader>
-        <CardContent className="pt-5">
+        <PageSection
+          eyebrow={<Badge variant="outline">Activity timeline</Badge>}
+          title="Operational history"
+          description="Persisted listing workflow, membership, invite, and company operations events for trusted reviewer roles."
+        >
           {workspace.activityUnavailableMessage ? (
-            <EmptyState
+            <PageState
               icon={Activity}
               title="Activity log unavailable"
               description={workspace.activityUnavailableMessage}
@@ -174,8 +167,8 @@ export default async function DashboardActivityPage() {
               showSourceBadges
             />
           )}
-        </CardContent>
-      </Card>
+        </PageSection>
+      </PageShell>
     </MainContainer>
   );
 }

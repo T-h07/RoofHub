@@ -24,24 +24,11 @@ function MobileNavLink({
   href,
   label,
   active,
-  disabled,
 }: {
   href: string;
   label: string;
   active: boolean;
-  disabled?: boolean;
 }) {
-  if (disabled) {
-    return (
-      <div className="border-nav-muted/35 text-nav-muted flex items-center justify-between rounded-lg border px-3 py-2.5 text-sm">
-        <span>{label}</span>
-        <span className="border-nav-muted/35 rounded-full border px-2 py-0.5 text-[0.64rem] font-semibold tracking-wider uppercase">
-          Soon
-        </span>
-      </div>
-    );
-  }
-
   return (
     <Link
       href={href}

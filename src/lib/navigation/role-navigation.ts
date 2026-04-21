@@ -29,7 +29,7 @@ const AUTH_SHARED_NAV: NavItem[] = [
 
 const PROVIDER_EXTRA_NAV: NavItem[] = [
   { title: "Dashboard", href: "/dashboard" },
-  { title: "My Listings", href: "/dashboard/listings" },
+  { title: "Listings", href: "/dashboard/listings" },
 ];
 
 const ADMIN_EXTRA_NAV: NavItem[] = [{ title: "Moderation", href: "/admin/moderation" }];
@@ -42,7 +42,7 @@ export function getPrimaryNavForViewer(viewer: NavViewer): NavItem[] {
   const companyNavItem: NavItem =
     viewer.role === "provider" && viewer.providerAccountType === "company"
       ? { title: "Company Workspace", href: "/profile/company" }
-      : { title: "Become a Company", href: "/profile/company/new" };
+      : { title: "Create Company Workspace", href: "/profile/company/new" };
 
   const nav = [...AUTH_SHARED_NAV];
   nav.splice(4, 0, companyNavItem);

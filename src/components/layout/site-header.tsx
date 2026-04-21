@@ -83,7 +83,7 @@ export function SiteHeader({ authState }: SiteHeaderProps) {
                 {siteConfig.name}
               </span>
               <span className="text-nav-muted hidden truncate text-[11px] xl:block">
-                Map-first marketplace
+                Rentals and homes for sale
               </span>
             </span>
           </Link>
