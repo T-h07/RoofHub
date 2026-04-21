@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ExternalLink,
   LoaderCircle,
@@ -21,6 +21,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { buttonVariants } from "@/components/ui/button";
 import type { ProviderInventoryMapListing } from "@/lib/listings/provider-dashboard/types";
 import { isPublicDiscoveryListing } from "@/lib/listings/visibility";
+import { useThemedMapStyleUrl } from "@/lib/map/use-themed-map-style";
 import { cn } from "@/lib/utils";
 
 type ProviderInventoryMapProps = {
@@ -156,6 +157,7 @@ export function ProviderInventoryMap({
 }: ProviderInventoryMapProps) {
   const [selectedListingId, setSelectedListingId] = useState<string | null>(null);
   const [mapReady, setMapReady] = useState(false);
+  const themedMapStyleUrl = useThemedMapStyleUrl(mapStyleUrl);
   const initialViewState = useMemo(() => getInitialViewState(listings), [listings]);
   const selectedListing = useMemo(() => {
     if (!selectedListingId) {
@@ -165,6 +167,10 @@ export function ProviderInventoryMap({
     return listings.find((listing) => listing.id === selectedListingId) ?? null;
   }, [listings, selectedListingId]);
   const previewListings = listings.slice(0, 10);
+
+  useEffect(() => {
+    setMapReady(false);
+  }, [themedMapStyleUrl]);
 
   return (
     <section className="border-border/80 bg-card/88 space-y-4 rounded-2xl border p-5 sm:p-6">
@@ -194,7 +200,7 @@ export function ProviderInventoryMap({
           <div className="border-border/75 bg-background relative h-[24rem] overflow-hidden rounded-xl border">
             <MapLibre
               mapLib={import("maplibre-gl")}
-              mapStyle={mapStyleUrl}
+              mapStyle={themedMapStyleUrl}
               initialViewState={initialViewState}
               style={{ width: "100%", height: "100%" }}
               dragRotate={false}

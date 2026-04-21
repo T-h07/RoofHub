@@ -10,6 +10,7 @@ import MapLibre, {
 
 import { buttonVariants } from "@/components/ui/button";
 import { DEFAULT_PUBLIC_MAP_STYLE_URL } from "@/lib/config/map";
+import { useThemedMapStyleUrl } from "@/lib/map/use-themed-map-style";
 import { cn } from "@/lib/utils";
 
 type ProviderLocationPickerMapProps = {
@@ -40,7 +41,8 @@ export function ProviderLocationPickerMap({
 }: ProviderLocationPickerMapProps) {
   const [isMapReady, setIsMapReady] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
-  const [activeStyleUrl, setActiveStyleUrl] = useState(mapStyleUrl);
+  const themedMapStyleUrl = useThemedMapStyleUrl(mapStyleUrl);
+  const [activeStyleUrl, setActiveStyleUrl] = useState(themedMapStyleUrl);
   const [didFallbackStyle, setDidFallbackStyle] = useState(false);
   const [mapRenderKey, setMapRenderKey] = useState(0);
 
@@ -60,12 +62,11 @@ export function ProviderLocationPickerMap({
   }, [latitude, longitude]);
 
   useEffect(() => {
-    setActiveStyleUrl(mapStyleUrl);
+    setActiveStyleUrl(themedMapStyleUrl);
     setDidFallbackStyle(false);
     setIsMapReady(false);
     setMapError(null);
-    setMapRenderKey((value) => value + 1);
-  }, [mapStyleUrl]);
+  }, [themedMapStyleUrl]);
 
   return (
     <div

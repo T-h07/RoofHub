@@ -1,5 +1,8 @@
 import { parseThemePreference, THEME_STORAGE_KEY, type ThemePreference } from "@/lib/theme/preference";
 
+export const THEME_CHANGE_EVENT = "roofhub:theme-change";
+export type ActiveTheme = "light" | "dark";
+
 export function resolveActiveTheme(preference: ThemePreference, prefersDark: boolean) {
   if (preference === "system") {
     return prefersDark ? "dark" : "light";
@@ -28,4 +31,12 @@ export function applyThemePreference(preference: ThemePreference) {
   rootElement.classList.toggle("dark", activeTheme === "dark");
 
   window.localStorage.setItem(THEME_STORAGE_KEY, preference);
+  window.dispatchEvent(
+    new CustomEvent(THEME_CHANGE_EVENT, {
+      detail: {
+        preference,
+        activeTheme,
+      },
+    })
+  );
 }

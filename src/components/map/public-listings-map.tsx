@@ -28,6 +28,7 @@ import {
   type MapSearchBounds,
 } from "@/lib/listings/map-bounds";
 import type { PublicMapListing } from "@/lib/listings/public-map";
+import { useThemedMapStyleUrl } from "@/lib/map/use-themed-map-style";
 import { cn } from "@/lib/utils";
 
 type PublicListingsMapProps = {
@@ -261,7 +262,8 @@ export function PublicListingsMap({ mapStyleUrl, listings, appliedBounds }: Publ
     [listings, appliedBounds]
   );
   const [selectedListingId, setSelectedListingId] = useState<string | null>(null);
-  const [activeStyleUrl, setActiveStyleUrl] = useState(mapStyleUrl);
+  const themedMapStyleUrl = useThemedMapStyleUrl(mapStyleUrl);
+  const [activeStyleUrl, setActiveStyleUrl] = useState(themedMapStyleUrl);
   const [didFallbackStyle, setDidFallbackStyle] = useState(false);
   const [isMapReady, setIsMapReady] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
@@ -303,12 +305,11 @@ export function PublicListingsMap({ mapStyleUrl, listings, appliedBounds }: Publ
   }, [appliedBounds]);
 
   useEffect(() => {
-    setActiveStyleUrl(mapStyleUrl);
+    setActiveStyleUrl(themedMapStyleUrl);
     setDidFallbackStyle(false);
     setIsMapReady(false);
     setMapError(null);
-    setMapRenderKey((value) => value + 1);
-  }, [mapStyleUrl]);
+  }, [themedMapStyleUrl]);
 
   useEffect(() => {
     if (selectedListingId && !listings.some((listing) => listing.id === selectedListingId)) {

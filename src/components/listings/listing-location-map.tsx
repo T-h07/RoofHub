@@ -13,6 +13,7 @@ import MapLibre, {
 
 import { buttonVariants } from "@/components/ui/button";
 import { DEFAULT_PUBLIC_MAP_STYLE_URL } from "@/lib/config/map";
+import { useThemedMapStyleUrl } from "@/lib/map/use-themed-map-style";
 import type { Enums } from "@/types/database";
 import { cn } from "@/lib/utils";
 
@@ -48,7 +49,8 @@ export function ListingLocationMap({
 }: ListingLocationMapProps) {
   const [isMapReady, setIsMapReady] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
-  const [activeStyleUrl, setActiveStyleUrl] = useState(mapStyleUrl);
+  const themedMapStyleUrl = useThemedMapStyleUrl(mapStyleUrl);
+  const [activeStyleUrl, setActiveStyleUrl] = useState(themedMapStyleUrl);
   const [didFallbackStyle, setDidFallbackStyle] = useState(false);
   const [mapRenderKey, setMapRenderKey] = useState(0);
 
@@ -71,12 +73,11 @@ export function ListingLocationMap({
   const mapZoom = publicLocationMode === "exact" ? 13.3 : 11.8;
 
   useEffect(() => {
-    setActiveStyleUrl(mapStyleUrl);
+    setActiveStyleUrl(themedMapStyleUrl);
     setDidFallbackStyle(false);
     setIsMapReady(false);
     setMapError(null);
-    setMapRenderKey((value) => value + 1);
-  }, [mapStyleUrl]);
+  }, [themedMapStyleUrl]);
 
   if (publicLocationMode === "hidden") {
     return (
