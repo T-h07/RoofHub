@@ -142,6 +142,16 @@ function toDeleteAccountError(message: string) {
     return "Account deletion failed while removing linked files. Please retry shortly.";
   }
 
+  if (
+    normalized.includes("transfer company ownership") ||
+    normalized.includes("transfer ownership first") ||
+    normalized.includes("company ownership") ||
+    normalized.includes("ownership transfer member") ||
+    normalized.includes("company profile")
+  ) {
+    return message;
+  }
+
   if (normalized.includes("audit history")) {
     return "Account deletion failed while removing audit history. Please retry shortly.";
   }
@@ -176,6 +186,14 @@ function getDeleteAccountReasonCategory(error: unknown) {
 
   if (message.includes("failed to load")) {
     return "linked_data_lookup_failed";
+  }
+
+  if (
+    message.includes("transfer ownership") ||
+    message.includes("company profile") ||
+    message.includes("last active owner")
+  ) {
+    return "company_ownership_resolution_failed";
   }
 
   return "unknown_delete_failure";
@@ -573,6 +591,8 @@ export async function deleteAccountAction(
 ): Promise<ProfileDeleteActionState> {
   const confirmDeleteText = readConfirmationValue(formData, "confirmDeleteText");
   const confirmEmail = readConfirmationValue(formData, "confirmEmail").toLowerCase();
+  const organizationMode = readConfirmationValue(formData, "organizationDeleteMode");
+  const transferTargetUserId = readConfirmationValue(formData, "transferTargetUserId");
 
   if (confirmDeleteText !== "DELETE") {
     return {
@@ -600,6 +620,8 @@ export async function deleteAccountAction(
   try {
     await hardDeleteAccount({
       userId: context.profile.id,
+      organizationMode: organizationMode || null,
+      transferTargetUserId: transferTargetUserId || null,
     });
 
     await clearAuthCookies();
@@ -614,6 +636,7 @@ export async function deleteAccountAction(
     console.error("[Profile][DeleteAccount] hard delete failed", {
       user_id: context.profile.id,
       reason_category: getDeleteAccountReasonCategory(error),
+      error_message: error instanceof Error ? error.message : "unknown_error",
     });
 
     return {

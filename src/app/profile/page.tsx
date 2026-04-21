@@ -249,6 +249,56 @@ export default async function ProfilePage() {
   const roleExperience = isProviderRole(profile.role)
     ? await loadProviderProfileExperience(supabase, profile, providerOrganizationId)
     : await loadSeekerProfileExperience(supabase, profile);
+  let ownedCompanyForDeletion: {
+    organizationId: string;
+    organizationName: string;
+    transferCandidates: Array<{
+      userId: string;
+      displayName: string;
+      role: import("@/lib/company/team-types").OrganizationMemberRole;
+    }>;
+  } | null = null;
+
+  if (companyContextResult.ok) {
+    const ownedWorkspaceOptions = companyContextResult.company.workspaceOptions.filter(
+      (workspace) => workspace.membership.role === "owner"
+    );
+
+    if (ownedWorkspaceOptions.length === 1) {
+      const ownedOrganization = ownedWorkspaceOptions[0].organization;
+      const { data: transferMemberRows, error: transferMembersError } = await supabase
+        .from("organization_members")
+        .select(
+          "user_id, role, profile:profiles!organization_members_user_id_fkey(display_name)"
+        )
+        .eq("organization_id", ownedOrganization.id)
+        .eq("member_status", "active")
+        .neq("user_id", profile.id)
+        .order("joined_at", { ascending: true });
+
+      if (!transferMembersError) {
+        ownedCompanyForDeletion = {
+          organizationId: ownedOrganization.id,
+          organizationName: ownedOrganization.name,
+          transferCandidates: (transferMemberRows ?? []).flatMap((row) => {
+            if (!row.user_id || !row.role) {
+              return [];
+            }
+
+            return [
+              {
+                userId: row.user_id,
+                role: row.role as import("@/lib/company/team-types").OrganizationMemberRole,
+                displayName:
+                  (row.profile as { display_name?: string | null } | null)?.display_name?.trim() ||
+                  "RoofHub team member",
+              },
+            ];
+          }),
+        };
+      }
+    }
+  }
 
   const contactMethods: PreferredContactMethod[] = profile.contact_methods;
 
@@ -275,6 +325,7 @@ export default async function ProfilePage() {
             email: profileResult.user.email ?? null,
             createdAt: profile.created_at,
             updatedAt: profile.updated_at,
+            ownedCompanyForDeletion,
           }}
           experience={roleExperience}
         />

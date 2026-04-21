@@ -17,8 +17,10 @@ import {
 import { Field, FieldHelp } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
 import { ThemePreferenceSelector } from "@/components/theme/theme-preference-selector";
 import { signOutAction } from "@/lib/auth/actions";
+import { ORGANIZATION_MEMBER_ROLE_LABELS } from "@/lib/company/team-types";
 import { deleteAccountAction } from "@/lib/profile/actions";
 import { PROFILE_DELETE_ACTION_IDLE_STATE } from "@/lib/profile/types";
 
@@ -29,6 +31,12 @@ type ProfileSecurityPanelProps = {
   account: ProfileAccountSnapshot;
 };
 
+function getDefaultOrganizationDeleteMode(account: ProfileAccountSnapshot) {
+  return account.ownedCompanyForDeletion?.transferCandidates.length
+    ? "transfer_company"
+    : "delete_company";
+}
+
 export function ProfileSecurityPanel({ account }: ProfileSecurityPanelProps) {
   const router = useRouter();
   const [deleteState, deleteAction, isDeletePending] = useActionState(
@@ -38,12 +46,20 @@ export function ProfileSecurityPanel({ account }: ProfileSecurityPanelProps) {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [deleteConfirmationText, setDeleteConfirmationText] = useState("");
   const [deleteConfirmationEmail, setDeleteConfirmationEmail] = useState("");
+  const [organizationDeleteMode, setOrganizationDeleteMode] = useState<
+    "delete_company" | "transfer_company"
+  >(getDefaultOrganizationDeleteMode(account));
+  const [transferTargetUserId, setTransferTargetUserId] = useState("");
 
   const requiresEmailDeleteConfirmation = Boolean(account.email?.trim());
+  const hasOwnedCompany = Boolean(account.ownedCompanyForDeletion);
+  const transferModeSelected = hasOwnedCompany && organizationDeleteMode === "transfer_company";
+  const transferTargetSelected = transferTargetUserId.trim().length > 0;
   const deleteConfirmationReady =
     deleteConfirmationText.trim() === "DELETE" &&
     (!requiresEmailDeleteConfirmation ||
-      deleteConfirmationEmail.trim().toLowerCase() === account.email?.trim().toLowerCase());
+      deleteConfirmationEmail.trim().toLowerCase() === account.email?.trim().toLowerCase()) &&
+    (!transferModeSelected || transferTargetSelected);
 
   useEffect(() => {
     if (deleteState.status === "success") {
@@ -112,6 +128,8 @@ export function ProfileSecurityPanel({ account }: ProfileSecurityPanelProps) {
             if (!open) {
               setDeleteConfirmationText("");
               setDeleteConfirmationEmail("");
+              setTransferTargetUserId("");
+              setOrganizationDeleteMode(getDefaultOrganizationDeleteMode(account));
             }
           }
         }}
@@ -163,6 +181,71 @@ export function ProfileSecurityPanel({ account }: ProfileSecurityPanelProps) {
               <input type="hidden" name="confirmEmail" value="" />
             )}
 
+            {hasOwnedCompany ? (
+              <div className="space-y-4 rounded-xl border border-destructive/35 bg-destructive/7 px-4 py-3">
+                <p className="text-sm font-semibold tracking-tight">Company ownership decision</p>
+                <p className="text-muted-foreground text-sm leading-6">
+                  You currently own <span className="font-medium">{account.ownedCompanyForDeletion?.organizationName}</span>.
+                  Choose whether to transfer ownership or delete this company profile with its listings.
+                </p>
+
+                <Field>
+                  <Label htmlFor="organization-delete-mode">Company action</Label>
+                  <Select
+                    id="organization-delete-mode"
+                    name="organizationDeleteMode"
+                    value={organizationDeleteMode}
+                    onChange={(event) =>
+                      setOrganizationDeleteMode(
+                        event.currentTarget.value === "delete_company"
+                          ? "delete_company"
+                          : "transfer_company"
+                      )
+                    }
+                    disabled={isDeletePending}
+                  >
+                    <option value="transfer_company">Transfer company ownership to a member</option>
+                    <option value="delete_company">Delete company profile and listings</option>
+                  </Select>
+                </Field>
+
+                {organizationDeleteMode === "transfer_company" ? (
+                  <Field>
+                    <Label htmlFor="transfer-target-user-id">Transfer ownership to</Label>
+                    <Select
+                      id="transfer-target-user-id"
+                      name="transferTargetUserId"
+                      value={transferTargetUserId}
+                      onChange={(event) => setTransferTargetUserId(event.currentTarget.value)}
+                      disabled={isDeletePending}
+                    >
+                      <option value="">Select a member</option>
+                      {account.ownedCompanyForDeletion?.transferCandidates.map((candidate) => (
+                        <option key={candidate.userId} value={candidate.userId}>
+                          {candidate.displayName} ({ORGANIZATION_MEMBER_ROLE_LABELS[candidate.role]})
+                        </option>
+                      ))}
+                    </Select>
+                    <FieldHelp>
+                      Ownership will move to this active member before your account is deleted.
+                    </FieldHelp>
+                  </Field>
+                ) : (
+                  <>
+                    <input type="hidden" name="transferTargetUserId" value="" />
+                    <FieldHelp>
+                      All company listings will be deleted. Team members lose this workspace and are reset to individual provider mode when they have no other active company memberships.
+                    </FieldHelp>
+                  </>
+                )}
+              </div>
+            ) : (
+              <>
+                <input type="hidden" name="organizationDeleteMode" value="" />
+                <input type="hidden" name="transferTargetUserId" value="" />
+              </>
+            )}
+
             {deleteState.status === "error" && deleteState.message ? (
               <AuthStatusMessage tone="error" message={deleteState.message} />
             ) : null}
@@ -180,11 +263,7 @@ export function ProfileSecurityPanel({ account }: ProfileSecurityPanelProps) {
               >
                 Cancel
               </Button>
-              <Button
-                type="submit"
-                variant="destructive"
-                disabled={!deleteConfirmationReady || isDeletePending}
-              >
+              <Button type="submit" variant="destructive" disabled={!deleteConfirmationReady || isDeletePending}>
                 {isDeletePending ? <LoaderCircle className="size-4 animate-spin" /> : null}
                 {isDeletePending ? "Deleting account..." : "Delete account permanently"}
               </Button>

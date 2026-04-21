@@ -36,4 +36,13 @@ export type ProfileAccountSnapshot = {
   email: string | null;
   createdAt: string;
   updatedAt: string;
+  ownedCompanyForDeletion: {
+    organizationId: string;
+    organizationName: string;
+    transferCandidates: Array<{
+      userId: string;
+      displayName: string;
+      role: import("@/lib/company/team-types").OrganizationMemberRole;
+    }>;
+  } | null;
 };

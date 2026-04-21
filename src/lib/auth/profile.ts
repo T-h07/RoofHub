@@ -1,6 +1,10 @@
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 
 import { DEFAULT_APP_ROLE } from "@/lib/auth/roles";
+import {
+  createSchemaDriftMessage,
+  isSupabaseSchemaDriftError,
+} from "@/lib/supabase/schema-drift";
 import type { Database, Tables } from "@/types/database";
 
 const PROFILE_SELECT =
@@ -65,7 +69,7 @@ function logProfileBootstrapFailure(
     | "profile_conflict_refetch_failed",
   details: Record<string, unknown>
 ) {
-  console.error("[Auth][ProfileBootstrap] ensure profile failed", {
+  console.warn("[Auth][ProfileBootstrap] ensure profile failed", {
     stage,
     ...details,
   });
@@ -119,12 +123,31 @@ async function fetchProfileByUserId(
     };
   }
 
-  console.error("[Auth][Profile] fetch failed", {
+  console.warn("[Auth][Profile] fetch failed", {
     user_id: userId,
     error_code: error.code ?? null,
     error_message: error.message,
     select: PROFILE_SELECT,
   });
+
+  if (
+    isSupabaseSchemaDriftError(error, [
+      "profiles",
+      "active_organization_id",
+      "provider_account_type",
+      "preferred_contact_method",
+      "contact_methods",
+    ])
+  ) {
+    return {
+      ok: false,
+      message: createSchemaDriftMessage("Profile"),
+      details: {
+        errorCode: error.code ?? null,
+        fetchReasonCategory: "query_failed",
+      },
+    };
+  }
 
   return {
     ok: false,
