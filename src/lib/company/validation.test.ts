@@ -50,6 +50,30 @@ test("company profile validation still rejects unsafe website schemes", () => {
   );
 });
 
+test("company profile validation normalizes copied email whitespace artifacts", () => {
+  const input = readCompanyProfileInput(
+    createFormData([
+      ["name", "RoofHub Realty"],
+      ["contactEmail", "  taulanthaxhiu765@gmail.com\u00A0\u200E"],
+    ])
+  );
+
+  assert.equal(input.contactEmail, "taulanthaxhiu765@gmail.com");
+  assert.equal(validateCompanyProfileInput(input).contactEmail, undefined);
+});
+
+test("company profile validation normalizes display-name email format", () => {
+  const input = readCompanyProfileInput(
+    createFormData([
+      ["name", "RoofHub Realty"],
+      ["contactEmail", "RoofHub Team <taulanthaxhiu765@gmail.com>"],
+    ])
+  );
+
+  assert.equal(input.contactEmail, "taulanthaxhiu765@gmail.com");
+  assert.equal(validateCompanyProfileInput(input).contactEmail, undefined);
+});
+
 test("company logo validation allows empty MIME metadata and jpg aliases", () => {
   const pngWithoutDeclaredType = new File(["logo"], "logo.png", { type: "" });
   const jpegAlias = new File(["logo"], "logo.jpg", { type: "image/jpg" });

@@ -18,6 +18,7 @@ import {
 } from "@/lib/security/audit";
 import { enforceTrafficControl, TRAFFIC_CONTROL_RULES } from "@/lib/security/traffic-control";
 import { createServerSupabaseClient } from "@/lib/supabase";
+import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { removeCompanyLogoByPath, uploadCompanyLogo } from "@/lib/supabase/storage/company-logos";
 
 function toProfileValidationErrorState(
@@ -28,6 +29,14 @@ function toProfileValidationErrorState(
     message: "Check the highlighted fields and try again.",
     errors,
   };
+}
+
+function encodeTextHex(value: string | null | undefined) {
+  if (!value) {
+    return null;
+  }
+
+  return Buffer.from(value, "utf8").toString("hex");
 }
 
 function toCompanyProfileUpdateError(message: string) {
@@ -46,6 +55,75 @@ function toCompanyProfileUpdateError(message: string) {
   }
 
   return "Company profile update failed. Please retry.";
+}
+
+type CompanyProfileConstraintField =
+  | "name"
+  | "contactEmail"
+  | "contactPhone"
+  | "websiteUrl"
+  | "coverageArea";
+
+function resolveCompanyProfileConstraintField(message: string | null | undefined) {
+  if (!message) {
+    return null;
+  }
+
+  const normalized = message.toLowerCase();
+
+  if (
+    normalized.includes("organizations_name_not_blank") ||
+    normalized.includes("company name must be")
+  ) {
+    return "name" as const;
+  }
+
+  if (
+    normalized.includes("organizations_contact_email_not_blank") ||
+    normalized.includes("organizations_contact_email_format")
+  ) {
+    return "contactEmail" as const;
+  }
+
+  if (
+    normalized.includes("organizations_contact_phone_not_blank") ||
+    normalized.includes("organizations_contact_phone_format")
+  ) {
+    return "contactPhone" as const;
+  }
+
+  if (
+    normalized.includes("organizations_website_url_not_blank") ||
+    normalized.includes("organizations_website_url_format")
+  ) {
+    return "websiteUrl" as const;
+  }
+
+  if (
+    normalized.includes("organizations_coverage_area_not_blank") ||
+    normalized.includes("organizations_coverage_area_length")
+  ) {
+    return "coverageArea" as const;
+  }
+
+  return null;
+}
+
+function toCompanyProfileConstraintErrorMessage(field: CompanyProfileConstraintField) {
+  switch (field) {
+    case "name":
+      return "Company name must be 2-120 characters.";
+    case "contactEmail":
+      return "Enter a valid email address.";
+    case "contactPhone":
+      return "Enter a valid phone number.";
+    case "websiteUrl":
+      return "Enter a valid website URL that starts with http or https.";
+    case "coverageArea":
+      return "Coverage summary must be 220 characters or fewer.";
+    default:
+      return "Check the highlighted fields and try again.";
+  }
 }
 
 function toCompanyLogoUploadError(message: string) {
@@ -69,6 +147,10 @@ function toCompanyLogoUploadError(message: string) {
 
   if (normalized.includes("row-level security") || normalized.includes("permission denied")) {
     return "You do not have permission to update this company logo.";
+  }
+
+  if (normalized.includes("supabase_service_role_key")) {
+    return "Company logo updates require server admin Supabase credentials. Add SUPABASE_SERVICE_ROLE_KEY and retry.";
   }
 
   return "Company logo update failed. Please retry.";
@@ -224,10 +306,10 @@ export async function updateCompanyProfileAction(
     .update({
       name: input.name,
       description: input.description,
-    contact_email: input.contactEmail,
-    contact_phone: input.contactPhone,
-    website_url: input.websiteUrl,
-    coverage_area: input.coverageArea,
+      contact_email: input.contactEmail,
+      contact_phone: input.contactPhone,
+      website_url: input.websiteUrl,
+      coverage_area: input.coverageArea,
     })
     .eq("id", ownerContext.organization.id)
     .select("id")
@@ -235,6 +317,18 @@ export async function updateCompanyProfileAction(
     .maybeSingle();
 
   if (error) {
+    console.error("[Company][Profile] update failed", {
+      organization_id: ownerContext.organization.id,
+      actor_user_id: ownerContext.profile.id,
+      input_contact_email: input.contactEmail,
+      input_contact_email_hex: encodeTextHex(input.contactEmail),
+      input_contact_email_length: input.contactEmail?.length ?? 0,
+      error_code: error.code ?? null,
+      error_message: error.message,
+      error_details: error.details ?? null,
+      error_hint: error.hint ?? null,
+    });
+
     await recordSecurityAuditEvent({
       supabase,
       event: {
@@ -251,6 +345,17 @@ export async function updateCompanyProfileAction(
         },
       },
     });
+
+    const constraintField =
+      resolveCompanyProfileConstraintField(error.message) ??
+      resolveCompanyProfileConstraintField(error.details) ??
+      resolveCompanyProfileConstraintField(error.hint);
+
+    if (constraintField) {
+      return toProfileValidationErrorState({
+        [constraintField]: toCompanyProfileConstraintErrorMessage(constraintField),
+      });
+    }
 
     return {
       status: "error",
@@ -355,13 +460,14 @@ export async function uploadCompanyLogoAction(
   }
 
   try {
-    const uploaded = await uploadCompanyLogo(supabase, {
+    const adminSupabase = createAdminSupabaseClient();
+    const uploaded = await uploadCompanyLogo(adminSupabase, {
       organizationId: ownerContext.organization.id,
       file,
     });
 
     const previousLogoPath = ownerContext.organization.logo_path;
-    const { data: updatedOrganization, error: updateError } = await supabase
+    const { data: updatedOrganization, error: updateError } = await adminSupabase
       .from("organizations")
       .update({
         logo_path: uploaded.storagePath,
@@ -373,7 +479,7 @@ export async function uploadCompanyLogoAction(
 
     if (updateError) {
       try {
-        await removeCompanyLogoByPath(supabase, {
+        await removeCompanyLogoByPath(adminSupabase, {
           organizationId: ownerContext.organization.id,
           storagePath: uploaded.storagePath,
         });
@@ -407,7 +513,7 @@ export async function uploadCompanyLogoAction(
 
     if (!updatedOrganization) {
       try {
-        await removeCompanyLogoByPath(supabase, {
+        await removeCompanyLogoByPath(adminSupabase, {
           organizationId: ownerContext.organization.id,
           storagePath: uploaded.storagePath,
         });
@@ -439,7 +545,7 @@ export async function uploadCompanyLogoAction(
 
     if (previousLogoPath && previousLogoPath !== uploaded.storagePath) {
       try {
-        await removeCompanyLogoByPath(supabase, {
+        await removeCompanyLogoByPath(adminSupabase, {
           organizationId: ownerContext.organization.id,
           storagePath: previousLogoPath,
         });
@@ -471,6 +577,12 @@ export async function uploadCompanyLogoAction(
       message: "Company logo updated.",
     };
   } catch (error) {
+    console.error("[Company][Logo] upload failed", {
+      organization_id: ownerContext.organization.id,
+      actor_user_id: ownerContext.profile.id,
+      error_message: error instanceof Error ? error.message : "unknown_logo_upload_error",
+    });
+
     await recordSecurityAuditEvent({
       supabase,
       event: {
@@ -530,17 +642,81 @@ export async function removeCompanyLogoAction(
     };
   }
 
-  const { data: updatedOrganization, error: updateError } = await supabase
-    .from("organizations")
-    .update({
-      logo_path: null,
-    })
-    .eq("id", ownerContext.organization.id)
-    .select("id")
-    .limit(1)
-    .maybeSingle();
+  try {
+    const adminSupabase = createAdminSupabaseClient();
+    const { data: updatedOrganization, error: updateError } = await adminSupabase
+      .from("organizations")
+      .update({
+        logo_path: null,
+      })
+      .eq("id", ownerContext.organization.id)
+      .select("id")
+      .limit(1)
+      .maybeSingle();
 
-  if (updateError) {
+    if (updateError) {
+      await recordSecurityAuditEvent({
+        supabase,
+        event: {
+          eventType: AUDIT_EVENT_TYPES.organizationLogoUpdateFailed,
+          actorUserId: ownerContext.profile.id,
+          actorRole: ownerContext.profile.role,
+          targetType: "organization",
+          targetId: ownerContext.organization.id,
+          metadata: {
+            outcome: "failed",
+            stage: "organization_row_update",
+            error_code: updateError.code ?? null,
+            error_message: updateError.message,
+            ...requestFingerprint,
+          },
+        },
+      });
+
+      return {
+        status: "error",
+        message: toCompanyLogoUploadError(updateError.message),
+      };
+    }
+
+    if (!updatedOrganization) {
+      await recordSecurityAuditEvent({
+        supabase,
+        event: {
+          eventType: AUDIT_EVENT_TYPES.organizationLogoUpdateFailed,
+          actorUserId: ownerContext.profile.id,
+          actorRole: ownerContext.profile.role,
+          targetType: "organization",
+          targetId: ownerContext.organization.id,
+          metadata: {
+            outcome: "empty_update_result",
+            stage: "organization_row_update",
+            ...requestFingerprint,
+          },
+        },
+      });
+
+      return {
+        status: "error",
+        message: "Company logo removal was rejected for this account. Refresh and retry.",
+      };
+    }
+
+    try {
+      await removeCompanyLogoByPath(adminSupabase, {
+        organizationId: ownerContext.organization.id,
+        storagePath: currentLogoPath,
+      });
+    } catch {
+      // Non-fatal cleanup; logo is already detached from organization row.
+    }
+  } catch (error) {
+    console.error("[Company][Logo] remove failed", {
+      organization_id: ownerContext.organization.id,
+      actor_user_id: ownerContext.profile.id,
+      error_message: error instanceof Error ? error.message : "unknown_logo_remove_error",
+    });
+
     await recordSecurityAuditEvent({
       supabase,
       event: {
@@ -551,9 +727,8 @@ export async function removeCompanyLogoAction(
         targetId: ownerContext.organization.id,
         metadata: {
           outcome: "failed",
-          stage: "organization_row_update",
-          error_code: updateError.code ?? null,
-          error_message: updateError.message,
+          stage: "logo_remove",
+          error_message: error instanceof Error ? error.message : "unknown_logo_remove_error",
           ...requestFingerprint,
         },
       },
@@ -561,40 +736,8 @@ export async function removeCompanyLogoAction(
 
     return {
       status: "error",
-      message: toCompanyLogoUploadError(updateError.message),
+      message: toCompanyLogoUploadError(error instanceof Error ? error.message : ""),
     };
-  }
-
-  if (!updatedOrganization) {
-    await recordSecurityAuditEvent({
-      supabase,
-      event: {
-        eventType: AUDIT_EVENT_TYPES.organizationLogoUpdateFailed,
-        actorUserId: ownerContext.profile.id,
-        actorRole: ownerContext.profile.role,
-        targetType: "organization",
-        targetId: ownerContext.organization.id,
-        metadata: {
-          outcome: "empty_update_result",
-          stage: "organization_row_update",
-          ...requestFingerprint,
-        },
-      },
-    });
-
-    return {
-      status: "error",
-      message: "Company logo removal was rejected for this account. Refresh and retry.",
-    };
-  }
-
-  try {
-    await removeCompanyLogoByPath(supabase, {
-      organizationId: ownerContext.organization.id,
-      storagePath: currentLogoPath,
-    });
-  } catch {
-    // Non-fatal cleanup; logo is already detached from organization row.
   }
 
   await recordSecurityAuditEvent({

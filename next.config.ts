@@ -2,8 +2,7 @@ import type { NextConfig } from "next";
 import type { RemotePattern } from "next/dist/shared/lib/image-config";
 
 const allowedDevOrigins = (
-  process.env.NEXT_DEV_ALLOWED_ORIGINS ??
-  "localhost,127.0.0.1,100.105.126.106"
+  process.env.NEXT_DEV_ALLOWED_ORIGINS ?? "localhost,127.0.0.1,100.105.126.106"
 )
   .split(",")
   .map((entry) => entry.trim())
@@ -97,6 +96,11 @@ function buildSecurityHeaders() {
 const nextConfig: NextConfig = {
   allowedDevOrigins,
   poweredByHeader: false,
+  experimental: {
+    serverActions: {
+      bodySizeLimit: "6mb",
+    },
+  },
   images: {
     remotePatterns: supabaseImagePattern ? [supabaseImagePattern] : [],
   },
