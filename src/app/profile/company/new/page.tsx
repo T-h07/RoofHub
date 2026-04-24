@@ -5,9 +5,14 @@ import { ArrowLeft, Building2 } from "lucide-react";
 import { AuthStatusMessage } from "@/components/auth/auth-status-message";
 import { CompanyWorkspaceCreateForm } from "@/components/company/company-workspace-create-form";
 import { CompanyWorkspaceSwitcher } from "@/components/company/company-workspace-switcher";
+import {
+  PageIntro,
+  PageSection,
+  PageShell,
+  PageState,
+} from "@/components/layout/page-shell";
 import { MainContainer } from "@/components/layout/main-container";
 import { buttonVariants } from "@/components/ui/button";
-import { EmptyState } from "@/components/ui/empty-state";
 import { getCurrentUserProfile } from "@/lib/auth/profile";
 import { toSignInPath } from "@/lib/auth/routing";
 import { getCurrentUserCompanyContext } from "@/lib/company/context";
@@ -27,7 +32,7 @@ export default async function CompanyWorkspaceCreatePage() {
   if (!profileResult.ok) {
     return (
       <MainContainer size="content">
-        <EmptyState
+        <PageState
           icon={Building2}
           title="Company setup is unavailable"
           description={profileResult.message}
@@ -45,37 +50,48 @@ export default async function CompanyWorkspaceCreatePage() {
   const hasProviderCompanyMode = profileResult.profile.provider_account_type === "company";
 
   return (
-    <MainContainer size="content" className="space-y-4">
-      <Link href="/profile/company" className={buttonVariants({ variant: "ghost", size: "sm" })}>
-        <ArrowLeft className="size-4" />
-        Back to company workspace
-      </Link>
-
-      {!companyContextResult.ok && hasProviderCompanyMode ? (
-        <AuthStatusMessage
-          tone="error"
-          message={
-            "Existing company membership could not be verified right now. You can continue setup; creation remains idempotent and will route to your workspace when context is available."
+    <MainContainer size="content" className="space-y-5">
+      <PageShell>
+        <PageIntro
+          eyebrow={<span className="type-label">Company setup</span>}
+          title="Create a RoofHub company workspace"
+          description="Set up company identity and governance foundations before team, listings, and workflow routing are activated."
+          actions={
+            <Link href="/profile/company" className={buttonVariants({ variant: "ghost", size: "sm" })}>
+              <ArrowLeft className="size-4" />
+              Back to company workspace
+            </Link>
           }
         />
-      ) : null}
 
-      {companyContextResult.ok &&
-      companyContextResult.company.workspaceState === "selection_required" ? (
-        <CompanyWorkspaceSwitcher
-          workspaceOptions={companyContextResult.company.workspaceOptions}
-          activeOrganizationId={companyContextResult.company.activeOrganizationId}
-          redirectTo="/profile/company"
-          title="Choose the workspace you are operating in now"
-          description="This account already belongs to more than one RoofHub company workspace. Pick the active one before continuing with company onboarding or workspace operations."
-          submitLabel="Open selected workspace"
-        />
-      ) : null}
+        {!companyContextResult.ok && hasProviderCompanyMode ? (
+          <AuthStatusMessage
+            tone="error"
+            message="Existing company membership could not be verified right now. You can continue setup; creation remains idempotent and will route to your workspace when context is available."
+          />
+        ) : null}
 
-      {companyContextResult.ok &&
-      companyContextResult.company.workspaceState === "selection_required" ? null : (
-        <CompanyWorkspaceCreateForm />
-      )}
+        {companyContextResult.ok &&
+        companyContextResult.company.workspaceState === "selection_required" ? (
+          <CompanyWorkspaceSwitcher
+            workspaceOptions={companyContextResult.company.workspaceOptions}
+            activeOrganizationId={companyContextResult.company.activeOrganizationId}
+            redirectTo="/profile/company"
+            title="Choose the workspace you are operating in now"
+            description="This account already belongs to more than one RoofHub company workspace. Pick the active one before continuing with company onboarding or workspace operations."
+            submitLabel="Open selected workspace"
+          />
+        ) : (
+          <PageSection
+            eyebrow={<span className="type-label">Workspace creation</span>}
+            title="Company governance setup"
+            description="Create company identity details once, then continue to governance and team management surfaces."
+            contentClassName="pt-4"
+          >
+            <CompanyWorkspaceCreateForm />
+          </PageSection>
+        )}
+      </PageShell>
     </MainContainer>
   );
 }

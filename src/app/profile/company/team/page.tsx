@@ -5,10 +5,16 @@ import { ShieldAlert, UsersRound } from "lucide-react";
 import { CompanyIdentityHeader } from "@/components/company/company-identity-header";
 import { CompanyWorkspaceSwitcher } from "@/components/company/company-workspace-switcher";
 import { CompanyTeamManagement } from "@/components/company/company-team-management";
+import {
+  PageSection,
+  PageShell,
+  PageState,
+  PageSummaryCard,
+  PageSummaryRow,
+} from "@/components/layout/page-shell";
 import { MainContainer } from "@/components/layout/main-container";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
-import { EmptyState } from "@/components/ui/empty-state";
 import { toSignInPath } from "@/lib/auth/routing";
 import { getCurrentUserCompanyContext } from "@/lib/company/context";
 import { toCompanyLogoPublicUrl } from "@/lib/company/logo";
@@ -46,34 +52,30 @@ export default async function CompanyTeamPage() {
     if (workspaceResult.reason === "management_access_required") {
       return (
         <MainContainer size="content" className="space-y-5">
-          <section className="border-border bg-card rounded-3xl border p-5 sm:p-7">
-            <div className="space-y-3">
-              <Badge variant="outline">Company team</Badge>
-              <h1 className="type-page-title">Team management access is restricted</h1>
-              <p className="type-body-muted max-w-3xl">{workspaceResult.message}</p>
-              <div className="flex flex-wrap gap-2">
-                <Link href="/profile/company" className={buttonVariants({ size: "sm" })}>
-                  Back to company workspace
-                </Link>
-                <Link href="/profile" className={buttonVariants({ variant: "outline", size: "sm" })}>
-                  Back to profile
-                </Link>
-              </div>
-            </div>
-          </section>
-
-          <EmptyState
-            icon={ShieldAlert}
-            title="Owner or admin role required"
-            description="Company team management is available only to owner and admin membership roles."
-          />
+          <PageShell>
+            <PageState
+              icon={ShieldAlert}
+              title="Team management access is restricted"
+              description={workspaceResult.message}
+              action={
+                <div className="flex flex-wrap items-center gap-2">
+                  <Link href="/profile/company" className={buttonVariants({ size: "sm" })}>
+                    Back to company workspace
+                  </Link>
+                  <Link href="/profile" className={buttonVariants({ variant: "outline", size: "sm" })}>
+                    Back to profile
+                  </Link>
+                </div>
+              }
+            />
+          </PageShell>
         </MainContainer>
       );
     }
 
     return (
       <MainContainer size="content">
-        <EmptyState
+        <PageState
           icon={UsersRound}
           title="Team workspace unavailable"
           description={workspaceResult.message}
@@ -92,7 +94,7 @@ export default async function CompanyTeamPage() {
   if (!viewerMembershipRole) {
     return (
       <MainContainer size="content">
-        <EmptyState
+        <PageState
           icon={ShieldAlert}
           title="Team management access is restricted"
           description="Only owner or admin members can manage team membership."
@@ -100,43 +102,75 @@ export default async function CompanyTeamPage() {
       </MainContainer>
     );
   }
+  const activeMemberCount = workspaceResult.members.filter(
+    (member) => member.member_status === "active"
+  ).length;
+  const pendingInviteCount = workspaceResult.pendingInvites.length;
 
   return (
     <MainContainer size="wide" className="space-y-5">
-      <CompanyIdentityHeader
-        company={{
-          name: organization.name,
-          slug: organization.slug,
-          description: organization.description,
-          logoUrl,
-          contactEmail: organization.contact_email,
-          contactPhone: organization.contact_phone,
-          websiteUrl: organization.website_url,
-          coverageArea: organization.coverage_area,
-        }}
-        contextLabel="Company team"
-        supportingLabel="Invite staff, assign workspace roles, and manage active membership from the governance workspace."
-        actions={
-          <>
-            <Link href="/profile/company" className={buttonVariants({ variant: "outline", size: "sm" })}>
-              Back to workspace
-            </Link>
-            <Link
-              href={`/companies/${organization.slug}`}
-              className={buttonVariants({ variant: "ghost", size: "sm" })}
-            >
-              View public page
-            </Link>
-          </>
-        }
-      />
+      <PageShell>
+        <CompanyIdentityHeader
+          company={{
+            name: organization.name,
+            slug: organization.slug,
+            description: organization.description,
+            logoUrl,
+            contactEmail: organization.contact_email,
+            contactPhone: organization.contact_phone,
+            websiteUrl: organization.website_url,
+            coverageArea: organization.coverage_area,
+          }}
+          contextLabel="Company team"
+          supportingLabel="Invite staff, assign workspace roles, and manage active membership from the governance workspace."
+          actions={
+            <>
+              <Link href="/profile/company" className={buttonVariants({ variant: "outline", size: "sm" })}>
+                Back to workspace
+              </Link>
+              <Link
+                href={`/companies/${organization.slug}`}
+                className={buttonVariants({ variant: "ghost", size: "sm" })}
+              >
+                View public page
+              </Link>
+            </>
+          }
+        />
 
-      <CompanyTeamManagement
-        organizationId={organization.id}
-        viewerMembershipRole={viewerMembershipRole}
-        members={workspaceResult.members}
-        pendingInvites={workspaceResult.pendingInvites}
-      />
+        <PageSummaryRow>
+          <PageSummaryCard
+            label="Active members"
+            value={new Intl.NumberFormat("en").format(activeMemberCount)}
+            detail="Users with active access to this company workspace."
+            tone="primary"
+          />
+          <PageSummaryCard
+            label="Pending invites"
+            value={new Intl.NumberFormat("en").format(pendingInviteCount)}
+            detail="Invite tokens waiting for acceptance or expiry."
+          />
+          <PageSummaryCard
+            label="Your governance role"
+            value={viewerMembershipRole === "owner" ? "Owner" : "Admin"}
+            detail="Determines which membership and invite controls you can perform."
+          />
+        </PageSummaryRow>
+
+        <PageSection
+          eyebrow={<Badge variant="outline">Team management</Badge>}
+          title="Members and invite lifecycle"
+          description="Manage workspace roles, pending invites, and member status in one governance surface."
+          contentClassName="pt-4"
+        >
+          <CompanyTeamManagement
+            organizationId={organization.id}
+            viewerMembershipRole={viewerMembershipRole}
+            members={workspaceResult.members}
+            pendingInvites={workspaceResult.pendingInvites}
+          />
+        </PageSection>
+      </PageShell>
     </MainContainer>
   );
 }

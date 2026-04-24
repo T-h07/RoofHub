@@ -6,9 +6,9 @@ import { CompanyIdentityHeader } from "@/components/company/company-identity-hea
 import { CompanyWorkspaceSwitcher } from "@/components/company/company-workspace-switcher";
 import { CompanyProfileForm } from "@/components/company/company-profile-form";
 import { AuthStatusMessage } from "@/components/auth/auth-status-message";
+import { PageSection, PageShell, PageState } from "@/components/layout/page-shell";
 import { MainContainer } from "@/components/layout/main-container";
 import { buttonVariants } from "@/components/ui/button";
-import { EmptyState } from "@/components/ui/empty-state";
 import { toSignInPath } from "@/lib/auth/routing";
 import { toCompanyLogoPublicUrl } from "@/lib/company/logo";
 import { getCurrentUserCompanyContext } from "@/lib/company/context";
@@ -46,7 +46,7 @@ export default async function CompanyProfileEditPage({
   if (!companyContextResult.ok) {
     return (
       <MainContainer size="content">
-        <EmptyState
+        <PageState
           icon={Building2}
           title="Company profile editing is unavailable"
           description={companyContextResult.message}
@@ -78,7 +78,7 @@ export default async function CompanyProfileEditPage({
   if (!ownerOrganization || !companyContextResult.company.canEditProfile) {
     return (
       <MainContainer size="content">
-        <EmptyState
+        <PageState
           icon={Building2}
           title="Company profile editing requires an owner workspace"
           description="Select an owner-managed company workspace before editing company profile details."
@@ -97,53 +97,62 @@ export default async function CompanyProfileEditPage({
 
   return (
     <MainContainer size="wide" className="space-y-5">
-      <Link href="/profile/company" className={buttonVariants({ variant: "ghost", size: "sm" })}>
-        <ArrowLeft className="size-4" />
-        Back to company workspace
-      </Link>
+      <PageShell>
+        {status === "saved" ? (
+          <AuthStatusMessage tone="success" message="Company profile saved successfully." />
+        ) : null}
 
-      {status === "saved" ? (
-        <AuthStatusMessage tone="success" message="Company profile saved successfully." />
-      ) : null}
+        <CompanyIdentityHeader
+          company={{
+            name: ownerOrganization.name,
+            slug: ownerOrganization.slug,
+            description: ownerOrganization.description,
+            logoUrl,
+            contactEmail: ownerOrganization.contact_email,
+            contactPhone: ownerOrganization.contact_phone,
+            websiteUrl: ownerOrganization.website_url,
+            coverageArea: ownerOrganization.coverage_area,
+          }}
+          contextLabel="Company profile editor"
+          supportingLabel="Refine how your company appears in the RoofHub marketplace before seekers view your public profile."
+          actions={
+            <>
+              <Link href="/profile/company" className={buttonVariants({ variant: "ghost", size: "sm" })}>
+                <ArrowLeft className="size-4" />
+                Back to company workspace
+              </Link>
+              <Link
+                href={`/companies/${ownerOrganization.slug}`}
+                className={buttonVariants({ variant: "outline", size: "sm" })}
+              >
+                View public company page
+              </Link>
+            </>
+          }
+        />
 
-      <CompanyIdentityHeader
-        company={{
-          name: ownerOrganization.name,
-          slug: ownerOrganization.slug,
-          description: ownerOrganization.description,
-          logoUrl,
-          contactEmail: ownerOrganization.contact_email,
-          contactPhone: ownerOrganization.contact_phone,
-          websiteUrl: ownerOrganization.website_url,
-          coverageArea: ownerOrganization.coverage_area,
-        }}
-        contextLabel="Company profile editor"
-        supportingLabel="Refine how your company appears in the RoofHub marketplace before seekers view your public profile."
-        actions={
-          <Link
-            href={`/companies/${ownerOrganization.slug}`}
-            className={buttonVariants({ variant: "outline", size: "sm" })}
-          >
-            View public company page
-          </Link>
-        }
-      />
-
-      <CompanyProfileForm
-        key={`${ownerOrganization.updated_at}:${ownerOrganization.logo_path ?? "no-logo"}`}
-        company={{
-          id: ownerOrganization.id,
-          name: ownerOrganization.name,
-          slug: ownerOrganization.slug,
-          description: ownerOrganization.description,
-          logoUrl,
-          logoPath: ownerOrganization.logo_path,
-          contactEmail: ownerOrganization.contact_email,
-          contactPhone: ownerOrganization.contact_phone,
-          websiteUrl: ownerOrganization.website_url,
-          coverageArea: ownerOrganization.coverage_area,
-        }}
-      />
+        <PageSection
+          title="Company profile fields"
+          description="Update identity, contact channels, coverage, and branding details for governance and public presence."
+          contentClassName="pt-4"
+        >
+          <CompanyProfileForm
+            key={`${ownerOrganization.updated_at}:${ownerOrganization.logo_path ?? "no-logo"}`}
+            company={{
+              id: ownerOrganization.id,
+              name: ownerOrganization.name,
+              slug: ownerOrganization.slug,
+              description: ownerOrganization.description,
+              logoUrl,
+              logoPath: ownerOrganization.logo_path,
+              contactEmail: ownerOrganization.contact_email,
+              contactPhone: ownerOrganization.contact_phone,
+              websiteUrl: ownerOrganization.website_url,
+              coverageArea: ownerOrganization.coverage_area,
+            }}
+          />
+        </PageSection>
+      </PageShell>
     </MainContainer>
   );
 }

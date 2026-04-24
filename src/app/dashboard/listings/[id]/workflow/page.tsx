@@ -3,11 +3,17 @@ import { notFound } from "next/navigation";
 import { ClipboardCheck, ShieldAlert } from "lucide-react";
 
 import { ProviderAccessRequired } from "@/components/dashboard/provider-access-required";
+import {
+  PageIntro,
+  PageNotice,
+  PageSection,
+  PageShell,
+  PageState,
+} from "@/components/layout/page-shell";
 import { MainContainer } from "@/components/layout/main-container";
 import { CompanyListingWorkflowPanel } from "@/components/listings/company-listing-workflow-panel";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
-import { EmptyState } from "@/components/ui/empty-state";
 import { loadCompanyListingWorkflowContextForViewer } from "@/lib/listings/company-workflow/queries";
 import { getProviderRouteContext } from "@/lib/listings/provider-wizard/access";
 
@@ -30,7 +36,7 @@ export default async function DashboardListingWorkflowPage({ params }: Dashboard
   if (!context.ok) {
     return (
       <MainContainer size="content">
-        <EmptyState
+        <PageState
           icon={ClipboardCheck}
           title="Listing workflow unavailable"
           description={context.message}
@@ -58,19 +64,34 @@ export default async function DashboardListingWorkflowPage({ params }: Dashboard
     if (workflowResult.reason === "not_company_listing") {
       return (
         <MainContainer size="content" className="space-y-5">
-          <section className="border-border bg-card rounded-2xl border p-5 sm:p-6">
-            <Badge variant="outline">Workflow</Badge>
-            <h1 className="type-page-title mt-2">Company workflow applies to company-owned listings only</h1>
-            <p className="type-body-muted mt-2">This listing uses the individual lifecycle flow and does not require company review states.</p>
-            <div className="mt-4 flex flex-wrap gap-2">
-              <Link href={`/dashboard/listings/${id}/edit?step=review`} className={buttonVariants({ size: "sm" })}>
-                Open listing editor
-              </Link>
-              <Link href="/dashboard/listings" className={buttonVariants({ variant: "outline", size: "sm" })}>
-                Back to listings
-              </Link>
-            </div>
-          </section>
+          <PageShell>
+            <PageIntro
+              eyebrow={<Badge variant="outline">Workflow</Badge>}
+              title="Company workflow applies to company-owned listings only"
+              description="This listing uses the individual lifecycle flow and does not require company review states."
+              actions={
+                <>
+                  <Link
+                    href={`/dashboard/listings/${id}/edit?step=review`}
+                    className={buttonVariants({ size: "sm" })}
+                  >
+                    Open listing editor
+                  </Link>
+                  <Link
+                    href="/dashboard/listings"
+                    className={buttonVariants({ variant: "outline", size: "sm" })}
+                  >
+                    Back to listings
+                  </Link>
+                </>
+              }
+            />
+            <PageNotice
+              tone="warning"
+              title="Review controls are not required on this listing"
+              description="Continue lifecycle actions from the listing editor where publish and unpublish are managed directly."
+            />
+          </PageShell>
         </MainContainer>
       );
     }
@@ -80,41 +101,63 @@ export default async function DashboardListingWorkflowPage({ params }: Dashboard
 
     return (
       <MainContainer size="content">
-        <EmptyState icon={icon} title={title} description={workflowResult.message} />
+        <PageState icon={icon} title={title} description={workflowResult.message} />
       </MainContainer>
     );
   }
 
   return (
     <MainContainer size="wide" className="space-y-5">
-      <section className="border-border/75 bg-card/60 rounded-xl border p-5 sm:p-6">
-        <Badge variant="primary">Company listing workflow</Badge>
-        <h1 className="type-page-title mt-2 max-w-4xl">Review, approve, and publish company listings with persisted timeline history.</h1>
-        <p className="type-body-muted mt-2 max-w-3xl">
-          Agent-created company listings remain private until review and publish actions are completed by trusted company workflow roles.
-        </p>
-        <div className="mt-4 flex flex-wrap gap-2">
-          <Link href="/dashboard/listings" className={buttonVariants({ variant: "outline", size: "sm" })}>
-            Back to listings
-          </Link>
-          {(workflowResult.viewerRole === "owner" ||
+      <PageShell>
+        <PageIntro
+          eyebrow={<Badge variant="primary">Company listing workflow</Badge>}
+          title={
+            workflowResult.viewerRole === "owner" ||
             workflowResult.viewerRole === "admin" ||
-            workflowResult.viewerRole === "manager") ? (
-            <Link href="/dashboard/activity" className={buttonVariants({ variant: "ghost", size: "sm" })}>
-              Open activity log
-            </Link>
-          ) : null}
-        </div>
-      </section>
+            workflowResult.viewerRole === "manager"
+              ? "Review, approve, and publish company listings with persisted timeline history."
+              : "Track live workflow state and submit listing updates for company review."
+          }
+          description={
+            workflowResult.viewerRole === "owner" ||
+            workflowResult.viewerRole === "admin" ||
+            workflowResult.viewerRole === "manager"
+              ? "Agent-created company listings remain private until review and publish actions are completed by trusted company workflow roles."
+              : "Company-owned listings stay controlled by reviewer roles after submission while you continue edits and follow workflow outcomes."
+          }
+          actions={
+            <>
+              <Link href="/dashboard/listings" className={buttonVariants({ variant: "outline", size: "sm" })}>
+                Back to listings
+              </Link>
+              {(workflowResult.viewerRole === "owner" ||
+                workflowResult.viewerRole === "admin" ||
+                workflowResult.viewerRole === "manager") ? (
+                <Link href="/dashboard/activity" className={buttonVariants({ variant: "ghost", size: "sm" })}>
+                  Open activity log
+                </Link>
+              ) : null}
+            </>
+          }
+        />
 
-      <CompanyListingWorkflowPanel
-        listingId={workflowResult.listing.id}
-        listingTitle={workflowResult.listing.title}
-        listingStatus={workflowResult.listing.listing_status}
-        viewerRole={workflowResult.viewerRole}
-        capabilities={workflowResult.capabilities}
-        timeline={workflowResult.timeline}
-      />
+        <PageSection
+          eyebrow={<Badge variant="outline">Workflow controls</Badge>}
+          title="Review timeline and transitions"
+          description="Complete review actions, monitor stage history, and maintain deterministic listing workflow outcomes."
+          contentClassName="pt-4"
+        >
+          <CompanyListingWorkflowPanel
+            listingId={workflowResult.listing.id}
+            listingTitle={workflowResult.listing.title}
+            listingStatus={workflowResult.listing.listing_status}
+            viewerRole={workflowResult.viewerRole}
+            capabilities={workflowResult.capabilities}
+            timeline={workflowResult.timeline}
+            activeEditSubmission={workflowResult.activeEditSubmission}
+          />
+        </PageSection>
+      </PageShell>
     </MainContainer>
   );
 }
