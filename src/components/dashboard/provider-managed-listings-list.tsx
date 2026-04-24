@@ -9,8 +9,15 @@ import { buttonVariants } from "@/components/ui/button";
 import type { ProviderManagedListing, ProviderListingType } from "@/lib/listings/provider-dashboard/types";
 import { isPublicDiscoveryListing } from "@/lib/listings/visibility";
 
+type ListingsRoleMode =
+  | "agent_primary"
+  | "manager_secondary"
+  | "owner_secondary"
+  | "individual_primary";
+
 type ProviderManagedListingsListProps = {
   listings: ProviderManagedListing[];
+  roleMode?: ListingsRoleMode;
 };
 
 const LISTING_TYPE_LABELS: Record<ProviderListingType, string> = {
@@ -67,6 +74,113 @@ function buildEditHref(listingId: string) {
   return `/dashboard/listings/${listingId}/edit?step=basics`;
 }
 
+function buildWorkflowHref(listingId: string) {
+  return `/dashboard/listings/${listingId}/workflow`;
+}
+
+function isReviewerSecondaryRoleMode(roleMode: ListingsRoleMode) {
+  return roleMode === "manager_secondary" || roleMode === "owner_secondary";
+}
+
+function buildCompanyListingActionModel(input: {
+  listing: ProviderManagedListing;
+  roleMode: ListingsRoleMode;
+}) {
+  const { listing, roleMode } = input;
+  const workflowHref = buildWorkflowHref(listing.id);
+  const editHref = buildEditHref(listing.id);
+  const isReviewerSecondary = isReviewerSecondaryRoleMode(roleMode);
+
+  if (isReviewerSecondary) {
+    switch (listing.listing_status) {
+      case "draft":
+        return {
+          primary: { label: "Inspect draft", href: editHref },
+          secondary: { label: "Workflow state", href: workflowHref },
+        };
+      case "needs_changes":
+        return {
+          primary: { label: "Workflow follow-up", href: workflowHref },
+          secondary: { label: "Inspect listing", href: editHref },
+        };
+      case "submitted_for_review":
+        return {
+          primary: { label: "Review workflow", href: workflowHref },
+          secondary: { label: "Inspect listing", href: editHref },
+        };
+      case "approved":
+        return {
+          primary: { label: "Publish workflow", href: workflowHref },
+          secondary: { label: "Inspect listing", href: editHref },
+        };
+      default:
+        return {
+          primary: { label: "Open workflow", href: workflowHref },
+          secondary: { label: "Open listing", href: editHref },
+        };
+    }
+  }
+
+  switch (listing.listing_status) {
+    case "draft":
+      return {
+        primary: { label: "Continue editing", href: editHref },
+        secondary: { label: "Workflow state", href: workflowHref },
+      };
+    case "needs_changes":
+      return {
+        primary: { label: "Resolve changes", href: editHref },
+        secondary: { label: "Workflow notes", href: workflowHref },
+      };
+    case "submitted_for_review":
+      return {
+        primary: { label: "Track review", href: workflowHref },
+        secondary: { label: "Open listing", href: editHref },
+      };
+    default:
+      return {
+        primary: { label: "Open listing", href: editHref },
+        secondary: { label: "Workflow history", href: workflowHref },
+      };
+  }
+}
+
+function buildListingStatusGuidance(listing: ProviderManagedListing, roleMode: ListingsRoleMode) {
+  const isReviewerSecondary = isReviewerSecondaryRoleMode(roleMode);
+
+  if (isReviewerSecondary) {
+    switch (listing.listing_status) {
+      case "submitted_for_review":
+        return "Reviewer action required now.";
+      case "needs_changes":
+        return "Waiting for revision progress.";
+      case "approved":
+        return "Ready for publish workflow decisions.";
+      case "draft":
+        return "Draft not yet in review queue.";
+      case "hidden_by_admin":
+        return "Moderation lock is active.";
+      default:
+        return "Use workflow for state history and routing.";
+    }
+  }
+
+  switch (listing.listing_status) {
+    case "draft":
+      return "Next step: complete details and submit.";
+    case "needs_changes":
+      return "Next step: apply feedback and resubmit.";
+    case "submitted_for_review":
+      return "Waiting for reviewer decision.";
+    case "approved":
+      return "Approved by reviewer, check workflow state.";
+    case "hidden_by_admin":
+      return "Moderation lock is active.";
+    default:
+      return "Keep listing details current.";
+  }
+}
+
 function renderOwnershipBadge(listing: ProviderManagedListing) {
   return listing.ownershipMode === "company" ? (
     <Badge variant="outline" className="text-[10px]">
@@ -97,7 +211,10 @@ function renderPreviewImage(listing: ProviderManagedListing) {
   );
 }
 
-export function ProviderManagedListingsList({ listings }: ProviderManagedListingsListProps) {
+export function ProviderManagedListingsList({
+  listings,
+  roleMode = "individual_primary",
+}: ProviderManagedListingsListProps) {
   return (
     <>
       <div className="hidden overflow-hidden rounded-xl border border-border/75 lg:block">
@@ -111,7 +228,14 @@ export function ProviderManagedListingsList({ listings }: ProviderManagedListing
             </tr>
           </thead>
           <tbody>
-            {listings.map((listing) => (
+            {listings.map((listing) => {
+              const statusGuidance = buildListingStatusGuidance(listing, roleMode);
+              const companyActionModel =
+                listing.ownershipMode === "company"
+                  ? buildCompanyListingActionModel({ listing, roleMode })
+                  : null;
+
+              return (
               <tr key={listing.id} className="border-t border-border/70 align-top">
                 <td className="px-4 py-3.5">
                   <div className="flex items-start gap-3">
@@ -152,6 +276,9 @@ export function ProviderManagedListingsList({ listings }: ProviderManagedListing
                 </td>
                 <td className="px-4 py-3.5">
                   <ProviderListingStatusBadge status={listing.listing_status} />
+                  <p className="text-muted-foreground mt-1 text-xs">
+                    {statusGuidance}
+                  </p>
                 </td>
                 <td className="px-4 py-3.5">
                   <p className="text-muted-foreground inline-flex items-center gap-1 text-xs">
@@ -160,19 +287,19 @@ export function ProviderManagedListingsList({ listings }: ProviderManagedListing
                   </p>
                 </td>
                 <td className="px-4 py-3.5">
-                  {listing.ownershipMode === "company" ? (
-                    <div className="flex flex-wrap items-center gap-2">
+                  {companyActionModel ? (
+                    <div className="flex flex-wrap items-center gap-1.5">
                       <Link
-                        href={`/dashboard/listings/${listing.id}/workflow`}
+                        href={companyActionModel.primary.href}
                         className={buttonVariants({ size: "sm" })}
                       >
-                        Workflow
+                        {companyActionModel.primary.label}
                       </Link>
                       <Link
-                        href={buildEditHref(listing.id)}
+                        href={companyActionModel.secondary.href}
                         className={buttonVariants({ variant: "outline", size: "sm" })}
                       >
-                        Edit
+                        {companyActionModel.secondary.label}
                       </Link>
                     </div>
                   ) : (
@@ -185,13 +312,21 @@ export function ProviderManagedListingsList({ listings }: ProviderManagedListing
                   )}
                 </td>
               </tr>
-            ))}
+            );
+            })}
           </tbody>
         </table>
       </div>
 
       <div className="grid gap-3 lg:hidden">
-        {listings.map((listing) => (
+        {listings.map((listing) => {
+          const statusGuidance = buildListingStatusGuidance(listing, roleMode);
+          const companyActionModel =
+            listing.ownershipMode === "company"
+              ? buildCompanyListingActionModel({ listing, roleMode })
+              : null;
+
+          return (
           <article
             key={listing.id}
             className="border-border/75 bg-card/58 space-y-3 rounded-xl border p-4"
@@ -201,6 +336,9 @@ export function ProviderManagedListingsList({ listings }: ProviderManagedListing
                 <p className="truncate text-sm font-semibold tracking-tight">{listing.title}</p>
                 <p className="text-muted-foreground text-xs">
                   {LISTING_TYPE_LABELS[listing.listing_type]} • {formatPropertyType(listing.property_type)}
+                </p>
+                <p className="text-muted-foreground text-[11px]">
+                  {statusGuidance}
                 </p>
               </div>
               <ProviderListingStatusBadge status={listing.listing_status} />
@@ -236,19 +374,19 @@ export function ProviderManagedListingsList({ listings }: ProviderManagedListing
               ) : null}
             </div>
 
-            {listing.ownershipMode === "company" ? (
+            {companyActionModel ? (
               <div className="flex flex-wrap gap-2">
                 <Link
-                  href={`/dashboard/listings/${listing.id}/workflow`}
+                  href={companyActionModel.primary.href}
                   className={buttonVariants({ size: "sm" })}
                 >
-                  Workflow
+                  {companyActionModel.primary.label}
                 </Link>
                 <Link
-                  href={buildEditHref(listing.id)}
+                  href={companyActionModel.secondary.href}
                   className={buttonVariants({ variant: "outline", size: "sm" })}
                 >
-                  Edit
+                  {companyActionModel.secondary.label}
                 </Link>
               </div>
             ) : (
@@ -260,7 +398,8 @@ export function ProviderManagedListingsList({ listings }: ProviderManagedListing
               />
             )}
           </article>
-        ))}
+        );
+        })}
       </div>
     </>
   );

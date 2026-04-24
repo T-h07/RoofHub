@@ -3,12 +3,12 @@ import { ListFilter, PlusSquare, Rows3, TriangleAlert } from "lucide-react";
 
 import { CompanyWorkspaceSwitcher } from "@/components/company/company-workspace-switcher";
 import { ProviderManagedListingsList } from "@/components/dashboard/provider-managed-listings-list";
-import { ProviderOverviewMetrics } from "@/components/dashboard/provider-overview-metrics";
 import { ProviderAccessRequired } from "@/components/dashboard/provider-access-required";
 import { MainContainer } from "@/components/layout/main-container";
 import { PageIntro, PageSection, PageShell, PageState } from "@/components/layout/page-shell";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
+import { ORGANIZATION_MEMBER_ROLE_LABELS, type OrganizationMemberRole } from "@/lib/company/team-types";
 import {
   PROVIDER_LISTING_FILTER_LABELS,
 } from "@/lib/listings/provider-dashboard/status";
@@ -28,6 +28,56 @@ import { cn } from "@/lib/utils";
 type DashboardListingsPageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
+
+type ListingsRoleMode =
+  | "agent_primary"
+  | "manager_secondary"
+  | "owner_secondary"
+  | "individual_primary";
+
+function resolveListingsRoleMode(role: OrganizationMemberRole | null): ListingsRoleMode {
+  if (role === "manager") {
+    return "manager_secondary";
+  }
+
+  if (role === "owner" || role === "admin") {
+    return "owner_secondary";
+  }
+
+  if (role === "agent") {
+    return "agent_primary";
+  }
+
+  return "individual_primary";
+}
+
+function isSecondaryListingsMode(mode: ListingsRoleMode) {
+  return mode === "manager_secondary" || mode === "owner_secondary";
+}
+
+function buildListingsIntroCopy(mode: ListingsRoleMode) {
+  if (mode === "agent_primary") {
+    return {
+      title: "Listings is your primary daily work surface.",
+      description:
+        "Create drafts, continue edits, submit for review, and track review outcomes from one focused inventory workflow.",
+    };
+  }
+
+  if (mode === "individual_primary") {
+    return {
+      title: "Listings is your primary inventory workflow.",
+      description:
+        "Create and manage listing drafts, update lifecycle state, and continue publishing work from a single queue.",
+    };
+  }
+
+  return {
+    title: "Listings is a secondary inventory surface for reviewer roles.",
+    description:
+      "Use dashboard as the primary review hub, then use listings for targeted inspection, context, and workflow continuation.",
+  };
+}
 
 function readStatusFilter(searchParams: Record<string, string | string[] | undefined>) {
   const raw = searchParams.status;
@@ -163,6 +213,13 @@ export default async function DashboardListingsPage({ searchParams }: DashboardL
     listingCreationContext.ok && listingCreationContext.context.ownershipMode === "company"
       ? listingCreationContext.context.organizationId
       : null;
+  const activeCompanyRole =
+    listingCreationContext.ok && listingCreationContext.context.ownershipMode === "company"
+      ? listingCreationContext.company?.activeRole ?? null
+      : null;
+  const listingsRoleMode = resolveListingsRoleMode(activeCompanyRole);
+  const introCopy = buildListingsIntroCopy(listingsRoleMode);
+  const isSecondaryMode = isSecondaryListingsMode(listingsRoleMode);
 
   const [overviewResult, listingsResult] = await Promise.all([
     loadProviderListingOverviewMetrics(context.supabase, {
@@ -181,31 +238,121 @@ export default async function DashboardListingsPage({ searchParams }: DashboardL
     <MainContainer size="wide" className="space-y-5">
       <PageShell>
         <PageIntro
-          eyebrow={<Badge variant="primary">My listings</Badge>}
-          title="Manage listings with status-aware lifecycle actions."
-          description="Filter by listing state, continue edits, and update lifecycle transitions across individual and company-owned inventory."
-          actions={
+          eyebrow={
             <>
-              <Link href="/dashboard/listings/new" className={buttonVariants({ size: "sm" })}>
-                <PlusSquare className="size-4" aria-hidden="true" />
-                New listing draft
-              </Link>
-              <Link href="/dashboard" className={buttonVariants({ variant: "outline", size: "sm" })}>
-                Back to dashboard
-              </Link>
+              <Badge variant="primary">Listings workspace</Badge>
+              {activeCompanyRole ? (
+                <Badge variant="outline">Active role: {ORGANIZATION_MEMBER_ROLE_LABELS[activeCompanyRole]}</Badge>
+              ) : null}
             </>
+          }
+          title={introCopy.title}
+          description={introCopy.description}
+          actions={
+            isSecondaryMode ? (
+              <>
+                <Link href="/dashboard" className={buttonVariants({ size: "sm" })}>
+                  Back to operations dashboard
+                </Link>
+                <Link href="/dashboard/listings/new" className={buttonVariants({ variant: "ghost", size: "sm" })}>
+                  <PlusSquare className="size-4" aria-hidden="true" />
+                  Create listing draft
+                </Link>
+              </>
+            ) : (
+              <>
+                <Link href="/dashboard/listings/new" className={buttonVariants({ size: "sm" })}>
+                  <PlusSquare className="size-4" aria-hidden="true" />
+                  Create listing draft
+                </Link>
+                <Link href="/dashboard" className={buttonVariants({ variant: "outline", size: "sm" })}>
+                  Back to dashboard
+                </Link>
+              </>
+            )
+          }
+          meta={
+            overviewResult.ok ? (
+              <>
+                <span className="border-border/70 bg-surface-soft inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs">
+                  <span className="text-muted-foreground">Draft</span>
+                  <span className="font-semibold">{overviewResult.metrics.draft}</span>
+                </span>
+                <span className="border-border/70 bg-surface-soft inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs">
+                  <span className="text-muted-foreground">In review</span>
+                  <span className="font-semibold">{overviewResult.metrics.submittedForReview}</span>
+                </span>
+                <span className="border-border/70 bg-surface-soft inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs">
+                  <span className="text-muted-foreground">Needs changes</span>
+                  <span className="font-semibold">{overviewResult.metrics.needsChanges}</span>
+                </span>
+                <span className="border-border/70 bg-surface-soft inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs">
+                  <span className="text-muted-foreground">Active</span>
+                  <span className="font-semibold">{overviewResult.metrics.published}</span>
+                </span>
+              </>
+            ) : (
+              <span className="text-muted-foreground text-xs">{overviewResult.message}</span>
+            )
           }
         />
 
+        <PageSection
+          eyebrow={<Badge variant="outline">Workflow sequence</Badge>}
+          title={
+            isSecondaryMode
+              ? "Use listings for inventory context and targeted workflow continuation"
+              : "Follow one clean listing work sequence"
+          }
+          description={
+            isSecondaryMode
+              ? "Dashboard remains the primary queue for review roles. Listings is focused on inspection and direct row-level continuation."
+              : "Scan status, continue edits, submit for review, then return to track outcomes without leaving this surface."
+          }
+        >
+          <div className="grid gap-2.5 md:grid-cols-3">
+            <Link
+              href="/dashboard/listings?status=draft"
+              className={buttonVariants({ variant: "ghost", size: "sm" }) + " h-auto justify-between px-3.5 py-3"}
+            >
+              <span className="text-left">
+                <span className="block text-sm font-semibold tracking-tight">1. Edit draft inventory</span>
+                <span className="text-muted-foreground block text-xs">Continue listing details and media.</span>
+              </span>
+              <span className="text-sm font-semibold">{overviewResult.ok ? overviewResult.metrics.draft : "—"}</span>
+            </Link>
+            <Link
+              href="/dashboard/listings?status=submitted_for_review"
+              className={buttonVariants({ variant: "ghost", size: "sm" }) + " h-auto justify-between px-3.5 py-3"}
+            >
+              <span className="text-left">
+                <span className="block text-sm font-semibold tracking-tight">2. Follow review queue state</span>
+                <span className="text-muted-foreground block text-xs">
+                  Track submitted listings through workflow decisions.
+                </span>
+              </span>
+              <span className="text-sm font-semibold">
+                {overviewResult.ok ? overviewResult.metrics.submittedForReview : "—"}
+              </span>
+            </Link>
+            <Link
+              href="/dashboard/listings?status=needs_changes"
+              className={buttonVariants({ variant: "ghost", size: "sm" }) + " h-auto justify-between px-3.5 py-3"}
+            >
+              <span className="text-left">
+                <span className="block text-sm font-semibold tracking-tight">3. Resolve change requests</span>
+                <span className="text-muted-foreground block text-xs">Apply reviewer feedback and resubmit.</span>
+              </span>
+              <span className="text-sm font-semibold">
+                {overviewResult.ok ? overviewResult.metrics.needsChanges : "—"}
+              </span>
+            </Link>
+          </div>
+        </PageSection>
+
         {!overviewResult.ok ? (
-          <PageState
-            icon={TriangleAlert}
-            title="Listing metrics unavailable"
-            description={overviewResult.message}
-          />
-        ) : (
-          <ProviderOverviewMetrics metrics={overviewResult.metrics} />
-        )}
+          <PageState icon={TriangleAlert} title="Listing metrics unavailable" description={overviewResult.message} />
+        ) : null}
 
         <PageSection
           eyebrow={
@@ -215,7 +362,7 @@ export default async function DashboardListingsPage({ searchParams }: DashboardL
             </Badge>
           }
           title="Inventory filters"
-          description="Keep the lifecycle queue readable by switching between published inventory, drafts, review states, and inactive listings."
+          description="Filter by lifecycle state to keep inventory scanning fast and action priority clear."
         >
           <div className="flex flex-wrap gap-2">
             {PROVIDER_LISTING_STATUS_FILTERS.map((filter) => {
@@ -255,7 +402,11 @@ export default async function DashboardListingsPage({ searchParams }: DashboardL
         <PageSection
           eyebrow={<Badge variant="outline">Managed inventory</Badge>}
           title="Listings in the current queue"
-          description="Review the listings that match the current lifecycle filter and continue directly into edit or workflow actions."
+          description={
+            isSecondaryMode
+              ? "Inspect listings in the selected state and open targeted workflow continuation where needed."
+              : "Review listings in the selected state and continue directly into the next relevant action."
+          }
         >
           {!listingsResult.ok ? (
             <PageState icon={Rows3} title="Managed listings unavailable" description={listingsResult.message} />
@@ -265,13 +416,22 @@ export default async function DashboardListingsPage({ searchParams }: DashboardL
               title="No listings in this state"
               description="Adjust filters or create a new listing draft to build your inventory."
               action={
-                <Link href="/dashboard/listings/new" className={buttonVariants({ size: "sm" })}>
-                  Start listing wizard
-                </Link>
+                isSecondaryMode ? (
+                  <Link href="/dashboard" className={buttonVariants({ size: "sm" })}>
+                    Back to operations dashboard
+                  </Link>
+                ) : (
+                  <Link href="/dashboard/listings/new" className={buttonVariants({ size: "sm" })}>
+                    Start listing wizard
+                  </Link>
+                )
               }
             />
           ) : (
-            <ProviderManagedListingsList listings={listingsResult.listings} />
+            <ProviderManagedListingsList
+              listings={listingsResult.listings}
+              roleMode={listingsRoleMode}
+            />
           )}
         </PageSection>
       </PageShell>
