@@ -61,6 +61,10 @@ const TYPE_LABELS: Record<string, string> = {
   [NOTIFICATION_TYPES.listingApproved]: "Approved",
   [NOTIFICATION_TYPES.listingPublished]: "Published",
   [NOTIFICATION_TYPES.listingUnpublished]: "Unpublished",
+  [NOTIFICATION_TYPES.listingEditReviewNeeded]: "Edit review needed",
+  [NOTIFICATION_TYPES.listingEditApproved]: "Edit approved",
+  [NOTIFICATION_TYPES.listingEditNeedsChanges]: "Edit needs changes",
+  [NOTIFICATION_TYPES.listingEditRejected]: "Edit rejected",
 };
 
 export function getNotificationCategory(type: string): NotificationCategory {
@@ -80,7 +84,7 @@ export function getNotificationTypeLabel(type: string) {
     return "Message update";
   }
 
-  if (type.startsWith("listing.workflow.")) {
+  if (type.startsWith("listing.")) {
     return "Listing update";
   }
 
@@ -117,13 +121,234 @@ export function getNotificationPriorityBadgeVariant(
   return "neutral";
 }
 
+function getMetadataStringValue(
+  notification: NotificationRecord,
+  key: string
+) {
+  const metadata =
+    notification.metadata &&
+    typeof notification.metadata === "object" &&
+    !Array.isArray(notification.metadata)
+      ? (notification.metadata as Record<string, unknown>)
+      : null;
+  const rawValue = metadata?.[key];
+  if (typeof rawValue !== "string") {
+    return null;
+  }
+
+  const normalized = rawValue.trim();
+  return normalized.length > 0 ? normalized : null;
+}
+
+function getConversationId(notification: NotificationRecord) {
+  if (
+    notification.entity_type === "conversation" &&
+    typeof notification.entity_id === "string" &&
+    notification.entity_id.trim().length > 0
+  ) {
+    return notification.entity_id.trim();
+  }
+
+  return getMetadataStringValue(notification, "conversation_id");
+}
+
+function getListingId(notification: NotificationRecord) {
+  if (
+    (notification.entity_type === "listing" ||
+      notification.entity_type === "listing_edit_submission") &&
+    typeof notification.entity_id === "string" &&
+    notification.entity_id.trim().length > 0
+  ) {
+    return notification.entity_id.trim();
+  }
+
+  return getMetadataStringValue(notification, "listing_id");
+}
+
+function getConversationLane(notification: NotificationRecord) {
+  const routingStatus = getMetadataStringValue(notification, "routing_status");
+  const eventType = getMetadataStringValue(notification, "event_type");
+  const nextAssigneeUserId = getMetadataStringValue(
+    notification,
+    "next_assignee_user_id"
+  );
+
+  if (routingStatus === "shared_queue") {
+    return "queue" as const;
+  }
+
+  if (routingStatus === "assigned_member") {
+    if (
+      nextAssigneeUserId &&
+      nextAssigneeUserId === notification.user_id
+    ) {
+      return "assigned" as const;
+    }
+
+    if (
+      notification.type === NOTIFICATION_TYPES.conversationAssigned ||
+      notification.type === NOTIFICATION_TYPES.conversationReassigned
+    ) {
+      return "queue" as const;
+    }
+
+    return "assigned" as const;
+  }
+
+  if (eventType === NOTIFICATION_TYPES.conversationUnassigned) {
+    return "queue" as const;
+  }
+
+  if (
+    eventType === NOTIFICATION_TYPES.conversationAssigned ||
+    eventType === NOTIFICATION_TYPES.conversationReassigned
+  ) {
+    if (
+      nextAssigneeUserId &&
+      nextAssigneeUserId === notification.user_id
+    ) {
+      return "assigned" as const;
+    }
+
+    return "queue" as const;
+  }
+
+  return null;
+}
+
+function withMessageContext(
+  href: string,
+  notification: NotificationRecord
+) {
+  const parsedUrl = new URL(href, "http://localhost");
+  if (parsedUrl.pathname !== "/messages") {
+    return href;
+  }
+
+  const conversationId =
+    parsedUrl.searchParams.get("conversationId") ??
+    getConversationId(notification);
+  if (conversationId) {
+    parsedUrl.searchParams.set("conversationId", conversationId);
+  }
+
+  const lane =
+    parsedUrl.searchParams.get("lane") ?? getConversationLane(notification);
+  if (lane) {
+    parsedUrl.searchParams.set("lane", lane);
+  }
+
+  const queryString = parsedUrl.searchParams.toString();
+  return queryString ? `${parsedUrl.pathname}?${queryString}` : parsedUrl.pathname;
+}
+
+function getListingActionHref(notification: NotificationRecord) {
+  const listingId = getListingId(notification);
+  if (!listingId) {
+    return "/dashboard/listings";
+  }
+
+  if (
+    notification.type === NOTIFICATION_TYPES.listingEditApproved ||
+    notification.type === NOTIFICATION_TYPES.listingEditNeedsChanges ||
+    notification.type === NOTIFICATION_TYPES.listingEditRejected
+  ) {
+    return `/dashboard/listings/${listingId}/edit?step=review`;
+  }
+
+  return `/dashboard/listings/${listingId}/workflow`;
+}
+
+function getCompanyActionHref(notification: NotificationRecord) {
+  if (notification.type === NOTIFICATION_TYPES.companyInviteReceived) {
+    return "/profile/company";
+  }
+
+  if (
+    notification.type === NOTIFICATION_TYPES.companyInviteAccepted ||
+    notification.type === NOTIFICATION_TYPES.companyMemberAdded ||
+    notification.type === NOTIFICATION_TYPES.companyMemberRoleChanged ||
+    notification.type === NOTIFICATION_TYPES.companyMemberSuspended ||
+    notification.type === NOTIFICATION_TYPES.companyMemberRemoved
+  ) {
+    return "/profile/company/team";
+  }
+
+  return "/profile/company";
+}
+
 export function getNotificationActionHref(notification: NotificationRecord) {
   const actionUrl = notification.action_url?.trim();
-  if (actionUrl && actionUrl.startsWith("/")) {
+  if (actionUrl && actionUrl.startsWith("/") && !actionUrl.startsWith("//")) {
+    if (actionUrl.startsWith("/messages")) {
+      return withMessageContext(actionUrl, notification);
+    }
+
     return actionUrl;
   }
 
+  const category = getNotificationCategory(notification.type);
+
+  if (category === "messages") {
+    return withMessageContext("/messages", notification);
+  }
+
+  if (category === "listings") {
+    return getListingActionHref(notification);
+  }
+
+  if (category === "company") {
+    return getCompanyActionHref(notification);
+  }
+
   return "/notifications";
+}
+
+export function getNotificationActionLabel(notification: NotificationRecord) {
+  const href = getNotificationActionHref(notification);
+
+  if (href.startsWith("/messages")) {
+    const lane = new URL(href, "http://localhost").searchParams.get("lane");
+
+    if (
+      notification.type === NOTIFICATION_TYPES.conversationAssigned ||
+      notification.type === NOTIFICATION_TYPES.conversationReassigned
+    ) {
+      return lane === "queue" ? "Open queue thread" : "Open assigned thread";
+    }
+
+    if (notification.type === NOTIFICATION_TYPES.conversationUnassigned) {
+      return "Open queue thread";
+    }
+
+    return lane === "queue" ? "Open queue thread" : "Open thread";
+  }
+
+  if (href.includes("/workflow")) {
+    return "Open workflow";
+  }
+
+  if (href.includes("/edit?")) {
+    return "Open listing draft";
+  }
+
+  if (href.startsWith("/dashboard/listings")) {
+    return "Open listing";
+  }
+
+  if (href.startsWith("/profile/company/invites/")) {
+    return "Open invite";
+  }
+
+  if (href.startsWith("/profile/company/team")) {
+    return "Open team";
+  }
+
+  if (href.startsWith("/profile/company")) {
+    return "Open company";
+  }
+
+  return "Open notification";
 }
 
 export function isNotificationUnread(notification: NotificationRecord) {

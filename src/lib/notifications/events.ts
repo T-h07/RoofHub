@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createAdminSupabaseClient } from "@/lib/supabase/admin";
+import type { CompanyListingEditReviewAction } from "@/lib/listings/company-workflow/types";
 
 import { createNotifications } from "./service";
 import { NOTIFICATION_TYPES } from "./types";
@@ -81,6 +82,8 @@ function uniqueRecipients(recipientIds: Array<string | null | undefined>, actorU
 type KnownNotificationType =
   (typeof NOTIFICATION_TYPES)[keyof typeof NOTIFICATION_TYPES];
 
+type ConversationNotificationLane = "assigned" | "queue";
+
 function dedupeNotificationsByUserAndType(
   notifications: Array<CreateNotificationInput & { type: KnownNotificationType }>
 ) {
@@ -94,6 +97,21 @@ function dedupeNotificationsByUserAndType(
   }
 
   return [...dedupedNotifications.values()];
+}
+
+function buildConversationNotificationActionUrl(
+  conversationId: string,
+  lane?: ConversationNotificationLane | null
+) {
+  const params = new URLSearchParams({
+    conversationId,
+  });
+
+  if (lane) {
+    params.set("lane", lane);
+  }
+
+  return `/messages?${params.toString()}`;
 }
 
 export async function notifyConversationInquiryCreated(input: {
@@ -119,7 +137,7 @@ export async function notifyConversationInquiryCreated(input: {
         body: `A seeker opened a new conversation on ${listingLabel}.`,
         entityType: "conversation",
         entityId: input.conversationId,
-        actionUrl: `/messages?conversationId=${input.conversationId}`,
+        actionUrl: buildConversationNotificationActionUrl(input.conversationId),
         priority: 3,
         actorUserId: input.seekerUserId,
         metadata: {
@@ -138,7 +156,7 @@ export async function notifyConversationInquiryCreated(input: {
         body: `A new inquiry was routed to you for ${listingLabel}.`,
         entityType: "conversation",
         entityId: input.conversationId,
-        actionUrl: `/messages?conversationId=${input.conversationId}`,
+        actionUrl: buildConversationNotificationActionUrl(input.conversationId, "assigned"),
         priority: 3,
         actorUserId: input.seekerUserId,
         metadata: {
@@ -164,7 +182,7 @@ export async function notifyConversationInquiryCreated(input: {
           body: `A new inquiry is waiting in the shared queue for ${listingLabel}.`,
           entityType: "conversation",
           entityId: input.conversationId,
-          actionUrl: `/messages?conversationId=${input.conversationId}`,
+          actionUrl: buildConversationNotificationActionUrl(input.conversationId, "queue"),
           priority: 3,
           actorUserId: input.seekerUserId,
           metadata: {
@@ -237,6 +255,31 @@ export async function notifyConversationMessageReceived(input: {
       return { ok: true as const, createdCount: 0 };
     }
 
+    const routingStatus =
+      input.ownerMode === "company_workspace"
+        ? input.assignedMemberUserId
+          ? "assigned_member"
+          : "shared_queue"
+        : "direct_provider";
+
+    const getRecipientLane = (
+      recipientId: string
+    ): ConversationNotificationLane | null => {
+      if (input.ownerMode !== "company_workspace") {
+        return null;
+      }
+
+      if (recipientId === input.seekerUserId) {
+        return null;
+      }
+
+      if (input.assignedMemberUserId && recipientId === input.assignedMemberUserId) {
+        return "assigned";
+      }
+
+      return input.assignedMemberUserId ? "assigned" : "queue";
+    };
+
     const preview = trimTo(input.messageBody, 120);
     const body = preview ? `${senderLabel}: ${preview}` : `${senderLabel} sent a new message.`;
 
@@ -249,7 +292,10 @@ export async function notifyConversationMessageReceived(input: {
         body,
         entityType: "conversation",
         entityId: input.conversationId,
-        actionUrl: `/messages?conversationId=${input.conversationId}`,
+        actionUrl: buildConversationNotificationActionUrl(
+          input.conversationId,
+          getRecipientLane(recipientId)
+        ),
         priority: 2,
         actorUserId: input.senderUserId,
         metadata: {
@@ -257,6 +303,7 @@ export async function notifyConversationMessageReceived(input: {
           listing_id: input.listingId,
           message_id: input.messageId,
           owner_mode: input.ownerMode,
+          routing_status: routingStatus,
         },
       })),
     });
@@ -713,7 +760,7 @@ export async function notifyConversationRoutingChanged(input: {
         body: "A shared inquiry was assigned to you and needs follow-up.",
         entityType: "conversation",
         entityId: input.conversationId,
-        actionUrl: `/messages?conversationId=${input.conversationId}`,
+        actionUrl: buildConversationNotificationActionUrl(input.conversationId, "assigned"),
         priority: 3,
         actorUserId: input.actorUserId,
         metadata: {
@@ -722,6 +769,7 @@ export async function notifyConversationRoutingChanged(input: {
           previous_assignee_user_id: input.previousAssigneeUserId,
           next_assignee_user_id: input.nextAssigneeUserId,
           event_type: input.eventType,
+          routing_status: "assigned_member",
         },
       });
 
@@ -741,7 +789,7 @@ export async function notifyConversationRoutingChanged(input: {
           body: `A company conversation was assigned to ${nextAssigneeLabel}.`,
           entityType: "conversation",
           entityId: input.conversationId,
-          actionUrl: `/messages?conversationId=${input.conversationId}`,
+          actionUrl: buildConversationNotificationActionUrl(input.conversationId, "queue"),
           priority: 1,
           actorUserId: input.actorUserId,
           metadata: {
@@ -750,6 +798,7 @@ export async function notifyConversationRoutingChanged(input: {
             previous_assignee_user_id: input.previousAssigneeUserId,
             next_assignee_user_id: input.nextAssigneeUserId,
             event_type: input.eventType,
+            routing_status: "assigned_member",
           },
         });
       }
@@ -763,7 +812,7 @@ export async function notifyConversationRoutingChanged(input: {
           body: "A company inquiry was reassigned to you and needs attention.",
           entityType: "conversation",
           entityId: input.conversationId,
-          actionUrl: `/messages?conversationId=${input.conversationId}`,
+          actionUrl: buildConversationNotificationActionUrl(input.conversationId, "assigned"),
           priority: 3,
           actorUserId: input.actorUserId,
           metadata: {
@@ -772,6 +821,7 @@ export async function notifyConversationRoutingChanged(input: {
             previous_assignee_user_id: input.previousAssigneeUserId,
             next_assignee_user_id: input.nextAssigneeUserId,
             event_type: input.eventType,
+            routing_status: "assigned_member",
           },
         });
       }
@@ -788,7 +838,7 @@ export async function notifyConversationRoutingChanged(input: {
           body: "This conversation was reassigned to another company member.",
           entityType: "conversation",
           entityId: input.conversationId,
-          actionUrl: `/messages?conversationId=${input.conversationId}`,
+          actionUrl: buildConversationNotificationActionUrl(input.conversationId, "queue"),
           priority: 1,
           actorUserId: input.actorUserId,
           metadata: {
@@ -797,6 +847,7 @@ export async function notifyConversationRoutingChanged(input: {
             previous_assignee_user_id: input.previousAssigneeUserId,
             next_assignee_user_id: input.nextAssigneeUserId,
             event_type: input.eventType,
+            routing_status: "assigned_member",
           },
         });
       }
@@ -818,7 +869,7 @@ export async function notifyConversationRoutingChanged(input: {
           body: `A company conversation was reassigned from ${previousAssigneeLabel} to ${nextAssigneeLabel}.`,
           entityType: "conversation",
           entityId: input.conversationId,
-          actionUrl: `/messages?conversationId=${input.conversationId}`,
+          actionUrl: buildConversationNotificationActionUrl(input.conversationId, "queue"),
           priority: 1,
           actorUserId: input.actorUserId,
           metadata: {
@@ -827,6 +878,7 @@ export async function notifyConversationRoutingChanged(input: {
             previous_assignee_user_id: input.previousAssigneeUserId,
             next_assignee_user_id: input.nextAssigneeUserId,
             event_type: input.eventType,
+            routing_status: "assigned_member",
           },
         });
       }
@@ -840,7 +892,7 @@ export async function notifyConversationRoutingChanged(input: {
           body: "This company conversation is no longer assigned to you.",
           entityType: "conversation",
           entityId: input.conversationId,
-          actionUrl: `/messages?conversationId=${input.conversationId}`,
+          actionUrl: buildConversationNotificationActionUrl(input.conversationId, "queue"),
           priority: 1,
           actorUserId: input.actorUserId,
           metadata: {
@@ -849,6 +901,7 @@ export async function notifyConversationRoutingChanged(input: {
             previous_assignee_user_id: input.previousAssigneeUserId,
             next_assignee_user_id: input.nextAssigneeUserId,
             event_type: input.eventType,
+            routing_status: "shared_queue",
           },
         });
       }
@@ -869,7 +922,7 @@ export async function notifyConversationRoutingChanged(input: {
           body: "A company conversation was returned to the shared queue.",
           entityType: "conversation",
           entityId: input.conversationId,
-          actionUrl: `/messages?conversationId=${input.conversationId}`,
+          actionUrl: buildConversationNotificationActionUrl(input.conversationId, "queue"),
           priority: 1,
           actorUserId: input.actorUserId,
           metadata: {
@@ -878,6 +931,7 @@ export async function notifyConversationRoutingChanged(input: {
             previous_assignee_user_id: input.previousAssigneeUserId,
             next_assignee_user_id: input.nextAssigneeUserId,
             event_type: input.eventType,
+            routing_status: "shared_queue",
           },
         });
       }
@@ -1058,5 +1112,109 @@ export async function notifyListingWorkflowTransition(input: {
     });
   } catch {
     return { ok: false as const, message: "notification_workflow_delivery_failed" };
+  }
+}
+
+export async function notifyListingEditReviewSubmission(input: {
+  listingId: string;
+  listingTitle: string;
+  organizationId: string;
+  actorUserId: string;
+  submittedByUserId: string;
+}) {
+  try {
+    const listingLabel = trimTo(input.listingTitle, 72) || "this listing";
+    const reviewerRecipientIds = await loadActiveOrganizationUserIds({
+      organizationId: input.organizationId,
+      roles: ["owner", "admin", "manager"],
+    });
+
+    const recipients = uniqueRecipients(reviewerRecipientIds, input.actorUserId);
+    if (recipients.length === 0) {
+      return { ok: true as const, createdCount: 0 };
+    }
+
+    return createNotifications({
+      notifications: recipients.map((recipientUserId) => ({
+        userId: recipientUserId,
+        organizationId: input.organizationId,
+        type: NOTIFICATION_TYPES.listingEditReviewNeeded,
+        title: "Live listing edit review needed",
+        body: `${listingLabel} has pending live-edit updates waiting for review.`,
+        entityType: "listing_edit_submission",
+        entityId: input.listingId,
+        actionUrl: `/dashboard/listings/${input.listingId}/workflow`,
+        priority: 3,
+        actorUserId: input.actorUserId,
+        metadata: {
+          listing_id: input.listingId,
+          action: "edit_submission_submitted",
+          submitted_by_user_id: input.submittedByUserId,
+        },
+      })),
+    });
+  } catch {
+    return { ok: false as const, message: "notification_listing_edit_submission_delivery_failed" };
+  }
+}
+
+export async function notifyListingEditReviewOutcome(input: {
+  listingId: string;
+  listingTitle: string;
+  organizationId: string;
+  action: CompanyListingEditReviewAction;
+  actorUserId: string;
+  submitterUserId: string;
+  reviewerNote?: string;
+}) {
+  try {
+    const recipients = uniqueRecipients([input.submitterUserId], input.actorUserId);
+    if (recipients.length === 0) {
+      return { ok: true as const, createdCount: 0 };
+    }
+
+    const listingLabel = trimTo(input.listingTitle, 72) || "this listing";
+    const trimmedReviewerNote = trimTo(input.reviewerNote ?? "", 180);
+    const typeByAction: Record<CompanyListingEditReviewAction, KnownNotificationType> = {
+      approve: NOTIFICATION_TYPES.listingEditApproved,
+      needs_changes: NOTIFICATION_TYPES.listingEditNeedsChanges,
+      reject: NOTIFICATION_TYPES.listingEditRejected,
+    };
+    const titleByAction: Record<CompanyListingEditReviewAction, string> = {
+      approve: "Live listing edits approved",
+      needs_changes: "Live listing edits need changes",
+      reject: "Live listing edits rejected",
+    };
+    const bodyByAction: Record<CompanyListingEditReviewAction, string> = {
+      approve: `${listingLabel} was approved and is now updated on the public listing.`,
+      needs_changes: `${listingLabel} needs additional updates before live changes can be applied.`,
+      reject: `${listingLabel} edit submission was rejected and was not applied.`,
+    };
+
+    return createNotifications({
+      notifications: recipients.map((recipientUserId) => ({
+        userId: recipientUserId,
+        organizationId: input.organizationId,
+        type: typeByAction[input.action],
+        title: titleByAction[input.action],
+        body:
+          input.action === "needs_changes" && trimmedReviewerNote
+            ? `${bodyByAction[input.action]} Note: ${trimmedReviewerNote}`
+            : bodyByAction[input.action],
+        entityType: "listing_edit_submission",
+        entityId: input.listingId,
+        actionUrl: `/dashboard/listings/${input.listingId}/edit?step=review`,
+        priority: input.action === "needs_changes" ? 3 : 2,
+        actorUserId: input.actorUserId,
+        metadata: {
+          listing_id: input.listingId,
+          action: input.action,
+          submitter_user_id: input.submitterUserId,
+          reviewer_note_present: Boolean(trimmedReviewerNote),
+        },
+      })),
+    });
+  } catch {
+    return { ok: false as const, message: "notification_listing_edit_review_outcome_delivery_failed" };
   }
 }

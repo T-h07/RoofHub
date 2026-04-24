@@ -6,6 +6,7 @@ import { Archive, ArrowUpRight, LoaderCircle, RotateCcw, X } from "lucide-react"
 import { buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
+  getNotificationActionLabel,
   formatNotificationTimestampLabel,
   formatNotificationTimestampTitle,
   getNotificationActionHref,
@@ -53,10 +54,12 @@ export function NotificationRow({
 }: NotificationRowProps) {
   const unread = isNotificationUnread(notification);
   const actionHref = getNotificationActionHref(notification);
+  const actionLabel = getNotificationActionLabel(notification);
   const category = getNotificationCategory(notification.type);
   const isActive = isNotificationActive(notification);
   const isArchived = isNotificationArchived(notification);
   const isDismissed = isNotificationDismissed(notification);
+  const canDismiss = notification.priority <= 1;
 
   return (
     <article
@@ -124,11 +127,14 @@ export function NotificationRow({
               href={actionHref}
               onClick={onNavigate}
               className={cn(
-                buttonVariants({ size: "sm", variant: "outline" }),
+                buttonVariants({
+                  size: "sm",
+                  variant: unread && isActive ? "default" : "outline",
+                }),
                 "h-8 gap-1.5"
               )}
             >
-              Open
+              {actionLabel}
               <ArrowUpRight className="size-3.5" aria-hidden="true" />
             </Link>
 
@@ -179,7 +185,7 @@ export function NotificationRow({
               </button>
             ) : null}
 
-            {showManagementActions && isActive && onDismiss ? (
+            {showManagementActions && isActive && onDismiss && canDismiss ? (
               <button
                 type="button"
                 onClick={() => onDismiss(notification.id)}
