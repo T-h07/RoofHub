@@ -139,11 +139,9 @@ export default async function DashboardActivityPage() {
               <Link href="/dashboard/listings" className={buttonVariants({ variant: "ghost", size: "sm" })}>
                 Listings
               </Link>
-              {workspace.isOwnerOrAdmin ? (
-                <Link href="/profile/company/team" className={buttonVariants({ variant: "ghost", size: "sm" })}>
-                  Team
-                </Link>
-              ) : null}
+              <Link href="/messages" className={buttonVariants({ variant: "ghost", size: "sm" })}>
+                Inbox
+              </Link>
             </>
           }
         />

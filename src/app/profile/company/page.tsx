@@ -14,6 +14,7 @@ import { getCurrentUserCompanyContext } from "@/lib/company/context";
 import { toCompanyLogoPublicUrl } from "@/lib/company/logo";
 import { loadPendingCompanyInvitesForCurrentUser } from "@/lib/company/team-queries";
 import { ORGANIZATION_MEMBER_ROLE_LABELS } from "@/lib/company/team-types";
+import { getCompanyOperationalHomeForRole } from "@/lib/navigation/company-ia";
 import { PUBLIC_DISCOVERY_STATUS } from "@/lib/listings/visibility";
 import { createServerSupabaseClient } from "@/lib/supabase";
 
@@ -195,6 +196,7 @@ export default async function CompanyWorkspacePage({ searchParams }: CompanyWork
   const membership = company.activeMembership;
   const logoUrl = toCompanyLogoPublicUrl(supabase, organization.logo_path);
   const completion = buildProfileCompletionChecklist(organization);
+  const operationalHomeHref = getCompanyOperationalHomeForRole(membership.role);
   const { count: publishedListingCount } = await supabase
     .from("listings")
     .select("id", { count: "exact", head: true })
@@ -228,17 +230,14 @@ export default async function CompanyWorkspacePage({ searchParams }: CompanyWork
             websiteUrl: organization.website_url,
             coverageArea: organization.coverage_area,
           }}
-          contextLabel="Company workspace"
-          supportingLabel={`Active role: ${ORGANIZATION_MEMBER_ROLE_LABELS[membership.role]}. Company routes now resolve against this explicit workspace selection instead of guessed membership ordering.`}
+          contextLabel="Company governance workspace"
+          supportingLabel={`Active role: ${ORGANIZATION_MEMBER_ROLE_LABELS[membership.role]}. Use this surface for company profile, team, and governance controls while operational listing work stays in the dashboard.`}
           listingCount={publishedListingCount ?? 0}
           actions={
             <>
-              <Link href="/dashboard" className={buttonVariants({ size: "sm" })}>
-                Open operations dashboard
-              </Link>
               {company.canEditProfile ? (
                 <Link href="/profile/company/edit" className={buttonVariants({ variant: "outline", size: "sm" })}>
-                  Complete company profile
+                  Edit company profile
                 </Link>
               ) : null}
               {company.canManageTeam ? (
@@ -254,6 +253,9 @@ export default async function CompanyWorkspacePage({ searchParams }: CompanyWork
                 className={buttonVariants({ variant: "ghost", size: "sm" })}
               >
                 View public company page
+              </Link>
+              <Link href={operationalHomeHref} className={buttonVariants({ size: "sm" })}>
+                Open operations workspace
               </Link>
             </>
           }
@@ -304,33 +306,29 @@ export default async function CompanyWorkspacePage({ searchParams }: CompanyWork
 
             <PageSection
               eyebrow={<Badge variant="outline">Next actions</Badge>}
-              title="Keep company presence up to date"
-              description="Use these shortcuts to manage how your company appears publicly."
+              title="Governance actions"
+              description="Keep company identity, profile quality, and team governance current."
             >
               <div className="space-y-3">
-                <Link href="/dashboard" className={buttonVariants({ size: "sm" })}>
-                  Open operations dashboard
-                </Link>
                 <Link href="/profile/company/edit" className={buttonVariants({ size: "sm" })}>
                   Edit company profile
                 </Link>
+                {company.canManageTeam ? (
+                  <Link
+                    href="/profile/company/team"
+                    className={buttonVariants({ variant: "outline", size: "sm" })}
+                  >
+                    Manage team members
+                  </Link>
+                ) : null}
                 <Link
                   href={`/companies/${organization.slug}`}
                   className={buttonVariants({ variant: "outline", size: "sm" })}
                 >
                   Open public company page
                 </Link>
-                <Link
-                  href="/dashboard/listings"
-                  className={buttonVariants({ variant: "ghost", size: "sm" })}
-                >
-                  Review managed listings
-                </Link>
-                <Link
-                  href="/profile/company/team"
-                  className={buttonVariants({ variant: "outline", size: "sm" })}
-                >
-                  Manage team members
+                <Link href={operationalHomeHref} className={buttonVariants({ variant: "ghost", size: "sm" })}>
+                  Open operational workspace
                 </Link>
               </div>
             </PageSection>
@@ -356,12 +354,12 @@ export default async function CompanyWorkspacePage({ searchParams }: CompanyWork
 
             <PageSection
               eyebrow={<Badge variant="outline">Available actions</Badge>}
-              title="Continue in the active workspace"
-              description="Open the company surfaces you have access to from this membership."
+              title="Membership-aware actions"
+              description="Use governance tools you have access to and continue operational work from one canonical entry point."
             >
               <div className="space-y-3">
-                <Link href="/dashboard" className={buttonVariants({ size: "sm" })}>
-                  Open operations dashboard
+                <Link href={operationalHomeHref} className={buttonVariants({ size: "sm" })}>
+                  {membership.role === "agent" ? "Open listing inventory" : "Open operations dashboard"}
                 </Link>
                 {company.canManageTeam ? (
                   <Link href="/profile/company/team" className={buttonVariants({ variant: "outline", size: "sm" })}>

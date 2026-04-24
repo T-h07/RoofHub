@@ -115,14 +115,11 @@ export default async function CompanyTeamPage() {
           coverageArea: organization.coverage_area,
         }}
         contextLabel="Company team"
-        supportingLabel="Invite staff, assign workspace roles, and manage active membership safely."
+        supportingLabel="Invite staff, assign workspace roles, and manage active membership from the governance workspace."
         actions={
           <>
             <Link href="/profile/company" className={buttonVariants({ variant: "outline", size: "sm" })}>
               Back to workspace
-            </Link>
-            <Link href="/dashboard/activity" className={buttonVariants({ variant: "ghost", size: "sm" })}>
-              Activity log
             </Link>
             <Link
               href={`/companies/${organization.slug}`}

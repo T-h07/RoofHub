@@ -12,6 +12,7 @@ import {
   Gauge,
   Globe,
   Megaphone,
+  MessageSquareMore,
   PlusSquare,
   Rows3,
   ShieldAlert,
@@ -221,29 +222,31 @@ function buildQuickActions(workspace: CompanyDashboardWorkspaceData): QuickActio
       variant: "outline",
     },
     {
-      href: `/companies/${workspace.organization.slug}`,
-      label: "View public company page",
-      detail: "Check live brand and published inventory.",
-      icon: Globe,
-      variant: "ghost",
-    },
-    {
-      href: "/profile/company",
-      label: "Company workspace settings",
-      detail: "Open profile, branding, and internal tools.",
-      icon: Building2,
+      href: "/messages",
+      label: "Open workspace inbox",
+      detail: "Continue inquiry response and thread routing.",
+      icon: MessageSquareMore,
       variant: "ghost",
     }
   );
 
   if (workspace.isOwnerOrAdmin) {
-    actions.push({
-      href: "/profile/company/team",
-      label: "Manage team and invites",
-      detail: "Invite staff and adjust membership roles.",
-      icon: Users,
-      variant: "outline",
-    });
+    actions.push(
+      {
+        href: "/profile/company",
+        label: "Open governance workspace",
+        detail: "Manage branding, company profile, and governance settings.",
+        icon: Building2,
+        variant: "ghost",
+      },
+      {
+        href: "/profile/company/team",
+        label: "Manage team and invites",
+        detail: "Invite staff and adjust membership roles.",
+        icon: Users,
+        variant: "outline",
+      }
+    );
   }
 
   return actions;
@@ -285,23 +288,25 @@ export function CompanyDashboardWorkspace({
               New listing
             </Link>
             <Link
-              href="/profile/company"
+              href="/dashboard/listings"
               className={buttonVariants({ variant: "outline", size: "sm" })}
             >
-              Company settings
+              Inventory
             </Link>
             <Link
-              href={`/companies/${workspace.organization.slug}`}
+              href="/messages"
               className={buttonVariants({ variant: "ghost", size: "sm" })}
             >
-              Public page
+              Inbox
             </Link>
-            {workspace.canViewActivityFeed ? (
-              <Link
-                href="/dashboard/activity"
-                className={buttonVariants({ variant: "outline", size: "sm" })}
-              >
-                Activity log
+            {workspace.isReviewer ? (
+              <Link href="#pending-review-queue" className={buttonVariants({ variant: "outline", size: "sm" })}>
+                Review queue
+              </Link>
+            ) : null}
+            {workspace.isOwnerOrAdmin ? (
+              <Link href="/profile/company" className={buttonVariants({ variant: "ghost", size: "sm" })}>
+                Governance
               </Link>
             ) : null}
           </>
