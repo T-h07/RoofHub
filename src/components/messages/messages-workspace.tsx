@@ -33,6 +33,7 @@ import type {
   MessagingMessageRecord,
   MessagingThreadResult,
 } from "@/lib/messaging/types";
+import type { MessagingInboxLane } from "@/lib/messaging/presentation";
 import { toMessagePreview } from "@/lib/messaging/validation";
 import { createClient as createBrowserSupabaseClient } from "@/lib/supabase/client";
 import type { Database } from "@/types/database";
@@ -44,6 +45,7 @@ const FALLBACK_REFRESH_INTERVAL_MS = 15_000;
 type MessagesWorkspaceProps = {
   initialSummaries: MessagingConversationSummary[];
   initialInbox: MessagingInboxContext;
+  initialLane: MessagingInboxLane;
   selectedConversationId: string | null;
   initialThread: MessagingThreadResult | null;
   initialThreadError: string | null;
@@ -202,6 +204,7 @@ function optimisticMessage(
 export function MessagesWorkspace({
   initialSummaries,
   initialInbox,
+  initialLane,
   selectedConversationId,
   initialThread,
   initialThreadError,
@@ -211,6 +214,7 @@ export function MessagesWorkspace({
 
   const [summaries, setSummaries] = useState<MessagingConversationSummary[]>(initialSummaries);
   const [inbox, setInbox] = useState(initialInbox);
+  const [activeLane, setActiveLane] = useState<MessagingInboxLane>(initialLane);
   const [thread, setThread] = useState<MessagingClientThread | null>(
     initialThread ? toClientThread(initialThread) : null
   );
@@ -240,10 +244,17 @@ export function MessagesWorkspace({
     () => summaries.reduce((total, summary) => total + summary.unreadCount, 0),
     [summaries]
   );
+  const isCompanyQueueWorkspace =
+    inbox.mode === "company_workspace" &&
+    inbox.companyQueueAccess === "company_queue";
   const hasConversationSelection = Boolean(selectedConversationId);
 
   const showConversationListOnMobile = !hasConversationSelection;
   const showThreadOnMobile = hasConversationSelection;
+
+  useEffect(() => {
+    setActiveLane(initialLane);
+  }, [initialLane]);
 
   const refreshConversationSummariesFromServer = useCallback(
     async (mode: "manual" | "fallback" | "resync") => {
@@ -656,12 +667,46 @@ export function MessagesWorkspace({
     };
   }, [realtimeHealth, refreshWorkspaceFromServer]);
 
+  function buildMessagesHref(options?: {
+    conversationId?: string | null;
+    lane?: MessagingInboxLane;
+  }) {
+    const params = new URLSearchParams();
+    const conversationId = options?.conversationId;
+    const lane = options?.lane ?? activeLane;
+
+    if (conversationId) {
+      params.set("conversationId", conversationId);
+    }
+
+    if (isCompanyQueueWorkspace && lane !== "all") {
+      params.set("lane", lane);
+    }
+
+    const queryString = params.toString();
+    return queryString ? `/messages?${queryString}` : "/messages";
+  }
+
   function openConversation(conversationId: string) {
-    router.push(`/messages?conversationId=${conversationId}`);
+    router.push(
+      buildMessagesHref({
+        conversationId,
+      })
+    );
   }
 
   function clearThreadSelection() {
-    router.push("/messages");
+    router.push(buildMessagesHref());
+  }
+
+  function handleLaneChange(nextLane: MessagingInboxLane) {
+    setActiveLane(nextLane);
+    router.push(
+      buildMessagesHref({
+        conversationId: selectedConversationId,
+        lane: nextLane,
+      })
+    );
   }
 
   async function handleSendMessage(body: string) {
@@ -930,8 +975,10 @@ export function MessagesWorkspace({
             inbox={inbox}
             summaries={summaries}
             selectedConversationId={selectedConversationId}
+            activeLane={activeLane}
             unreadTotalCount={unreadTotalCount}
             onOpenConversation={openConversation}
+            onChangeLane={handleLaneChange}
             realtimeHealth={realtimeHealth}
             isRefreshing={isFallbackRefreshing}
             onRefresh={refreshNow}

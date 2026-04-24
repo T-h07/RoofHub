@@ -11,12 +11,17 @@ import {
   loadMessagingConversationSummariesQuery,
   loadMessagingThreadQuery,
 } from "@/lib/messaging";
+import {
+  normalizeMessagingInboxLane,
+  type MessagingInboxLane,
+} from "@/lib/messaging/presentation";
 import { isUuid } from "@/lib/messaging/validation";
 
 type MessagesPageProps = {
   searchParams: Promise<{
     listingId?: string;
     conversationId?: string;
+    lane?: string;
   }>;
 };
 
@@ -28,10 +33,37 @@ function normalizeParam(value: string | string[] | undefined) {
   return value.trim();
 }
 
+function buildMessagesHref(input: {
+  listingId?: string;
+  conversationId?: string;
+  lane?: MessagingInboxLane;
+}) {
+  const params = new URLSearchParams();
+
+  if (input.listingId) {
+    params.set("listingId", input.listingId);
+  }
+
+  if (input.conversationId) {
+    params.set("conversationId", input.conversationId);
+  }
+
+  if (input.lane && input.lane !== "all") {
+    params.set("lane", input.lane);
+  }
+
+  const queryString = params.toString();
+  return queryString ? `/messages?${queryString}` : "/messages";
+}
+
 export default async function MessagesPage({ searchParams }: MessagesPageProps) {
   const resolvedSearchParams = await searchParams;
   const listingId = normalizeParam(resolvedSearchParams.listingId);
   let conversationId = normalizeParam(resolvedSearchParams.conversationId);
+  const requestedLane = normalizeMessagingInboxLane(
+    normalizeParam(resolvedSearchParams.lane),
+    "all"
+  );
   let handoffErrorMessage: string | null = null;
 
   if (listingId) {
@@ -39,12 +71,24 @@ export default async function MessagesPage({ searchParams }: MessagesPageProps) 
 
     if (!createResult.ok) {
       if (createResult.requiresAuth) {
-        redirect(toSignInPath(`/messages?listingId=${listingId}`));
+        redirect(
+          toSignInPath(
+            buildMessagesHref({
+              listingId,
+              lane: requestedLane,
+            })
+          )
+        );
       }
 
       handoffErrorMessage = createResult.message;
     } else {
-      redirect(`/messages?conversationId=${createResult.data.conversation.id}`);
+      redirect(
+        buildMessagesHref({
+          conversationId: createResult.data.conversation.id,
+          lane: requestedLane,
+        })
+      );
     }
   }
 
@@ -84,7 +128,14 @@ export default async function MessagesPage({ searchParams }: MessagesPageProps) 
 
       if (!threadResult.ok) {
         if (threadResult.requiresAuth) {
-          redirect(toSignInPath(`/messages?conversationId=${conversationId}`));
+          redirect(
+            toSignInPath(
+              buildMessagesHref({
+                conversationId,
+                lane: requestedLane,
+              })
+            )
+          );
         }
 
         threadError = threadResult.message;
@@ -94,18 +145,32 @@ export default async function MessagesPage({ searchParams }: MessagesPageProps) 
     }
   }
 
+  const initialLane: MessagingInboxLane =
+    inbox.mode === "company_workspace"
+      ? inbox.companyQueueAccess === "company_queue"
+        ? normalizeMessagingInboxLane(
+            normalizeParam(resolvedSearchParams.lane),
+            "queue"
+          )
+        : "assigned"
+      : "all";
+
   return (
     <MainContainer size="wide" className="space-y-4">
       <section className="border-border/75 bg-card/58 space-y-3 rounded-xl border p-5 sm:p-6">
         <Badge variant="primary">Messages</Badge>
         <h1 className="type-page-title max-w-4xl">
           {inbox.mode === "company_workspace"
-            ? `${inbox.workspaceName} inbox with company-owned routing.`
+            ? inbox.companyQueueAccess === "company_queue"
+              ? `${inbox.workspaceName} inbox with shared queue and assigned thread lanes.`
+              : `${inbox.workspaceName} inbox for your assigned company threads.`
             : "Listing-bound conversations with protected participant access."}
         </h1>
         <p className="type-body-muted max-w-3xl">
           {inbox.mode === "company_workspace"
-            ? "Review shared inquiries, assign the active handler, and respond from the correct RoofHub workspace without collapsing ownership into one personal inbox."
+            ? inbox.companyQueueAccess === "company_queue"
+              ? "Separate shared queue work from assigned follow-up so managers and owners can route inquiries without losing operational context."
+              : "Focus on assigned conversations and respond directly from the right listing context without queue-management noise."
             : "Track listing inquiries, review message history, and respond in one inbox without leaving the marketplace workflow."}
         </p>
       </section>
@@ -128,9 +193,10 @@ export default async function MessagesPage({ searchParams }: MessagesPageProps) 
         />
       ) : (
         <MessagesWorkspace
-          key={`${conversationId || "none"}-${summariesResult.data.summaries.length}-${summariesResult.data.summaries[0]?.conversation.id ?? "empty"}`}
+          key={`${initialLane}-${conversationId || "none"}-${summariesResult.data.summaries.length}-${summariesResult.data.summaries[0]?.conversation.id ?? "empty"}`}
           initialSummaries={summariesResult.data.summaries}
           initialInbox={inbox}
+          initialLane={initialLane}
           selectedConversationId={conversationId || null}
           initialThread={thread}
           initialThreadError={threadError}

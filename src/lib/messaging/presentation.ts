@@ -14,6 +14,28 @@ const MESSAGE_TIME_FORMATTER = new Intl.DateTimeFormat("en", {
   minute: "2-digit",
 });
 
+export const MESSAGING_INBOX_LANES = ["all", "assigned", "queue"] as const;
+
+export type MessagingInboxLane = (typeof MESSAGING_INBOX_LANES)[number];
+
+export function normalizeMessagingInboxLane(
+  value: string | null | undefined,
+  fallback: MessagingInboxLane = "all"
+): MessagingInboxLane {
+  if (typeof value !== "string") {
+    return fallback;
+  }
+
+  const normalizedValue = value.trim().toLowerCase();
+  if (
+    (MESSAGING_INBOX_LANES as readonly string[]).includes(normalizedValue)
+  ) {
+    return normalizedValue as MessagingInboxLane;
+  }
+
+  return fallback;
+}
+
 function parseDate(value: string) {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) {
