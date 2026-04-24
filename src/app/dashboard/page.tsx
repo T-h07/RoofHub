@@ -89,15 +89,7 @@ export default async function DashboardPage() {
     listingCreationContext.ok &&
     listingCreationContext.context.ownershipMode === "company"
   ) {
-    const [dashboardResult, companyInventoryMapResult] = await Promise.all([
-      loadCompanyDashboardWorkspace(context.supabase),
-      loadProviderInventoryMapListings(context.supabase, {
-        userId: context.profile.id,
-        organizationId: listingCreationContext.context.organizationId,
-        scope: "organization",
-        limit: 280,
-      }),
-    ]);
+    const dashboardResult = await loadCompanyDashboardWorkspace(context.supabase);
 
     if (!dashboardResult.ok) {
       return (
@@ -115,6 +107,23 @@ export default async function DashboardPage() {
         </MainContainer>
       );
     }
+
+    const shouldLoadInventoryMap =
+      dashboardResult.workspace.membership.role !== "manager";
+
+    const companyInventoryMapResult = shouldLoadInventoryMap
+      ? await loadProviderInventoryMapListings(context.supabase, {
+          userId: context.profile.id,
+          organizationId: listingCreationContext.context.organizationId,
+          scope: "organization",
+          limit: 280,
+        })
+      : {
+          ok: true as const,
+          listings: [],
+          totalCount: 0,
+          mappableCount: 0,
+        };
 
     const logoUrl = toCompanyLogoPublicUrl(
       context.supabase,

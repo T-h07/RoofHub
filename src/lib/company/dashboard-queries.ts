@@ -5,9 +5,11 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Tables } from "@/types/database";
 import type { Database } from "@/types/database";
 import {
+  canManageCompanyConversationRouting,
   canManageCompanyTeam,
   canReviewCompanyListingWorkflow,
   canViewCompanyActivityFeed,
+  canViewCompanyInboxQueue,
   canViewCompanyPendingQueue,
 } from "@/lib/company/permissions";
 import {
@@ -26,6 +28,11 @@ type CompanyDashboardOverviewRpcRow =
   Database["public"]["Functions"]["get_company_dashboard_overview"]["Returns"][number];
 type CompanyDashboardPendingQueueRpcRow =
   Database["public"]["Functions"]["get_company_dashboard_pending_queue"]["Returns"][number];
+type CompanyDashboardConversationRow = Pick<
+  Tables<"conversations">,
+  "id" | "assigned_member_user_id" | "routing_status"
+>;
+type CompanyDashboardUnreadMessageRow = Pick<Tables<"messages">, "conversation_id">;
 
 export type CompanyDashboardOverviewMetrics = {
   draftCount: number;
@@ -55,15 +62,29 @@ export type CompanyDashboardPendingQueueItem = {
 
 export type CompanyDashboardActivityItem = CompanyActivityItem;
 
+export type CompanyDashboardMessagingMetrics = {
+  totalConversations: number;
+  sharedQueueConversations: number;
+  assignedToViewerConversations: number;
+  assignedToOtherConversations: number;
+  unreadMessages: number;
+  unreadAssignedToViewerMessages: number;
+  unreadSharedQueueMessages: number;
+};
+
 export type CompanyDashboardWorkspaceData = {
   profile: Tables<"profiles">;
   organization: CompanyWorkspaceSummary;
   membership: CompanyMembershipSummary;
   overview: CompanyDashboardOverviewMetrics;
+  messaging: CompanyDashboardMessagingMetrics;
+  messagingUnavailableMessage: string | null;
   pendingReviewQueue: CompanyDashboardPendingQueueItem[];
   pendingQueueUnavailableMessage: string | null;
   activity: CompanyDashboardActivityItem[];
   canViewActivityFeed: boolean;
+  canViewInboxQueue: boolean;
+  canManageRouting: boolean;
   activityAccessMessage: string | null;
   activityUnavailableMessage: string | null;
   isReviewer: boolean;
@@ -111,6 +132,100 @@ function mapPendingQueueRows(rows: CompanyDashboardPendingQueueRpcRow[]): Compan
   }));
 }
 
+function createEmptyMessagingMetrics(): CompanyDashboardMessagingMetrics {
+  return {
+    totalConversations: 0,
+    sharedQueueConversations: 0,
+    assignedToViewerConversations: 0,
+    assignedToOtherConversations: 0,
+    unreadMessages: 0,
+    unreadAssignedToViewerMessages: 0,
+    unreadSharedQueueMessages: 0,
+  };
+}
+
+async function loadCompanyDashboardMessagingMetrics(input: {
+  adminSupabase: ReturnType<typeof getCompanyAdminClient>;
+  organizationId: string;
+  viewerUserId: string;
+  canViewInboxQueue: boolean;
+}) {
+  const { adminSupabase, organizationId, viewerUserId, canViewInboxQueue } = input;
+  const emptyMetrics = createEmptyMessagingMetrics();
+
+  let conversationQuery = adminSupabase
+    .from("conversations")
+    .select("id, assigned_member_user_id, routing_status")
+    .eq("owner_mode", "company_workspace")
+    .eq("organization_id", organizationId);
+
+  if (!canViewInboxQueue) {
+    conversationQuery = conversationQuery.eq("assigned_member_user_id", viewerUserId);
+  }
+
+  const { data: conversationRows, error: conversationError } = await conversationQuery;
+
+  if (conversationError || !conversationRows) {
+    return {
+      metrics: emptyMetrics,
+      unavailableMessage: canViewInboxQueue
+        ? "Inbox workload metrics are temporarily unavailable."
+        : "Assigned inbox metrics are temporarily unavailable.",
+    };
+  }
+
+  const conversations = conversationRows as CompanyDashboardConversationRow[];
+  if (conversations.length === 0) {
+    return { metrics: emptyMetrics, unavailableMessage: null };
+  }
+
+  const conversationIds = conversations.map((conversation) => conversation.id);
+  const { data: unreadRows, error: unreadError } = await adminSupabase
+    .from("messages")
+    .select("conversation_id")
+    .in("conversation_id", conversationIds)
+    .neq("sender_id", viewerUserId)
+    .is("read_at", null);
+
+  const unreadByConversation = new Map<string, number>();
+  if (!unreadError && unreadRows) {
+    for (const row of unreadRows as CompanyDashboardUnreadMessageRow[]) {
+      unreadByConversation.set(
+        row.conversation_id,
+        (unreadByConversation.get(row.conversation_id) ?? 0) + 1
+      );
+    }
+  }
+
+  const metrics = createEmptyMessagingMetrics();
+  for (const conversation of conversations) {
+    const unreadCount = unreadByConversation.get(conversation.id) ?? 0;
+    metrics.totalConversations += 1;
+    metrics.unreadMessages += unreadCount;
+
+    if (conversation.routing_status === "shared_queue") {
+      metrics.sharedQueueConversations += 1;
+      metrics.unreadSharedQueueMessages += unreadCount;
+    }
+
+    if (conversation.assigned_member_user_id === viewerUserId) {
+      metrics.assignedToViewerConversations += 1;
+      metrics.unreadAssignedToViewerMessages += unreadCount;
+    } else if (conversation.assigned_member_user_id) {
+      metrics.assignedToOtherConversations += 1;
+    }
+  }
+
+  return {
+    metrics,
+    unavailableMessage: unreadError
+      ? canViewInboxQueue
+        ? "Unread message metrics are temporarily unavailable."
+        : "Unread assigned message metrics are temporarily unavailable."
+      : null,
+  };
+}
+
 type LoadCompanyDashboardWorkspaceOptions = {
   pendingQueueLimit?: number;
   activityLimit?: number;
@@ -156,9 +271,17 @@ export async function loadCompanyDashboardWorkspace(
     membership.role,
     membership.member_status
   );
+  const canViewInboxQueue = canViewCompanyInboxQueue(
+    membership.role,
+    membership.member_status
+  );
+  const canManageRouting = canManageCompanyConversationRouting(
+    membership.role,
+    membership.member_status
+  );
   const adminSupabase = getCompanyAdminClient();
 
-  const [overviewRpcResult, pendingQueueRpcResult, activityRpcResult] = await Promise.all([
+  const [overviewRpcResult, pendingQueueRpcResult, activityRpcResult, messagingMetricsResult] = await Promise.all([
     adminSupabase.rpc("get_company_dashboard_overview", {
       p_organization_id: organization.id,
       p_viewer_user_id: profile.id,
@@ -177,6 +300,12 @@ export async function loadCompanyDashboardWorkspace(
           p_limit: activityLimit,
         })
       : Promise.resolve({ data: [], error: null }),
+    loadCompanyDashboardMessagingMetrics({
+      adminSupabase,
+      organizationId: organization.id,
+      viewerUserId: profile.id,
+      canViewInboxQueue,
+    }),
   ]);
 
   if (overviewRpcResult.error || !overviewRpcResult.data?.[0]) {
@@ -204,12 +333,16 @@ export async function loadCompanyDashboardWorkspace(
       organization,
       membership,
       overview,
+      messaging: messagingMetricsResult.metrics,
+      messagingUnavailableMessage: messagingMetricsResult.unavailableMessage,
       pendingReviewQueue,
       pendingQueueUnavailableMessage: canViewPendingQueue && pendingQueueRpcResult.error
         ? "Pending queue is temporarily unavailable."
         : null,
       activity,
       canViewActivityFeed,
+      canViewInboxQueue,
+      canManageRouting,
       activityAccessMessage: canViewActivityFeed
         ? null
         : "Owner, admin, or manager role is required for company activity log visibility.",
