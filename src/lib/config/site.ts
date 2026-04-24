@@ -23,7 +23,7 @@ export const footerLinkGroups: FooterLinkGroup[] = [
     links: [
       { title: "Operations dashboard", href: "/dashboard" },
       { title: "Listing inventory", href: "/dashboard/listings" },
-      { title: "Company governance", href: "/profile/company" },
+      { title: "Company", href: "/profile/company" },
     ],
   },
 ];

@@ -22,7 +22,8 @@ type NavViewer = {
 
 export type ViewerNavigation = {
   primary: NavItem[];
-  menu: NavItem[];
+  secondary: NavItem[];
+  account: NavItem[];
 };
 
 const GUEST_NAVIGATION: ViewerNavigation = {
@@ -31,19 +32,23 @@ const GUEST_NAVIGATION: ViewerNavigation = {
     { title: "Explore", href: "/explore" },
     { title: "Map", href: "/map" },
   ],
-  menu: [],
+  secondary: [],
+  account: [],
 };
 
-const AUTH_BASE_PRIMARY_NAV: NavItem[] = [
-  { title: "Explore", href: "/explore" },
-  { title: "Map", href: "/map" },
+const AUTH_COMMUNICATION_PRIMARY_NAV: NavItem[] = [
   { title: "Messages", href: COMPANY_CANONICAL_PATHS.inbox },
   { title: "Notifications", href: COMPANY_CANONICAL_PATHS.notifications },
 ];
 
-const AUTH_BASE_MENU_NAV: NavItem[] = [
-  { title: "Favorites", href: "/favorites" },
+const AUTH_DISCOVERY_PRIMARY_NAV: NavItem[] = [
+  { title: "Explore", href: "/explore" },
+  { title: "Map", href: "/map" },
+];
+
+const AUTH_ACCOUNT_NAV: NavItem[] = [
   { title: "Profile", href: "/profile" },
+  { title: "Favorites", href: "/favorites" },
 ];
 
 const PROVIDER_OPERATIONS_NAV: NavItem[] = [
@@ -53,11 +58,8 @@ const PROVIDER_OPERATIONS_NAV: NavItem[] = [
 
 const APP_ADMIN_NAV: NavItem[] = [{ title: "Moderation", href: "/admin/moderation" }];
 
-function buildProviderCompanyNavigation(
-  viewer: NavViewer,
-  navigation: ViewerNavigation
-) {
-  const roleScopedMenuItems: NavItem[] = [];
+function buildCompanyPrimaryNav(viewer: NavViewer): NavItem[] {
+  const nav: NavItem[] = [];
 
   if (
     viewer.companyMembershipRole === "owner" ||
@@ -65,32 +67,64 @@ function buildProviderCompanyNavigation(
     viewer.companyMembershipRole === "manager" ||
     viewer.companyMembershipRole === null
   ) {
-    navigation.primary.unshift(...PROVIDER_OPERATIONS_NAV);
+    nav.push(...PROVIDER_OPERATIONS_NAV);
   } else {
-    navigation.primary.unshift({
+    nav.push({
       title: "Listings",
       href: COMPANY_CANONICAL_PATHS.listingsInventory,
     });
-    roleScopedMenuItems.push({
+  }
+
+  nav.push(...AUTH_COMMUNICATION_PRIMARY_NAV);
+  nav.push({
+    title: "Company",
+    href: COMPANY_CANONICAL_PATHS.governanceHome,
+  });
+  nav.push(...AUTH_DISCOVERY_PRIMARY_NAV);
+
+  return nav;
+}
+
+function buildProviderCompanyNavigation(
+  viewer: NavViewer,
+  navigation: ViewerNavigation
+) {
+  navigation.primary = buildCompanyPrimaryNav(viewer);
+
+  if (viewer.companyMembershipRole === "agent") {
+    navigation.secondary.push({
       title: "Operations dashboard",
       href: COMPANY_CANONICAL_PATHS.operationalHome,
     });
   }
 
-  if (canAccessCompanyTeamInNav(viewer.companyMembershipRole)) {
-    roleScopedMenuItems.push({ title: "Team", href: COMPANY_CANONICAL_PATHS.companyTeam });
-  }
-
   if (canAccessCompanyActivityInNav(viewer.companyMembershipRole)) {
-    roleScopedMenuItems.push({ title: "Activity log", href: COMPANY_CANONICAL_PATHS.activity });
+    navigation.secondary.push({
+      title: "Activity",
+      href: COMPANY_CANONICAL_PATHS.activity,
+    });
   }
 
-  roleScopedMenuItems.push({
-    title: "Company governance",
-    href: COMPANY_CANONICAL_PATHS.governanceHome,
-  });
+  if (canAccessCompanyTeamInNav(viewer.companyMembershipRole)) {
+    navigation.secondary.push({
+      title: "Team",
+      href: COMPANY_CANONICAL_PATHS.companyTeam,
+    });
+  }
+}
 
-  navigation.menu.unshift(...roleScopedMenuItems);
+function buildProviderNavigation(viewer: NavViewer, navigation: ViewerNavigation) {
+  if (viewer.providerAccountType === "company") {
+    buildProviderCompanyNavigation(viewer, navigation);
+    return;
+  }
+
+  navigation.primary = [
+    ...PROVIDER_OPERATIONS_NAV,
+    ...AUTH_COMMUNICATION_PRIMARY_NAV,
+    ...AUTH_DISCOVERY_PRIMARY_NAV,
+  ];
+  navigation.secondary.push({ title: "Company setup", href: "/profile/company/new" });
 }
 
 export function getNavigationForViewer(viewer: NavViewer): ViewerNavigation {
@@ -99,17 +133,13 @@ export function getNavigationForViewer(viewer: NavViewer): ViewerNavigation {
   }
 
   const navigation: ViewerNavigation = {
-    primary: [...AUTH_BASE_PRIMARY_NAV],
-    menu: [...AUTH_BASE_MENU_NAV],
+    primary: [...AUTH_DISCOVERY_PRIMARY_NAV, ...AUTH_COMMUNICATION_PRIMARY_NAV],
+    secondary: [],
+    account: [...AUTH_ACCOUNT_NAV],
   };
 
   if (isProviderRole(viewer.role)) {
-    if (viewer.providerAccountType === "company") {
-      buildProviderCompanyNavigation(viewer, navigation);
-    } else {
-      navigation.primary.unshift(...PROVIDER_OPERATIONS_NAV);
-      navigation.menu.unshift({ title: "Company setup", href: "/profile/company/new" });
-    }
+    buildProviderNavigation(viewer, navigation);
   }
 
   if (isAdminRole(viewer.role)) {
@@ -118,7 +148,8 @@ export function getNavigationForViewer(viewer: NavViewer): ViewerNavigation {
 
   return {
     primary: [{ title: "Home", href: "/" }, ...navigation.primary],
-    menu: navigation.menu,
+    secondary: navigation.secondary,
+    account: navigation.account,
   };
 }
 
@@ -161,7 +192,7 @@ function getCompanyProviderCta(viewer: NavViewer) {
   }
 
   return {
-    label: "Company governance",
+    label: "Company",
     href: COMPANY_CANONICAL_PATHS.governanceHome,
     detail: getRoleLabel(viewer.role ?? "seeker"),
   };

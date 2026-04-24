@@ -118,11 +118,27 @@ export function MobileNavSheet({ authState }: MobileNavSheetProps) {
             </nav>
           </div>
 
-          {navigation.menu.length > 0 ? (
+          {navigation.secondary.length > 0 ? (
             <div className="space-y-2">
-              <p className="type-label">Workspace and account</p>
+              <p className="type-label">Workspace</p>
+              <nav className="space-y-2" aria-label="Mobile workspace navigation">
+                {navigation.secondary.map((item) => (
+                  <MobileNavLink
+                    key={item.href}
+                    href={item.href}
+                    label={item.title}
+                    active={isActive(item.href)}
+                  />
+                ))}
+              </nav>
+            </div>
+          ) : null}
+
+          {navigation.account.length > 0 ? (
+            <div className="space-y-2">
+              <p className="type-label">Account</p>
               <nav className="space-y-2" aria-label="Mobile account navigation">
-                {navigation.menu.map((item) => (
+                {navigation.account.map((item) => (
                   <MobileNavLink
                     key={item.href}
                     href={item.href}

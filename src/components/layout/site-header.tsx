@@ -16,7 +16,17 @@ import { HeaderAccountMenu } from "./header-account-menu";
 import { MainContainer } from "./main-container";
 import { MobileNavSheet } from "./mobile-nav-sheet";
 
-function HeaderLink({ href, label, active }: { href: string; label: string; active: boolean }) {
+function HeaderLink({
+  href,
+  label,
+  active,
+  tone = "primary",
+}: {
+  href: string;
+  label: string;
+  active: boolean;
+  tone?: "primary" | "secondary";
+}) {
   return (
     <Link
       href={href}
@@ -25,7 +35,9 @@ function HeaderLink({ href, label, active }: { href: string; label: string; acti
         "focus-visible:ring-ring focus-visible:ring-offset-nav-background focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none",
         active
           ? "bg-nav-active text-primary-foreground"
-          : "text-nav-muted hover:bg-nav-active/24 hover:text-nav-foreground"
+          : tone === "secondary"
+            ? "text-nav-muted/90 hover:bg-nav-active/16 hover:text-nav-foreground"
+            : "text-nav-muted hover:bg-nav-active/24 hover:text-nav-foreground"
       )}
     >
       {label}
@@ -90,6 +102,19 @@ export function SiteHeader({ authState }: SiteHeaderProps) {
                 active={isActive(item.href)}
               />
             ))}
+            {navigation.secondary.length > 0 ? (
+              <div className="border-nav-active/28 ml-1 flex min-w-0 items-center gap-1 border-l pl-2">
+                {navigation.secondary.map((item) => (
+                  <HeaderLink
+                    key={item.href}
+                    href={item.href}
+                    label={item.title}
+                    active={isActive(item.href)}
+                    tone="secondary"
+                  />
+                ))}
+              </div>
+            ) : null}
           </nav>
 
           <div className="hidden items-center gap-2 lg:flex">
@@ -114,7 +139,7 @@ export function SiteHeader({ authState }: SiteHeaderProps) {
                   providerAccountType={authState.providerAccountType}
                   profileError={authState.profileError}
                   cta={cta}
-                  links={navigation.menu}
+                  links={navigation.account}
                 />
               </>
             ) : (
