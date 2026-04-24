@@ -1,4 +1,10 @@
 import type { ComponentType, ReactNode } from "react";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  CircleAlert,
+  type LucideIcon,
+} from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -53,6 +59,17 @@ type PageSummaryCardProps = {
 };
 
 type PageStateProps = React.ComponentProps<typeof EmptyState>;
+
+type PageNoticeTone = "default" | "success" | "warning" | "danger";
+
+type PageNoticeProps = {
+  title: ReactNode;
+  description?: ReactNode;
+  tone?: PageNoticeTone;
+  icon?: LucideIcon;
+  action?: ReactNode;
+  className?: string;
+};
 
 type PageLoadingSkeletonProps = {
   className?: string;
@@ -144,7 +161,9 @@ export function PageSection({
             <CardTitle className="text-xl">{title}</CardTitle>
             {description ? <CardDescription className="max-w-3xl">{description}</CardDescription> : null}
           </div>
-          {action ? <div className="shrink-0">{action}</div> : null}
+          {action ? (
+            <PageActionRail className="w-full sm:w-auto sm:max-w-none">{action}</PageActionRail>
+          ) : null}
         </div>
       </CardHeader>
       <CardContent className={cn("pt-5", contentClassName)}>{children}</CardContent>
@@ -196,6 +215,51 @@ export function PageSummaryCard({
 
 export function PageState(props: PageStateProps) {
   return <EmptyState {...props} className={cn("bg-card/82", props.className)} />;
+}
+
+export function PageNotice({
+  title,
+  description,
+  tone = "default",
+  icon: Icon,
+  action,
+  className,
+}: PageNoticeProps) {
+  const ResolvedIcon: LucideIcon =
+    Icon ??
+    (tone === "success"
+      ? CheckCircle2
+      : tone === "warning"
+        ? CircleAlert
+        : tone === "danger"
+          ? AlertTriangle
+          : CircleAlert);
+
+  return (
+    <section
+      className={cn(
+        "rounded-xl border px-4 py-3",
+        tone === "default" && "border-border/70 bg-card/65",
+        tone === "success" && "border-success/35 bg-success/10",
+        tone === "warning" && "border-warning/35 bg-warning/10",
+        tone === "danger" && "border-destructive/35 bg-destructive/10",
+        className
+      )}
+    >
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0 space-y-1">
+          <p className="inline-flex items-center gap-1.5 text-sm font-semibold">
+            <ResolvedIcon className="size-4" aria-hidden="true" />
+            {title}
+          </p>
+          {description ? (
+            <p className="text-muted-foreground text-xs leading-5">{description}</p>
+          ) : null}
+        </div>
+        {action ? <PageActionRail className="sm:ml-3">{action}</PageActionRail> : null}
+      </div>
+    </section>
+  );
 }
 
 export function PageSectionEyebrow({
