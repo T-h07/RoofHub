@@ -16,8 +16,9 @@ import {
 import { useActiveRoute } from "@/hooks/use-active-route";
 import { signOutAction } from "@/lib/auth/actions";
 import { getRoleLabel, type AppRole, type ProviderAccountType } from "@/lib/auth/roles";
+import type { OrganizationMemberRole } from "@/lib/company/team-types";
 import { siteConfig } from "@/lib/config/site";
-import { getCtaForViewer, getPrimaryNavForViewer } from "@/lib/navigation/role-navigation";
+import { getCtaForViewer, getNavigationForViewer } from "@/lib/navigation/role-navigation";
 import { cn } from "@/lib/utils";
 
 function MobileNavLink({
@@ -51,6 +52,7 @@ type MobileNavSheetProps = {
     displayName: string | null;
     role: AppRole | null;
     providerAccountType: ProviderAccountType | null;
+    companyMembershipRole: OrganizationMemberRole | null;
     profileError: string | null;
     unreadNotificationCount: number;
   };
@@ -59,15 +61,17 @@ type MobileNavSheetProps = {
 export function MobileNavSheet({ authState }: MobileNavSheetProps) {
   const { isActive } = useActiveRoute();
   const isAuthenticated = authState.isAuthenticated;
-  const primaryNav = getPrimaryNavForViewer({
+  const navigation = getNavigationForViewer({
     isAuthenticated,
     role: authState.role,
     providerAccountType: authState.providerAccountType,
+    companyMembershipRole: authState.companyMembershipRole,
   });
   const cta = getCtaForViewer({
     isAuthenticated,
     role: authState.role,
     providerAccountType: authState.providerAccountType,
+    companyMembershipRole: authState.companyMembershipRole,
   });
 
   return (
@@ -103,7 +107,7 @@ export function MobileNavSheet({ authState }: MobileNavSheetProps) {
           <div className="space-y-2">
             <p className="type-label">Primary navigation</p>
             <nav className="space-y-2" aria-label="Mobile primary navigation">
-              {primaryNav.map((item) => (
+              {navigation.primary.map((item) => (
                 <MobileNavLink
                   key={item.href}
                   href={item.href}
@@ -113,6 +117,22 @@ export function MobileNavSheet({ authState }: MobileNavSheetProps) {
               ))}
             </nav>
           </div>
+
+          {navigation.menu.length > 0 ? (
+            <div className="space-y-2">
+              <p className="type-label">Workspace and account</p>
+              <nav className="space-y-2" aria-label="Mobile account navigation">
+                {navigation.menu.map((item) => (
+                  <MobileNavLink
+                    key={item.href}
+                    href={item.href}
+                    label={item.title}
+                    active={isActive(item.href)}
+                  />
+                ))}
+              </nav>
+            </div>
+          ) : null}
 
           <div className="border-nav-muted/35 bg-nav-active/14 rounded-lg border p-3">
             <div className="text-nav-foreground mb-3 flex items-center gap-2 text-sm font-medium">

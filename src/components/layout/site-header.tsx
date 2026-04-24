@@ -7,9 +7,9 @@ import { buttonVariants } from "@/components/ui/button";
 import { NotificationBell } from "@/components/notifications/notification-bell";
 import { useActiveRoute } from "@/hooks/use-active-route";
 import type { AppRole, ProviderAccountType } from "@/lib/auth/roles";
+import type { OrganizationMemberRole } from "@/lib/company/team-types";
 import { siteConfig } from "@/lib/config/site";
-import { getCtaForViewer, getPrimaryNavForViewer } from "@/lib/navigation/role-navigation";
-import type { NavItem } from "@/types/navigation";
+import { getCtaForViewer, getNavigationForViewer } from "@/lib/navigation/role-navigation";
 import { cn } from "@/lib/utils";
 
 import { HeaderAccountMenu } from "./header-account-menu";
@@ -40,36 +40,27 @@ type SiteHeaderProps = {
     displayName: string | null;
     role: AppRole | null;
     providerAccountType: ProviderAccountType | null;
+    companyMembershipRole: OrganizationMemberRole | null;
     profileError: string | null;
     unreadNotificationCount: number;
   };
 };
 
-const DESKTOP_PRIMARY_ROUTES = new Set(["/explore", "/map", "/dashboard", "/admin/moderation"]);
-
-function getDesktopPrimaryNav(nav: NavItem[]) {
-  return nav.filter((item) => DESKTOP_PRIMARY_ROUTES.has(item.href));
-}
-
-function getAccountMenuNav(nav: NavItem[]) {
-  return nav.filter((item) => item.href !== "/" && !DESKTOP_PRIMARY_ROUTES.has(item.href));
-}
-
 export function SiteHeader({ authState }: SiteHeaderProps) {
   const { isActive } = useActiveRoute();
   const isAuthenticated = authState.isAuthenticated;
-  const primaryNav = getPrimaryNavForViewer({
+  const navigation = getNavigationForViewer({
     isAuthenticated,
     role: authState.role,
     providerAccountType: authState.providerAccountType,
+    companyMembershipRole: authState.companyMembershipRole,
   });
   const cta = getCtaForViewer({
     isAuthenticated,
     role: authState.role,
     providerAccountType: authState.providerAccountType,
+    companyMembershipRole: authState.companyMembershipRole,
   });
-  const desktopPrimaryNav = getDesktopPrimaryNav(primaryNav);
-  const accountMenuNav = getAccountMenuNav(primaryNav);
   const accountLabel = authState.displayName || authState.email || "Signed in";
 
   return (
@@ -91,7 +82,7 @@ export function SiteHeader({ authState }: SiteHeaderProps) {
           </Link>
 
           <nav className="hidden min-w-0 items-center gap-1 lg:flex" aria-label="Primary navigation">
-            {desktopPrimaryNav.map((item) => (
+            {navigation.primary.map((item) => (
               <HeaderLink
                 key={item.href}
                 href={item.href}
@@ -123,7 +114,7 @@ export function SiteHeader({ authState }: SiteHeaderProps) {
                   providerAccountType={authState.providerAccountType}
                   profileError={authState.profileError}
                   cta={cta}
-                  links={accountMenuNav}
+                  links={navigation.menu}
                 />
               </>
             ) : (

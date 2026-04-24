@@ -2,6 +2,8 @@ import type { ReactNode } from "react";
 
 import { getCurrentUserProfile } from "@/lib/auth/profile";
 import type { AppRole, ProviderAccountType } from "@/lib/auth/roles";
+import { getCurrentUserCompanyContext } from "@/lib/company/context";
+import type { OrganizationMemberRole } from "@/lib/company/team-types";
 import { getUnreadNotificationCountForUser } from "@/lib/notifications";
 import { createServerSupabaseClient } from "@/lib/supabase";
 
@@ -18,6 +20,7 @@ type HeaderAuthState = {
   displayName: string | null;
   role: AppRole | null;
   providerAccountType: ProviderAccountType | null;
+  companyMembershipRole: OrganizationMemberRole | null;
   profileError: string | null;
   unreadNotificationCount: number;
 };
@@ -36,6 +39,7 @@ async function getHeaderAuthState(): Promise<HeaderAuthState> {
         displayName: null,
         role: null,
         providerAccountType: null,
+        companyMembershipRole: null,
         profileError: null,
         unreadNotificationCount: 0,
       };
@@ -55,9 +59,21 @@ async function getHeaderAuthState(): Promise<HeaderAuthState> {
         displayName: null,
         role: null,
         providerAccountType: null,
+        companyMembershipRole: null,
         profileError: profileResult.message,
         unreadNotificationCount,
       };
+    }
+
+    let companyMembershipRole: OrganizationMemberRole | null = null;
+    if (
+      profileResult.profile.role === "provider" &&
+      profileResult.profile.provider_account_type === "company"
+    ) {
+      const companyContextResult = await getCurrentUserCompanyContext(supabase);
+      if (companyContextResult.ok) {
+        companyMembershipRole = companyContextResult.company.activeMembership?.role ?? null;
+      }
     }
 
     return {
@@ -66,6 +82,7 @@ async function getHeaderAuthState(): Promise<HeaderAuthState> {
       displayName: profileResult.profile.display_name,
       role: profileResult.profile.role,
       providerAccountType: profileResult.profile.provider_account_type,
+      companyMembershipRole,
       profileError: null,
       unreadNotificationCount,
     };
@@ -76,6 +93,7 @@ async function getHeaderAuthState(): Promise<HeaderAuthState> {
       displayName: null,
       role: null,
       providerAccountType: null,
+      companyMembershipRole: null,
       profileError: "Profile state could not be loaded.",
       unreadNotificationCount: 0,
     };
