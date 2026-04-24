@@ -14,8 +14,6 @@ import { getCurrentUserCompanyContext } from "@/lib/company/context";
 import { toCompanyLogoPublicUrl } from "@/lib/company/logo";
 import { loadPendingCompanyInvitesForCurrentUser } from "@/lib/company/team-queries";
 import { ORGANIZATION_MEMBER_ROLE_LABELS } from "@/lib/company/team-types";
-import { getCompanyOperationalHomeForRole } from "@/lib/navigation/company-ia";
-import { PUBLIC_DISCOVERY_STATUS } from "@/lib/listings/visibility";
 import { createServerSupabaseClient } from "@/lib/supabase";
 
 type CompanyWorkspacePageProps = {
@@ -113,7 +111,7 @@ export default async function CompanyWorkspacePage({ searchParams }: CompanyWork
           activeOrganizationId={company.activeOrganizationId}
           redirectTo="/profile/company"
           title="Choose the company workspace you want to use"
-          description="This account belongs to more than one RoofHub company workspace. Pick the active workspace once, and RoofHub will use it consistently for dashboard, listings, team management, and activity views."
+          description="This account belongs to more than one RoofHub company workspace. Pick the active workspace once, and RoofHub will use it consistently for company governance, team management, and operational routing."
         />
       </MainContainer>
     );
@@ -196,12 +194,50 @@ export default async function CompanyWorkspacePage({ searchParams }: CompanyWork
   const membership = company.activeMembership;
   const logoUrl = toCompanyLogoPublicUrl(supabase, organization.logo_path);
   const completion = buildProfileCompletionChecklist(organization);
-  const operationalHomeHref = getCompanyOperationalHomeForRole(membership.role);
-  const { count: publishedListingCount } = await supabase
-    .from("listings")
-    .select("id", { count: "exact", head: true })
-    .eq("listing_status", PUBLIC_DISCOVERY_STATUS)
-    .eq("organization_id", organization.id);
+  const governanceCapabilities = [
+    {
+      key: "profile-edit",
+      label: "Company profile editing",
+      enabled: company.canEditProfile,
+      detail: company.canEditProfile
+        ? "You can edit branding, contact details, and company identity."
+        : "Owner membership is required to edit company profile fields.",
+    },
+    {
+      key: "team-management",
+      label: "Team and invite management",
+      enabled: company.canManageTeam,
+      detail: company.canManageTeam
+        ? "You can invite members and manage role or status changes."
+        : "Owner or admin membership is required for team and invite controls.",
+    },
+  ] as const;
+
+  let activeMemberCount: number | null = null;
+  let pendingInviteCount: number | null = null;
+
+  if (company.canManageTeam) {
+    const [activeMembersResult, pendingInvitesResult] = await Promise.all([
+      supabase
+        .from("organization_members")
+        .select("id", { count: "exact", head: true })
+        .eq("organization_id", organization.id)
+        .eq("member_status", "active"),
+      supabase
+        .from("organization_member_invites")
+        .select("id", { count: "exact", head: true })
+        .eq("organization_id", organization.id)
+        .eq("invite_status", "pending"),
+    ]);
+
+    if (!activeMembersResult.error) {
+      activeMemberCount = activeMembersResult.count ?? 0;
+    }
+
+    if (!pendingInvitesResult.error) {
+      pendingInviteCount = pendingInvitesResult.count ?? 0;
+    }
+  }
 
   return (
     <MainContainer size="wide" className="space-y-5">
@@ -231,12 +267,11 @@ export default async function CompanyWorkspacePage({ searchParams }: CompanyWork
             coverageArea: organization.coverage_area,
           }}
           contextLabel="Company governance workspace"
-          supportingLabel={`Active role: ${ORGANIZATION_MEMBER_ROLE_LABELS[membership.role]}. Use this surface for company profile, team, and governance controls while operational listing work stays in the dashboard.`}
-          listingCount={publishedListingCount ?? 0}
+          supportingLabel={`Active role: ${ORGANIZATION_MEMBER_ROLE_LABELS[membership.role]}. This page is dedicated to company governance: profile identity, team administration, invites, and public presence.`}
           actions={
             <>
               {company.canEditProfile ? (
-                <Link href="/profile/company/edit" className={buttonVariants({ variant: "outline", size: "sm" })}>
+                <Link href="/profile/company/edit" className={buttonVariants({ size: "sm" })}>
                   Edit company profile
                 </Link>
               ) : null}
@@ -245,7 +280,7 @@ export default async function CompanyWorkspacePage({ searchParams }: CompanyWork
                   href="/profile/company/team"
                   className={buttonVariants({ variant: "outline", size: "sm" })}
                 >
-                  Team management
+                  Open team and invites
                 </Link>
               ) : null}
               <Link
@@ -254,23 +289,22 @@ export default async function CompanyWorkspacePage({ searchParams }: CompanyWork
               >
                 View public company page
               </Link>
-              <Link href={operationalHomeHref} className={buttonVariants({ size: "sm" })}>
-                Open operations workspace
-              </Link>
             </>
           }
         />
 
-        {company.canEditProfile ? (
-          <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+        <section className="grid gap-5 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+          <div className="space-y-5">
             <PageSection
-              eyebrow={<Badge variant="outline">Profile readiness</Badge>}
-              title="Brand and contact completeness"
-              description="A complete profile improves trust and gives seekers enough context before first contact."
+              eyebrow={<Badge variant="outline">Company profile</Badge>}
+              title="Identity and branding governance"
+              description="Maintain a complete company profile so your team identity and public presence stay accurate."
             >
               <div className="space-y-4">
                 <div className="flex items-center justify-between gap-3">
-                  <p className="text-sm font-semibold">Completion</p>
+                  <p className="text-sm font-semibold">
+                    Completion {completion.completed}/{completion.total}
+                  </p>
                   <Badge variant={completion.percent >= 80 ? "success" : "warning"}>
                     {completion.percent}%
                   </Badge>
@@ -298,84 +332,112 @@ export default async function CompanyWorkspacePage({ searchParams }: CompanyWork
                 ) : (
                   <p className="text-muted-foreground inline-flex items-center gap-2 text-sm">
                     <CircleCheck className="text-success size-4" />
-                    Company profile is fully complete for this foundation phase.
+                    Company profile is complete.
+                  </p>
+                )}
+
+                {company.canEditProfile ? (
+                  <Link href="/profile/company/edit" className={buttonVariants({ size: "sm" })}>
+                    Edit company profile
+                  </Link>
+                ) : (
+                  <p className="text-muted-foreground inline-flex items-center gap-2 text-sm">
+                    <ShieldCheck className="text-primary size-4" />
+                    Profile editing is limited to owner membership.
                   </p>
                 )}
               </div>
             </PageSection>
 
             <PageSection
-              eyebrow={<Badge variant="outline">Next actions</Badge>}
-              title="Governance actions"
-              description="Keep company identity, profile quality, and team governance current."
+              eyebrow={<Badge variant="outline">Team and invites</Badge>}
+              title="Membership administration"
+              description="Manage workspace members and invitation lifecycle from one governance surface."
+            >
+              {company.canManageTeam ? (
+                <div className="space-y-4">
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <div className="border-border/70 bg-surface-soft rounded-xl border px-3.5 py-3">
+                      <p className="text-muted-foreground text-xs uppercase tracking-wide">Active members</p>
+                      <p className="mt-1 text-xl font-semibold tracking-tight">
+                        {activeMemberCount ?? "—"}
+                      </p>
+                    </div>
+                    <div className="border-border/70 bg-surface-soft rounded-xl border px-3.5 py-3">
+                      <p className="text-muted-foreground text-xs uppercase tracking-wide">Pending invites</p>
+                      <p className="mt-1 text-xl font-semibold tracking-tight">
+                        {pendingInviteCount ?? "—"}
+                      </p>
+                    </div>
+                  </div>
+
+                  <p className="type-body-muted">
+                    Owner and admin members can invite teammates, assign roles, and manage membership status.
+                  </p>
+
+                  <Link href="/profile/company/team" className={buttonVariants({ variant: "outline", size: "sm" })}>
+                    Open team and invites
+                  </Link>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <p className="text-muted-foreground inline-flex items-center gap-2 text-sm">
+                    <ShieldCheck className="text-primary size-4" />
+                    Team and invite administration is limited to owner or admin membership.
+                  </p>
+                </div>
+              )}
+            </PageSection>
+          </div>
+
+          <div className="space-y-5">
+            <PageSection
+              eyebrow={<Badge variant="outline">Public presence</Badge>}
+              title="External company page"
+              description="Use your public company page to verify how RoofHub presents your brand and contact identity."
             >
               <div className="space-y-3">
-                <Link href="/profile/company/edit" className={buttonVariants({ size: "sm" })}>
-                  Edit company profile
-                </Link>
-                {company.canManageTeam ? (
-                  <Link
-                    href="/profile/company/team"
-                    className={buttonVariants({ variant: "outline", size: "sm" })}
-                  >
-                    Manage team members
-                  </Link>
-                ) : null}
                 <Link
                   href={`/companies/${organization.slug}`}
                   className={buttonVariants({ variant: "outline", size: "sm" })}
                 >
-                  Open public company page
+                  View public company page
                 </Link>
-                <Link href={operationalHomeHref} className={buttonVariants({ variant: "ghost", size: "sm" })}>
-                  Open operational workspace
-                </Link>
-              </div>
-            </PageSection>
-          </section>
-        ) : (
-          <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-            <PageSection
-              eyebrow={<Badge variant="outline">Membership scope</Badge>}
-              title="You are operating inside this workspace"
-              description="Workspace access is active, but profile editing remains limited to owner membership in the selected company."
-            >
-              <div className="space-y-3 text-sm text-muted-foreground">
-                <p className="inline-flex items-center gap-2">
-                  <ShieldCheck className="text-primary size-4" />
-                  Role: {ORGANIZATION_MEMBER_ROLE_LABELS[membership.role]}
-                </p>
-                <p>
-                  Dashboard, listing, and activity routes now use this workspace as the trusted company
-                  context until you switch to a different one.
+                <p className="type-body-muted">
+                  This is a public reference surface, not an operational workflow area.
                 </p>
               </div>
             </PageSection>
 
             <PageSection
-              eyebrow={<Badge variant="outline">Available actions</Badge>}
-              title="Membership-aware actions"
-              description="Use governance tools you have access to and continue operational work from one canonical entry point."
+              eyebrow={<Badge variant="outline">Governance scope</Badge>}
+              title="Role-based governance access"
+              description="Company governance visibility is intentionally scoped by membership role."
             >
-              <div className="space-y-3">
-                <Link href={operationalHomeHref} className={buttonVariants({ size: "sm" })}>
-                  {membership.role === "agent" ? "Open listing inventory" : "Open operations dashboard"}
-                </Link>
-                {company.canManageTeam ? (
-                  <Link href="/profile/company/team" className={buttonVariants({ variant: "outline", size: "sm" })}>
-                    Manage team members
-                  </Link>
-                ) : null}
-                <Link
-                  href={`/companies/${organization.slug}`}
-                  className={buttonVariants({ variant: "ghost", size: "sm" })}
-                >
-                  View public company page
-                </Link>
-              </div>
+              <ul className="space-y-2.5">
+                {governanceCapabilities.map((capability) => (
+                  <li
+                    key={capability.key}
+                    className="border-border/70 bg-surface-soft rounded-xl border px-3.5 py-3"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-sm font-semibold">{capability.label}</p>
+                      <Badge variant={capability.enabled ? "success" : "outline"}>
+                        {capability.enabled ? "Available" : "Restricted"}
+                      </Badge>
+                    </div>
+                    <p className="text-muted-foreground mt-1 text-xs leading-5">{capability.detail}</p>
+                  </li>
+                ))}
+              </ul>
+
+              <p className="type-body-muted pt-2">
+                Operational listing workflow, review queue actions, and inbox routing stay in the dedicated
+                operational surfaces.
+              </p>
             </PageSection>
-          </section>
-        )}
+          </div>
+        </section>
       </PageShell>
     </MainContainer>
   );
