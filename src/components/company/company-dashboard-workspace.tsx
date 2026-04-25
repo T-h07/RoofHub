@@ -57,7 +57,12 @@ type DashboardNextStep = {
   detail: string;
   href: string;
   actionLabel: string;
-  icon: typeof PlusSquare | typeof FileSearch | typeof MessageSquareMore | typeof Megaphone | typeof Rows3;
+  icon:
+    | typeof PlusSquare
+    | typeof FileSearch
+    | typeof MessageSquareMore
+    | typeof Megaphone
+    | typeof Rows3;
 };
 
 function resolveDashboardRoleMode(workspace: CompanyDashboardWorkspaceData): DashboardRoleMode {
@@ -151,15 +156,10 @@ function buildHeaderActions(
 
   if (mode === "agent") {
     return (
-      <>
-        <Link href="/dashboard/listings/new" className={buttonVariants({ size: "sm" })}>
-          <PlusSquare className="size-4" aria-hidden="true" />
-          Create listing
-        </Link>
-        <Link href="/dashboard/listings" className={buttonVariants({ variant: "outline", size: "sm" })}>
-          Listings
-        </Link>
-      </>
+      <Link href="/dashboard/listings/new" className={buttonVariants({ size: "sm" })}>
+        <PlusSquare className="size-4" aria-hidden="true" />
+        Create listing
+      </Link>
     );
   }
 
@@ -179,7 +179,10 @@ function buildHeaderActions(
         </Link>
       )}
       {workspace.canViewInboxQueue ? (
-        <Link href="/messages" className={buttonVariants({ variant: "outline", size: "sm" })}>
+        <Link
+          href="/messages?section=outer_company&lane=queue"
+          className={buttonVariants({ variant: "outline", size: "sm" })}
+        >
           Inbox routing
         </Link>
       ) : null}
@@ -222,7 +225,7 @@ function buildNextStep(
         detail: `${workspace.messaging.unreadAssignedToViewerMessages} unread message${
           workspace.messaging.unreadAssignedToViewerMessages === 1 ? "" : "s"
         } are waiting in your assigned inbox.`,
-        href: "/messages",
+        href: "/messages?section=outer_company&lane=assigned",
         actionLabel: "Open assigned inbox",
         icon: MessageSquareMore,
       };
@@ -230,7 +233,8 @@ function buildNextStep(
 
     return {
       title: "Start your next listing",
-      detail: "No urgent backlog is waiting. Start the next draft to keep inventory throughput strong.",
+      detail:
+        "No urgent backlog is waiting. Start the next draft to keep inventory throughput strong.",
       href: "/dashboard/listings/new",
       actionLabel: "Create new draft",
       icon: PlusSquare,
@@ -254,7 +258,7 @@ function buildNextStep(
       detail: `${workspace.messaging.unreadSharedQueueMessages} shared-queue unread message${
         workspace.messaging.unreadSharedQueueMessages === 1 ? "" : "s"
       } need assignment or reply.`,
-      href: "/messages",
+      href: "/messages?section=outer_company&lane=queue",
       actionLabel: "Open inbox routing",
       icon: MessageSquareMore,
     };
@@ -289,7 +293,8 @@ function renderPendingQueue(workspace: CompanyDashboardWorkspaceData) {
           <Badge variant="primary">Pending review queue</Badge>
           <CardTitle className="text-xl">Listings awaiting reviewer action</CardTitle>
           <p className="type-body-muted">
-            Move submitted listings through approval and publish decisions with clear queue ownership.
+            Move submitted listings through approval and publish decisions with clear queue
+            ownership.
           </p>
         </div>
       </CardHeader>
@@ -324,7 +329,7 @@ function renderPendingQueue(workspace: CompanyDashboardWorkspaceData) {
                   <ProviderListingStatusBadge status={item.listingStatus} />
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                <div className="text-muted-foreground flex flex-wrap items-center gap-2 text-xs">
                   <span className="inline-flex items-center gap-1">
                     <Clock3 className="size-3.5" aria-hidden="true" />
                     Submitted {formatFreshness(item.submittedAt)}
@@ -365,7 +370,10 @@ function renderActivityCard(workspace: CompanyDashboardWorkspaceData) {
             </p>
           </div>
           {workspace.canViewActivityFeed ? (
-            <Link href="/dashboard/activity" className={buttonVariants({ variant: "ghost", size: "sm" })}>
+            <Link
+              href="/dashboard/activity"
+              className={buttonVariants({ variant: "ghost", size: "sm" })}
+            >
               Full activity
             </Link>
           ) : null}
@@ -408,40 +416,56 @@ function renderAgentPanels(workspace: CompanyDashboardWorkspaceData) {
             <Badge variant="outline">Listing workload</Badge>
             <CardTitle className="text-xl">Continue listing work</CardTitle>
             <p className="type-body-muted">
-              Keep inventory moving from draft to review-ready states with one consistent operational flow.
+              Keep inventory moving from draft to review-ready states with one consistent
+              operational flow.
             </p>
           </div>
         </CardHeader>
         <CardContent className="space-y-2.5 pt-5">
           <Link
             href="/dashboard/listings?status=draft"
-            className={buttonVariants({ variant: "ghost", size: "sm" }) + " h-auto w-full justify-between px-3.5 py-3"}
+            className={
+              buttonVariants({ variant: "ghost", size: "sm" }) +
+              " h-auto w-full justify-between px-3.5 py-3"
+            }
           >
             <span className="text-left">
               <span className="block text-sm font-semibold tracking-tight">Draft listings</span>
-              <span className="text-muted-foreground block text-xs">Complete listing details and media.</span>
+              <span className="text-muted-foreground block text-xs">
+                Complete listing details and media.
+              </span>
             </span>
             <span className="text-sm font-semibold">{workspace.overview.draftCount}</span>
           </Link>
 
           <Link
             href="/dashboard/listings?status=needs_changes"
-            className={buttonVariants({ variant: "ghost", size: "sm" }) + " h-auto w-full justify-between px-3.5 py-3"}
+            className={
+              buttonVariants({ variant: "ghost", size: "sm" }) +
+              " h-auto w-full justify-between px-3.5 py-3"
+            }
           >
             <span className="text-left">
               <span className="block text-sm font-semibold tracking-tight">Needs changes</span>
-              <span className="text-muted-foreground block text-xs">Resolve reviewer feedback and resubmit.</span>
+              <span className="text-muted-foreground block text-xs">
+                Resolve reviewer feedback and resubmit.
+              </span>
             </span>
             <span className="text-sm font-semibold">{workspace.overview.needsChangesCount}</span>
           </Link>
 
           <Link
             href="/dashboard/listings?status=submitted_for_review"
-            className={buttonVariants({ variant: "ghost", size: "sm" }) + " h-auto w-full justify-between px-3.5 py-3"}
+            className={
+              buttonVariants({ variant: "ghost", size: "sm" }) +
+              " h-auto w-full justify-between px-3.5 py-3"
+            }
           >
             <span className="text-left">
               <span className="block text-sm font-semibold tracking-tight">Awaiting review</span>
-              <span className="text-muted-foreground block text-xs">Submitted listings currently in reviewer queue.</span>
+              <span className="text-muted-foreground block text-xs">
+                Submitted listings currently in reviewer queue.
+              </span>
             </span>
             <span className="text-sm font-semibold">{workspace.overview.pendingReviewCount}</span>
           </Link>
@@ -467,14 +491,18 @@ function renderAgentPanels(workspace: CompanyDashboardWorkspaceData) {
         </CardHeader>
         <CardContent className="space-y-3 pt-5">
           <div className="border-border/70 bg-surface-soft rounded-xl border px-3.5 py-3">
-            <p className="text-muted-foreground text-xs uppercase tracking-wide">Assigned conversations</p>
+            <p className="text-muted-foreground text-xs tracking-wide uppercase">
+              Assigned conversations
+            </p>
             <p className="mt-1 text-2xl font-semibold tracking-tight">
               {workspace.messaging.assignedToViewerConversations}
             </p>
           </div>
 
           <div className="border-border/70 bg-surface-soft rounded-xl border px-3.5 py-3">
-            <p className="text-muted-foreground text-xs uppercase tracking-wide">Unread assigned messages</p>
+            <p className="text-muted-foreground text-xs tracking-wide uppercase">
+              Unread assigned messages
+            </p>
             <p className="mt-1 text-2xl font-semibold tracking-tight">
               {workspace.messaging.unreadAssignedToViewerMessages}
             </p>
@@ -485,12 +513,12 @@ function renderAgentPanels(workspace: CompanyDashboardWorkspaceData) {
           ) : null}
 
           <div className="flex flex-wrap gap-2">
-            <Link href="/messages" className={buttonVariants({ size: "sm" })}>
+            <Link
+              href="/messages?section=outer_company&lane=assigned"
+              className={buttonVariants({ size: "sm" })}
+            >
               <MessageSquareMore className="size-4" aria-hidden="true" />
               Open assigned inbox
-            </Link>
-            <Link href="/dashboard/listings" className={buttonVariants({ variant: "outline", size: "sm" })}>
-              Listings
             </Link>
           </div>
         </CardContent>
@@ -510,7 +538,9 @@ function renderReviewerPanels(workspace: CompanyDashboardWorkspaceData, mode: Da
             <div className="space-y-2">
               <Badge variant="outline">Inbox routing</Badge>
               <CardTitle className="text-xl">
-                {mode === "manager" ? "Shared queue and assignment" : "Operational routing workload"}
+                {mode === "manager"
+                  ? "Shared queue and assignment"
+                  : "Operational routing workload"}
               </CardTitle>
               <p className="type-body-muted">
                 {mode === "manager"
@@ -522,13 +552,17 @@ function renderReviewerPanels(workspace: CompanyDashboardWorkspaceData, mode: Da
           <CardContent className="space-y-3 pt-5">
             <div className="grid gap-2 sm:grid-cols-2">
               <div className="border-border/70 bg-surface-soft rounded-xl border px-3.5 py-3">
-                <p className="text-muted-foreground text-xs uppercase tracking-wide">Shared queue</p>
+                <p className="text-muted-foreground text-xs tracking-wide uppercase">
+                  Shared queue
+                </p>
                 <p className="mt-1 text-xl font-semibold tracking-tight">
                   {workspace.messaging.sharedQueueConversations}
                 </p>
               </div>
               <div className="border-border/70 bg-surface-soft rounded-xl border px-3.5 py-3">
-                <p className="text-muted-foreground text-xs uppercase tracking-wide">Unread shared messages</p>
+                <p className="text-muted-foreground text-xs tracking-wide uppercase">
+                  Unread shared messages
+                </p>
                 <p className="mt-1 text-xl font-semibold tracking-tight">
                   {workspace.messaging.unreadSharedQueueMessages}
                 </p>
@@ -537,13 +571,17 @@ function renderReviewerPanels(workspace: CompanyDashboardWorkspaceData, mode: Da
 
             <div className="grid gap-2 sm:grid-cols-2">
               <div className="border-border/70 bg-surface-soft rounded-xl border px-3.5 py-3">
-                <p className="text-muted-foreground text-xs uppercase tracking-wide">Assigned to you</p>
+                <p className="text-muted-foreground text-xs tracking-wide uppercase">
+                  Assigned to you
+                </p>
                 <p className="mt-1 text-xl font-semibold tracking-tight">
                   {workspace.messaging.assignedToViewerConversations}
                 </p>
               </div>
               <div className="border-border/70 bg-surface-soft rounded-xl border px-3.5 py-3">
-                <p className="text-muted-foreground text-xs uppercase tracking-wide">Assigned to others</p>
+                <p className="text-muted-foreground text-xs tracking-wide uppercase">
+                  Assigned to others
+                </p>
                 <p className="mt-1 text-xl font-semibold tracking-tight">
                   {workspace.messaging.assignedToOtherConversations}
                 </p>
@@ -551,19 +589,21 @@ function renderReviewerPanels(workspace: CompanyDashboardWorkspaceData, mode: Da
             </div>
 
             {workspace.messagingUnavailableMessage ? (
-              <p className="text-muted-foreground text-xs">{workspace.messagingUnavailableMessage}</p>
+              <p className="text-muted-foreground text-xs">
+                {workspace.messagingUnavailableMessage}
+              </p>
             ) : null}
 
             <div className="flex flex-wrap gap-2">
               {workspace.canViewInboxQueue ? (
-                <Link href="/messages" className={buttonVariants({ size: "sm" })}>
+                <Link
+                  href="/messages?section=outer_company&lane=queue"
+                  className={buttonVariants({ size: "sm" })}
+                >
                   <MessageSquareMore className="size-4" aria-hidden="true" />
                   Open inbox routing
                 </Link>
               ) : null}
-              <Link href="/dashboard/listings" className={buttonVariants({ variant: "outline", size: "sm" })}>
-                Listing backlog
-              </Link>
             </div>
           </CardContent>
         </Card>
@@ -578,32 +618,47 @@ function renderReviewerPanels(workspace: CompanyDashboardWorkspaceData, mode: Da
           <CardContent className="space-y-2 pt-5">
             <Link
               href="/dashboard/listings?status=needs_changes"
-              className={buttonVariants({ variant: "ghost", size: "sm" }) + " h-auto w-full justify-between px-3.5 py-3"}
+              className={
+                buttonVariants({ variant: "ghost", size: "sm" }) +
+                " h-auto w-full justify-between px-3.5 py-3"
+              }
             >
               <span className="text-left">
                 <span className="block text-sm font-semibold tracking-tight">Needs changes</span>
-                <span className="text-muted-foreground block text-xs">Listings returned for revision.</span>
+                <span className="text-muted-foreground block text-xs">
+                  Listings returned for revision.
+                </span>
               </span>
               <span className="text-sm font-semibold">{workspace.overview.needsChangesCount}</span>
             </Link>
 
             <Link
               href="/dashboard/listings?status=draft"
-              className={buttonVariants({ variant: "ghost", size: "sm" }) + " h-auto w-full justify-between px-3.5 py-3"}
+              className={
+                buttonVariants({ variant: "ghost", size: "sm" }) +
+                " h-auto w-full justify-between px-3.5 py-3"
+              }
             >
               <span className="text-left">
                 <span className="block text-sm font-semibold tracking-tight">Draft inventory</span>
-                <span className="text-muted-foreground block text-xs">Listings still in edit phase.</span>
+                <span className="text-muted-foreground block text-xs">
+                  Listings still in edit phase.
+                </span>
               </span>
               <span className="text-sm font-semibold">{workspace.overview.draftCount}</span>
             </Link>
 
             <Link
               href="/dashboard/listings?status=published"
-              className={buttonVariants({ variant: "ghost", size: "sm" }) + " h-auto w-full justify-between px-3.5 py-3"}
+              className={
+                buttonVariants({ variant: "ghost", size: "sm" }) +
+                " h-auto w-full justify-between px-3.5 py-3"
+              }
             >
               <span className="text-left">
-                <span className="block text-sm font-semibold tracking-tight">Published listings</span>
+                <span className="block text-sm font-semibold tracking-tight">
+                  Published listings
+                </span>
                 <span className="text-muted-foreground block text-xs">Live public inventory.</span>
               </span>
               <span className="text-sm font-semibold">{workspace.overview.publishedCount}</span>
@@ -681,36 +736,18 @@ export function CompanyDashboardWorkspace({
             </div>
           </CardHeader>
           <CardContent className="space-y-2.5 pt-5">
-            <Link href={nextStep.href} className={buttonVariants({ size: "sm" }) + " w-full justify-start"}>
+            <Link
+              href={nextStep.href}
+              className={buttonVariants({ size: "sm" }) + " w-full justify-start"}
+            >
               <nextStep.icon className="size-4" aria-hidden="true" />
               {nextStep.actionLabel}
             </Link>
 
-            {mode === "agent" ? (
-              <Link
-                href="/messages"
-                className={buttonVariants({ variant: "outline", size: "sm" }) + " w-full justify-start"}
-              >
-                <MessageSquareMore className="size-4" aria-hidden="true" />
-                Open assigned inbox
-              </Link>
-            ) : workspace.canViewInboxQueue ? (
-              <Link
-                href="/messages"
-                className={buttonVariants({ variant: "outline", size: "sm" }) + " w-full justify-start"}
-              >
-                <MessageSquareMore className="size-4" aria-hidden="true" />
-                Open inbox routing
-              </Link>
-            ) : null}
-
-            <Link
-              href="/dashboard/listings"
-              className={buttonVariants({ variant: "ghost", size: "sm" }) + " w-full justify-start"}
-            >
-              <Rows3 className="size-4" aria-hidden="true" />
-              Open listing backlog
-            </Link>
+            <p className="type-body-muted">
+              Secondary workflow surfaces stay below in their role-specific sections so this panel
+              keeps one operational next step.
+            </p>
           </CardContent>
         </Card>
       </section>
@@ -746,9 +783,13 @@ export function CompanyDashboardWorkspace({
       {mode === "agent" && workspace.overview.pendingReviewCount > 0 ? (
         <Card className="border-border/80 bg-card/88">
           <CardContent className="flex flex-wrap items-center justify-between gap-3 py-4">
-            <p className="text-sm text-muted-foreground">
-              <span className="font-semibold text-foreground">{workspace.overview.pendingReviewCount}</span> listing
-              {workspace.overview.pendingReviewCount === 1 ? " is" : "s are"} currently in reviewer queue.
+            <p className="text-muted-foreground text-sm">
+              <span className="text-foreground font-semibold">
+                {workspace.overview.pendingReviewCount}
+              </span>{" "}
+              listing
+              {workspace.overview.pendingReviewCount === 1 ? " is" : "s are"} currently in reviewer
+              queue.
             </p>
             <Link
               href="/dashboard/listings?status=submitted_for_review"
