@@ -10,26 +10,34 @@ import {
   PageState,
 } from "@/components/layout/page-shell";
 import { MessagesWorkspace } from "@/components/messages/messages-workspace";
+import { InternalCompanyWorkspace } from "@/components/messages/internal-company-workspace";
+import { ComposeTeamMessageButton } from "@/components/messages/compose-team-message-button";
 import { MainContainer } from "@/components/layout/main-container";
 import { Badge } from "@/components/ui/badge";
-import { buttonVariants } from "@/components/ui/button";
 import { toSignInPath } from "@/lib/auth/routing";
 import {
   createOrGetConversationForListingAction,
+  loadInternalCompanyConversationSummariesQuery,
+  loadInternalCompanyMemberOptionsQuery,
+  loadInternalCompanyThreadQuery,
   loadMessagingConversationSummariesQuery,
   loadMessagingThreadQuery,
 } from "@/lib/messaging";
 import {
   normalizeMessagingInboxLane,
+  normalizeMessagingSection,
   type MessagingInboxLane,
+  type MessagingSection,
 } from "@/lib/messaging/presentation";
 import { isUuid } from "@/lib/messaging/validation";
+import { cn } from "@/lib/utils";
 
 type MessagesPageProps = {
   searchParams: Promise<{
     listingId?: string;
     conversationId?: string;
     lane?: string;
+    section?: string;
   }>;
 };
 
@@ -42,11 +50,16 @@ function normalizeParam(value: string | string[] | undefined) {
 }
 
 function buildMessagesHref(input: {
+  section?: MessagingSection;
   listingId?: string;
   conversationId?: string;
   lane?: MessagingInboxLane;
 }) {
   const params = new URLSearchParams();
+
+  if (input.section) {
+    params.set("section", input.section);
+  }
 
   if (input.listingId) {
     params.set("listingId", input.listingId);
@@ -64,6 +77,35 @@ function buildMessagesHref(input: {
   return queryString ? `/messages?${queryString}` : "/messages";
 }
 
+function SectionLink({
+  href,
+  label,
+  count,
+  active,
+}: {
+  href: string;
+  label: string;
+  count: number | null;
+  active: boolean;
+}) {
+  return (
+    <Link
+      href={href}
+      className={cn(
+        "rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
+        active
+          ? "bg-primary text-primary-foreground"
+          : "text-muted-foreground hover:bg-accent/70 hover:text-foreground"
+      )}
+    >
+      {label}
+      {typeof count === "number" ? (
+        <span className="ml-1 opacity-80">{new Intl.NumberFormat("en").format(count)}</span>
+      ) : null}
+    </Link>
+  );
+}
+
 export default async function MessagesPage({ searchParams }: MessagesPageProps) {
   const resolvedSearchParams = await searchParams;
   const listingId = normalizeParam(resolvedSearchParams.listingId);
@@ -71,6 +113,10 @@ export default async function MessagesPage({ searchParams }: MessagesPageProps) 
   const requestedLane = normalizeMessagingInboxLane(
     normalizeParam(resolvedSearchParams.lane),
     "all"
+  );
+  const requestedSection = normalizeMessagingSection(
+    normalizeParam(resolvedSearchParams.section),
+    "outer_company"
   );
   let handoffErrorMessage: string | null = null;
 
@@ -84,6 +130,7 @@ export default async function MessagesPage({ searchParams }: MessagesPageProps) 
             buildMessagesHref({
               listingId,
               lane: requestedLane,
+              section: "outer_company",
             })
           )
         );
@@ -95,17 +142,18 @@ export default async function MessagesPage({ searchParams }: MessagesPageProps) 
         buildMessagesHref({
           conversationId: createResult.data.conversation.id,
           lane: requestedLane,
+          section: "outer_company",
         })
       );
     }
   }
 
-  const summariesResult = await loadMessagingConversationSummariesQuery({
+  const externalSummariesResult = await loadMessagingConversationSummariesQuery({
     limit: 120,
   });
 
-  if (!summariesResult.ok) {
-    if (summariesResult.requiresAuth) {
+  if (!externalSummariesResult.ok) {
+    if (externalSummariesResult.requiresAuth) {
       redirect(toSignInPath("/messages"));
     }
 
@@ -114,84 +162,152 @@ export default async function MessagesPage({ searchParams }: MessagesPageProps) 
         <PageState
           icon={TriangleAlert}
           title="Inbox unavailable"
-          description={summariesResult.message}
+          description={externalSummariesResult.message}
         />
       </MainContainer>
     );
   }
 
-  let threadError: string | null = null;
-  let thread = null;
-  const inbox = summariesResult.data.inbox;
+  const inbox = externalSummariesResult.data.inbox;
+  const isCompanyWorkspace = inbox.mode === "company_workspace";
+  const activeSection: MessagingSection = isCompanyWorkspace ? requestedSection : "outer_company";
+
+  let internalSummariesResult: Awaited<
+    ReturnType<typeof loadInternalCompanyConversationSummariesQuery>
+  > | null = null;
+  let internalMemberOptionsResult: Awaited<
+    ReturnType<typeof loadInternalCompanyMemberOptionsQuery>
+  > | null = null;
+
+  if (isCompanyWorkspace) {
+    [internalSummariesResult, internalMemberOptionsResult] = await Promise.all([
+      loadInternalCompanyConversationSummariesQuery({
+        limit: 120,
+      }),
+      loadInternalCompanyMemberOptionsQuery(),
+    ]);
+  }
+
+  let externalThreadError: string | null = null;
+  let externalThread = null;
+
+  let internalThreadError: string | null = null;
+  let internalThread = null;
 
   if (conversationId) {
     if (!isUuid(conversationId)) {
-      threadError = "Conversation reference is invalid.";
+      if (activeSection === "in_company") {
+        internalThreadError = "Conversation reference is invalid.";
+      } else {
+        externalThreadError = "Conversation reference is invalid.";
+      }
       conversationId = "";
+    } else if (activeSection === "in_company") {
+      if (!isCompanyWorkspace) {
+        internalThreadError =
+          "Internal company conversations require an active RoofHub company context.";
+      } else {
+        const internalThreadResult = await loadInternalCompanyThreadQuery({
+          conversationId,
+          limit: 400,
+        });
+
+        if (!internalThreadResult.ok) {
+          if (internalThreadResult.requiresAuth) {
+            redirect(
+              toSignInPath(
+                buildMessagesHref({
+                  conversationId,
+                  section: "in_company",
+                })
+              )
+            );
+          }
+
+          internalThreadError = internalThreadResult.message;
+        } else {
+          internalThread = internalThreadResult.data;
+        }
+      }
     } else {
-      const threadResult = await loadMessagingThreadQuery({
+      const externalThreadResult = await loadMessagingThreadQuery({
         conversationId,
         limit: 400,
       });
 
-      if (!threadResult.ok) {
-        if (threadResult.requiresAuth) {
+      if (!externalThreadResult.ok) {
+        if (externalThreadResult.requiresAuth) {
           redirect(
             toSignInPath(
               buildMessagesHref({
                 conversationId,
                 lane: requestedLane,
+                section: "outer_company",
               })
             )
           );
         }
 
-        threadError = threadResult.message;
+        externalThreadError = externalThreadResult.message;
       } else {
-        thread = threadResult.data;
+        externalThread = externalThreadResult.data;
       }
     }
   }
 
-  const initialLane: MessagingInboxLane =
+  const initialOuterLane: MessagingInboxLane =
     inbox.mode === "company_workspace"
       ? inbox.companyQueueAccess === "company_queue"
-        ? normalizeMessagingInboxLane(
-            normalizeParam(resolvedSearchParams.lane),
-            "queue"
-          )
+        ? normalizeMessagingInboxLane(normalizeParam(resolvedSearchParams.lane), "queue")
         : "assigned"
       : "all";
-  const inboxDescription =
+
+  const outerDescription =
     inbox.mode === "company_workspace"
       ? inbox.companyQueueAccess === "company_queue"
-        ? "Separate shared queue work from assigned follow-up so managers and owners can route inquiries without losing operational context."
-        : "Focus on assigned conversations and respond directly from the right listing context without queue-management noise."
-      : "Track listing inquiries, review message history, and respond in one inbox without leaving the marketplace workflow.";
-  const introActions =
-    inbox.mode === "company_workspace" ? (
-      <>
-        <Link href="/dashboard" className={buttonVariants({ variant: "outline", size: "sm" })}>
-          Dashboard
-        </Link>
-        <Link href="/dashboard/listings" className={buttonVariants({ variant: "ghost", size: "sm" })}>
-          Listings
-        </Link>
-      </>
-    ) : inbox.mode === "individual_provider" ? (
-      <>
-        <Link href="/dashboard/listings" className={buttonVariants({ variant: "outline", size: "sm" })}>
-          Listings
-        </Link>
-        <Link href="/dashboard" className={buttonVariants({ variant: "ghost", size: "sm" })}>
-          Dashboard
-        </Link>
-      </>
-    ) : (
-      <Link href="/favorites" className={buttonVariants({ variant: "outline", size: "sm" })}>
-        Saved listings
-      </Link>
-    );
+        ? "Client Inbox keeps seeker and client inquiries clear with distinct queue and assigned lanes."
+        : "Client Inbox keeps your assigned client and inquiry conversations focused and actionable."
+      : "Track listing inquiries, review message history, and respond in one inbox without leaving the RoofHub workflow.";
+
+  const introDescription =
+    isCompanyWorkspace && activeSection === "in_company"
+      ? "Team Chat is your internal collaboration space for direct messages and group conversations between active company members."
+      : outerDescription;
+
+  const outerCount = externalSummariesResult.data.summaries.length;
+  const internalCount =
+    internalSummariesResult && internalSummariesResult.ok
+      ? internalSummariesResult.data.summaries.length
+      : null;
+
+  const sectionSwitcher = isCompanyWorkspace ? (
+    <div className="flex flex-wrap items-center justify-between gap-2">
+      <div className="border-border/75 bg-card/55 inline-flex flex-wrap items-center gap-1 rounded-lg border p-1">
+        <SectionLink
+          href={buildMessagesHref({
+            section: "outer_company",
+            conversationId: activeSection === "outer_company" ? conversationId : undefined,
+            lane: initialOuterLane,
+          })}
+          label="Client Inbox"
+          count={outerCount}
+          active={activeSection === "outer_company"}
+        />
+        <SectionLink
+          href={buildMessagesHref({
+            section: "in_company",
+            conversationId: activeSection === "in_company" ? conversationId : undefined,
+          })}
+          label="Team Chat"
+          count={internalCount}
+          active={activeSection === "in_company"}
+        />
+      </div>
+      {internalMemberOptionsResult && internalMemberOptionsResult.ok ? (
+        <ComposeTeamMessageButton members={internalMemberOptionsResult.data} />
+      ) : null}
+    </div>
+  ) : null;
 
   return (
     <MainContainer size="wide" className="space-y-5">
@@ -199,15 +315,16 @@ export default async function MessagesPage({ searchParams }: MessagesPageProps) 
         <PageIntro
           eyebrow={<Badge variant="primary">Messages</Badge>}
           title={
-            inbox.mode === "company_workspace"
-              ? inbox.companyQueueAccess === "company_queue"
-                ? `${inbox.workspaceName} inbox with shared queue and assigned thread lanes.`
-                : `${inbox.workspaceName} inbox for your assigned company threads.`
+            isCompanyWorkspace
+              ? activeSection === "in_company"
+                ? `${inbox.workspaceName} team chat`
+                : `${inbox.workspaceName} client inbox`
               : "Listing-bound conversations with protected participant access."
           }
-          description={inboxDescription}
-          actions={introActions}
-        />
+          description={introDescription}
+        >
+          {sectionSwitcher}
+        </PageIntro>
 
         {handoffErrorMessage ? (
           <PageNotice
@@ -217,29 +334,79 @@ export default async function MessagesPage({ searchParams }: MessagesPageProps) 
           />
         ) : null}
 
-        <PageSection
-          eyebrow={<Badge variant="outline">Inbox</Badge>}
-          title="Conversation workload"
-          description="Open the right thread quickly, then continue from assigned handling or queue-routing context."
-        >
-          {summariesResult.data.summaries.length === 0 ? (
-            <PageState
-              icon={MessageSquareMore}
-              title="No conversations yet"
-              description="Open a listing and use Contact to start a listing-bound thread. Your inbox will appear here."
-            />
-          ) : (
-            <MessagesWorkspace
-              key={`${initialLane}-${conversationId || "none"}-${summariesResult.data.summaries.length}-${summariesResult.data.summaries[0]?.conversation.id ?? "empty"}`}
-              initialSummaries={summariesResult.data.summaries}
-              initialInbox={inbox}
-              initialLane={initialLane}
-              selectedConversationId={conversationId || null}
-              initialThread={thread}
-              initialThreadError={threadError}
-            />
-          )}
-        </PageSection>
+        {activeSection === "in_company" ? (
+          <PageSection
+            eyebrow={<Badge variant="outline">Team Chat</Badge>}
+            title="Internal company communication"
+            description="Direct and group collaboration threads for active RoofHub company members."
+            action={
+              internalMemberOptionsResult && internalMemberOptionsResult.ok ? (
+                <ComposeTeamMessageButton members={internalMemberOptionsResult.data} />
+              ) : null
+            }
+          >
+            {!isCompanyWorkspace ? (
+              <PageState
+                icon={TriangleAlert}
+                title="Internal conversations unavailable"
+                description="Team Chat is available only inside an active company context."
+              />
+            ) : !internalSummariesResult ? (
+              <PageState
+                icon={TriangleAlert}
+                title="Internal conversations unavailable"
+                description="Internal company conversations could not be loaded right now."
+              />
+            ) : !internalSummariesResult.ok ? (
+              <PageState
+                icon={TriangleAlert}
+                title="Internal conversations unavailable"
+                description={internalSummariesResult.message}
+              />
+            ) : (
+              <InternalCompanyWorkspace
+                workspaceName={inbox.workspaceName ?? "Company"}
+                viewerUserId={inbox.viewerUserId}
+                initialSummaries={internalSummariesResult.data.summaries}
+                initialMembers={internalSummariesResult.data.members}
+                selectedConversationId={conversationId || null}
+                initialThread={internalThread}
+                initialThreadError={internalThreadError}
+              />
+            )}
+          </PageSection>
+        ) : (
+          <PageSection
+            eyebrow={<Badge variant="outline">Client Inbox</Badge>}
+            title={
+              isCompanyWorkspace ? "Client and inquiry communication" : "Conversation workload"
+            }
+            description={
+              isCompanyWorkspace
+                ? "Listing-linked client and seeker communication with role-aware routing."
+                : "Open the right thread quickly, then continue from assigned handling or queue-routing context."
+            }
+          >
+            {externalSummariesResult.data.summaries.length === 0 ? (
+              <PageState
+                icon={MessageSquareMore}
+                title="No conversations yet"
+                description="Open a listing and use Contact to start a listing-bound thread. Your inbox will appear here."
+              />
+            ) : (
+              <MessagesWorkspace
+                key={`${initialOuterLane}-${conversationId || "none"}-${externalSummariesResult.data.summaries.length}-${externalSummariesResult.data.summaries[0]?.conversation.id ?? "empty"}`}
+                initialSummaries={externalSummariesResult.data.summaries}
+                initialInbox={inbox}
+                initialLane={initialOuterLane}
+                messageSection={isCompanyWorkspace ? "outer_company" : null}
+                selectedConversationId={conversationId || null}
+                initialThread={externalThread}
+                initialThreadError={externalThreadError}
+              />
+            )}
+          </PageSection>
+        )}
       </PageShell>
     </MainContainer>
   );

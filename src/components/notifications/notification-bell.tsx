@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Bell, LoaderCircle } from "lucide-react";
@@ -15,12 +15,13 @@ import {
   markAllNotificationsReadAction,
   markNotificationReadAction,
 } from "@/lib/notifications/actions";
-import type { NotificationRecord } from "@/lib/notifications/types";
 import { cn } from "@/lib/utils";
 
 import { NotificationRow } from "./notification-row";
+import { useRealtimeNotifications } from "./use-realtime-notifications";
 
 type NotificationBellProps = {
+  viewerUserId: string | null;
   initialUnreadCount: number;
   compact?: boolean;
   className?: string;
@@ -34,59 +35,69 @@ function formatUnreadBadge(value: number) {
   return String(value);
 }
 
-export function NotificationBell({ initialUnreadCount, compact = false, className }: NotificationBellProps) {
+export function NotificationBell({
+  viewerUserId,
+  initialUnreadCount,
+  compact = false,
+  className,
+}: NotificationBellProps) {
   const router = useRouter();
   const rootRef = useRef<HTMLDivElement | null>(null);
   const [open, setOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [notifications, setNotifications] = useState<NotificationRecord[]>([]);
   const [hasLoaded, setHasLoaded] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(initialUnreadCount);
   const [pendingNotificationId, setPendingNotificationId] = useState<string | null>(null);
   const [isMarkAllPending, startMarkAllTransition] = useTransition();
 
-  useEffect(() => {
-    setUnreadCount(initialUnreadCount);
-  }, [initialUnreadCount]);
-
-  useEffect(() => {
-    if (!open || hasLoaded) {
-      return;
-    }
-
-    let cancelled = false;
-    setIsLoading(true);
-    setErrorMessage(null);
-
-    void loadCurrentUserNotificationsAction({
-      limit: 8,
-      scope: "active",
-      order: "priority_then_recent",
-    }).then((result) => {
-      if (cancelled) {
-        return;
-      }
+  const {
+    notifications,
+    setNotifications,
+    unreadCount,
+    setUnreadCount,
+  } = useRealtimeNotifications({
+    viewerUserId,
+    initialUnreadCount,
+    prioritize: true,
+    maxItems: 8,
+    refreshFromServer: async () => {
+      const result = await loadCurrentUserNotificationsAction({
+        limit: 8,
+        scope: "active",
+        order: "priority_then_recent",
+      });
 
       if (!result.ok) {
         setErrorMessage(result.message);
-        setIsLoading(false);
-        return;
+        return null;
       }
 
-      setNotifications(result.data.notifications);
-      setUnreadCount((current) => {
-        const localUnread = countUnreadNotifications(result.data.notifications);
-        return Math.max(current, localUnread);
-      });
-      setHasLoaded(true);
-      setIsLoading(false);
+      setErrorMessage(null);
+      return result.data.notifications;
+    },
+  });
+
+  const loadPreviewNotifications = useCallback(async () => {
+    setIsLoading(true);
+    setErrorMessage(null);
+
+    const result = await loadCurrentUserNotificationsAction({
+      limit: 8,
+      scope: "active",
+      order: "priority_then_recent",
     });
 
-    return () => {
-      cancelled = true;
-    };
-  }, [open, hasLoaded]);
+    if (!result.ok) {
+      setErrorMessage(result.message);
+      setIsLoading(false);
+      return;
+    }
+
+    setNotifications(result.data.notifications);
+    setUnreadCount(countUnreadNotifications(result.data.notifications, { activeOnly: true }));
+    setHasLoaded(true);
+    setIsLoading(false);
+  }, [setNotifications, setUnreadCount]);
 
   useEffect(() => {
     if (!open) {
@@ -125,7 +136,7 @@ export function NotificationBell({ initialUnreadCount, compact = false, classNam
     return countUnreadNotifications(notifications);
   }, [notifications]);
 
-  function updateNotificationReadState(notificationId: string) {
+function updateNotificationReadState(notificationId: string) {
     setNotifications((current) =>
       current.map((notification) =>
         notification.id === notificationId
@@ -190,7 +201,14 @@ export function NotificationBell({ initialUnreadCount, compact = false, classNam
     <div ref={rootRef} className={cn("relative", className)}>
       <button
         type="button"
-        onClick={() => setOpen((current) => !current)}
+        onClick={() => {
+          const nextOpen = !open;
+          setOpen(nextOpen);
+
+          if (nextOpen && !hasLoaded && !isLoading) {
+            void loadPreviewNotifications();
+          }
+        }}
         className={cn(
           compact
             ? "border-nav-muted/45 bg-nav-background/55 hover:bg-nav-active/24 inline-flex size-9 items-center justify-center rounded-lg border text-nav-foreground transition-colors"

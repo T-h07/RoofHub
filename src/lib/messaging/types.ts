@@ -31,6 +31,7 @@ export type MessagingResult<TData> =
 
 export type MessagingConversationOwnerMode = Enums<"conversation_owner_mode">;
 export type MessagingConversationRoutingStatus = Enums<"conversation_routing_status">;
+export type MessagingInternalConversationKind = Enums<"company_internal_conversation_kind">;
 
 export type MessagingConversationRecord = Pick<
   Tables<"conversations">,
@@ -46,6 +47,36 @@ export type MessagingConversationRecord = Pick<
   | "last_message_at"
   | "created_at"
   | "updated_at"
+>;
+
+export type MessagingInternalConversationRecord = Pick<
+  Tables<"company_internal_conversations">,
+  | "id"
+  | "organization_id"
+  | "kind"
+  | "title"
+  | "created_by_user_id"
+  | "last_message_at"
+  | "created_at"
+  | "updated_at"
+>;
+
+export type MessagingInternalConversationParticipantRecord = Pick<
+  Tables<"company_internal_conversation_participants">,
+  | "id"
+  | "conversation_id"
+  | "organization_id"
+  | "user_id"
+  | "added_by_user_id"
+  | "joined_at"
+  | "last_read_at"
+  | "created_at"
+  | "updated_at"
+>;
+
+export type MessagingInternalMessageRecord = Pick<
+  Tables<"company_internal_messages">,
+  "id" | "conversation_id" | "sender_user_id" | "body" | "created_at"
 >;
 
 export type MessagingMessageRecord = Pick<
@@ -133,10 +164,37 @@ export type MessagingConversationSummary = {
   companyRouting: MessagingCompanyRoutingSummary | null;
 };
 
+export type MessagingInternalParticipantSummary = {
+  userId: string;
+  displayName: string;
+  role: OrganizationMemberRole | null;
+  memberStatus: OrganizationMemberStatus | null;
+  joinedAt: string;
+  lastReadAt: string | null;
+  isViewer: boolean;
+};
+
+export type MessagingInternalConversationSummary = {
+  conversation: MessagingInternalConversationRecord;
+  unreadCount: number;
+  participantCount: number;
+  counterpartUserId: string | null;
+  counterpartDisplayName: string | null;
+  participantPreview: string[];
+  lastMessage: MessagingInternalMessageRecord | null;
+};
+
 export type MessagingConversationSummariesResult = {
   summaries: MessagingConversationSummary[];
   unreadTotalCount: number;
   inbox: MessagingInboxContext;
+};
+
+export type MessagingInternalConversationSummariesResult = {
+  summaries: MessagingInternalConversationSummary[];
+  unreadTotalCount: number;
+  inbox: MessagingInboxContext;
+  members: MessagingAssignableCompanyMember[];
 };
 
 export type MessagingThreadResult = {
@@ -152,6 +210,15 @@ export type MessagingThreadResult = {
   inbox: MessagingInboxContext;
 };
 
+export type MessagingInternalThreadResult = {
+  conversation: MessagingInternalConversationRecord;
+  participants: MessagingInternalParticipantSummary[];
+  messages: MessagingInternalMessageRecord[];
+  unreadCount: number;
+  inbox: MessagingInboxContext;
+  canManageParticipants: boolean;
+};
+
 export type CreateOrGetConversationInput = {
   listingId: string;
 };
@@ -161,7 +228,27 @@ export type SendConversationMessageInput = {
   body: string;
 };
 
+export type CreateInternalConversationInput = {
+  kind: MessagingInternalConversationKind;
+  participantUserIds: string[];
+  title?: string;
+};
+
+export type CreateInternalConversationResult = {
+  conversation: MessagingInternalConversationRecord;
+  created: boolean;
+};
+
+export type SendInternalConversationMessageInput = {
+  conversationId: string;
+  body: string;
+};
+
 export type MarkConversationReadInput = {
+  conversationId: string;
+};
+
+export type MarkInternalConversationReadInput = {
   conversationId: string;
 };
 
@@ -181,7 +268,16 @@ export type LoadConversationSummariesInput = {
   limit?: number;
 };
 
+export type LoadInternalConversationSummariesInput = {
+  limit?: number;
+};
+
 export type LoadConversationThreadInput = {
+  conversationId: string;
+  limit?: number;
+};
+
+export type LoadInternalConversationThreadInput = {
   conversationId: string;
   limit?: number;
 };

@@ -9,6 +9,7 @@ import { useActiveRoute } from "@/hooks/use-active-route";
 import type { AppRole, ProviderAccountType } from "@/lib/auth/roles";
 import type { OrganizationMemberRole } from "@/lib/company/team-types";
 import { siteConfig } from "@/lib/config/site";
+import { COMPANY_CANONICAL_PATHS } from "@/lib/navigation/company-ia";
 import { getCtaForViewer, getNavigationForViewer } from "@/lib/navigation/role-navigation";
 import { cn } from "@/lib/utils";
 
@@ -48,6 +49,7 @@ function HeaderLink({
 type SiteHeaderProps = {
   authState: {
     isAuthenticated: boolean;
+    userId: string | null;
     email: string | null;
     displayName: string | null;
     role: AppRole | null;
@@ -74,10 +76,16 @@ export function SiteHeader({ authState }: SiteHeaderProps) {
     companyMembershipRole: authState.companyMembershipRole,
   });
   const accountLabel = authState.displayName || authState.email || "Signed in";
+  const desktopPrimaryNavigation = isAuthenticated
+    ? navigation.primary.filter((item) => item.href !== COMPANY_CANONICAL_PATHS.notifications)
+    : navigation.primary;
+  const ctaPath = cta.href.split("#")[0];
+  const shouldShowDesktopCta =
+    !isAuthenticated || !desktopPrimaryNavigation.some((item) => item.href === ctaPath);
 
   return (
     <header className="border-nav-active/20 bg-nav-background/96 text-nav-foreground sticky top-0 z-40 border-b backdrop-blur-md">
-      <MainContainer>
+      <MainContainer size="wide">
         <div className="flex h-[4.5rem] items-center justify-between gap-3">
           <Link href="/" className="group inline-flex min-w-0 items-center gap-2.5">
             <span className="border-nav-active/45 bg-nav-active/22 text-nav-foreground group-hover:bg-nav-active/32 inline-flex size-8.5 shrink-0 items-center justify-center rounded-lg border transition-colors">
@@ -88,13 +96,16 @@ export function SiteHeader({ authState }: SiteHeaderProps) {
                 {siteConfig.name}
               </span>
               <span className="text-nav-muted hidden truncate text-[11px] xl:block">
-                Rentals and homes for sale
+                Company real estate platform
               </span>
             </span>
           </Link>
 
-          <nav className="hidden min-w-0 items-center gap-1 lg:flex" aria-label="Primary navigation">
-            {navigation.primary.map((item) => (
+          <nav
+            className="hidden min-w-0 items-center gap-1 lg:flex"
+            aria-label="Primary navigation"
+          >
+            {desktopPrimaryNavigation.map((item) => (
               <HeaderLink
                 key={item.href}
                 href={item.href}
@@ -121,18 +132,21 @@ export function SiteHeader({ authState }: SiteHeaderProps) {
             {isAuthenticated ? (
               <>
                 <NotificationBell
+                  viewerUserId={authState.userId}
                   initialUnreadCount={authState.unreadNotificationCount}
                 />
-                <Link
-                  href={cta.href}
-                  className={cn(
-                    buttonVariants({ size: "sm" }),
-                    "hidden gap-1.5 xl:inline-flex shadow-none"
-                  )}
-                >
-                  {cta.label}
-                  <Sparkles className="size-4" aria-hidden="true" />
-                </Link>
+                {shouldShowDesktopCta ? (
+                  <Link
+                    href={cta.href}
+                    className={cn(
+                      buttonVariants({ size: "sm" }),
+                      "hidden gap-1.5 shadow-none xl:inline-flex"
+                    )}
+                  >
+                    {cta.label}
+                    <Sparkles className="size-4" aria-hidden="true" />
+                  </Link>
+                ) : null}
                 <HeaderAccountMenu
                   accountLabel={accountLabel}
                   role={authState.role}
@@ -148,7 +162,7 @@ export function SiteHeader({ authState }: SiteHeaderProps) {
                   href="/auth/sign-in"
                   className={cn(
                     buttonVariants({ variant: "outline", size: "sm" }),
-                    "border-nav-muted/45 bg-transparent text-nav-foreground hover:bg-nav-active/24 hover:text-nav-foreground"
+                    "border-nav-muted/45 text-nav-foreground hover:bg-nav-active/24 hover:text-nav-foreground bg-transparent"
                   )}
                 >
                   Sign in
@@ -167,6 +181,7 @@ export function SiteHeader({ authState }: SiteHeaderProps) {
           <div className="flex items-center gap-2 lg:hidden">
             {isAuthenticated ? (
               <NotificationBell
+                viewerUserId={authState.userId}
                 initialUnreadCount={authState.unreadNotificationCount}
                 compact
               />

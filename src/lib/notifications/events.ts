@@ -83,6 +83,7 @@ type KnownNotificationType =
   (typeof NOTIFICATION_TYPES)[keyof typeof NOTIFICATION_TYPES];
 
 type ConversationNotificationLane = "assigned" | "queue";
+type ConversationNotificationSection = "outer_company" | "in_company";
 
 function dedupeNotificationsByUserAndType(
   notifications: Array<CreateNotificationInput & { type: KnownNotificationType }>
@@ -101,13 +102,15 @@ function dedupeNotificationsByUserAndType(
 
 function buildConversationNotificationActionUrl(
   conversationId: string,
-  lane?: ConversationNotificationLane | null
+  lane?: ConversationNotificationLane | null,
+  section: ConversationNotificationSection = "outer_company"
 ) {
   const params = new URLSearchParams({
     conversationId,
+    section,
   });
 
-  if (lane) {
+  if (lane && section === "outer_company") {
     params.set("lane", lane);
   }
 
@@ -309,6 +312,56 @@ export async function notifyConversationMessageReceived(input: {
     });
   } catch {
     return { ok: false as const, message: "notification_message_delivery_failed" };
+  }
+}
+
+export async function notifyInternalCompanyMessageReceived(input: {
+  conversationId: string;
+  organizationId: string;
+  senderUserId: string;
+  senderDisplayName: string | null;
+  conversationTitle: string | null;
+  recipientUserIds: string[];
+  messageBody: string;
+}) {
+  try {
+    const recipients = uniqueRecipients(input.recipientUserIds, input.senderUserId);
+    if (recipients.length === 0) {
+      return { ok: true as const, createdCount: 0 };
+    }
+
+    const senderLabel = trimTo(input.senderDisplayName ?? "A teammate", 60) || "A teammate";
+    const conversationLabel =
+      trimTo(input.conversationTitle ?? "", 64) || "an internal team thread";
+    const preview = trimTo(input.messageBody, 120);
+
+    return createNotifications({
+      notifications: recipients.map((recipientUserId) => ({
+        userId: recipientUserId,
+        organizationId: input.organizationId,
+        type: NOTIFICATION_TYPES.internalCompanyMessageReceived,
+        title: "New internal message",
+        body: preview
+          ? `${senderLabel} in ${conversationLabel}: ${preview}`
+          : `${senderLabel} posted in ${conversationLabel}.`,
+        entityType: "conversation",
+        entityId: input.conversationId,
+        actionUrl: buildConversationNotificationActionUrl(
+          input.conversationId,
+          null,
+          "in_company"
+        ),
+        priority: 2,
+        actorUserId: input.senderUserId,
+        metadata: {
+          conversation_id: input.conversationId,
+          message_section: "in_company",
+          messaging_scope: "internal_company",
+        },
+      })),
+    });
+  } catch {
+    return { ok: false as const, message: "notification_internal_message_delivery_failed" };
   }
 }
 

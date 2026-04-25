@@ -25,20 +25,36 @@ import {
   loadMessagingConversationSummariesQuery,
   loadMessagingThreadQuery,
 } from "./queries";
+import {
+  createInternalCompanyConversationMutation,
+  loadInternalCompanyConversationSummariesQuery,
+  loadInternalCompanyThreadQuery,
+  markInternalCompanyConversationReadMutation,
+  sendInternalCompanyMessageMutation,
+} from "./internal-company";
 import type {
   ConversationCreateResult,
   ConversationReadResult,
   ConversationSendMessageResult,
+  CreateInternalConversationInput,
+  CreateInternalConversationResult,
   CreateOrGetConversationInput,
   LoadConversationSummariesInput,
   LoadConversationThreadInput,
+  LoadInternalConversationSummariesInput,
+  LoadInternalConversationThreadInput,
   MarkConversationReadInput,
+  MarkInternalConversationReadInput,
   MessagingConversationRecord,
   MessagingConversationSummariesResult,
+  MessagingInternalConversationSummariesResult,
+  MessagingInternalMessageRecord,
+  MessagingInternalThreadResult,
   MessagingThreadResult,
   MessagingMessageRecord,
   MessagingResult,
   SendConversationMessageInput,
+  SendInternalConversationMessageInput,
   UpdateConversationRoutingInput,
   UpdateConversationRoutingResult,
 } from "./types";
@@ -852,4 +868,80 @@ export async function loadMessagingThreadAction(
     conversationId: input.conversationId,
     limit: readOptionalLimit(input.limit),
   });
+}
+
+export async function loadInternalCompanyConversationSummariesAction(
+  input: LoadInternalConversationSummariesInput = {}
+): Promise<MessagingResult<MessagingInternalConversationSummariesResult>> {
+  const normalizedInput = isRecord(input)
+    ? {
+        limit: readOptionalLimit(input.limit),
+      }
+    : {};
+
+  return loadInternalCompanyConversationSummariesQuery(normalizedInput);
+}
+
+export async function loadInternalCompanyThreadAction(
+  input: LoadInternalConversationThreadInput
+): Promise<MessagingResult<MessagingInternalThreadResult>> {
+  if (!isRecord(input) || typeof input.conversationId !== "string") {
+    return toMessagingFailure("invalid_input", "Conversation reference is invalid.");
+  }
+
+  return loadInternalCompanyThreadQuery({
+    conversationId: input.conversationId,
+    limit: readOptionalLimit(input.limit),
+  });
+}
+
+export async function createInternalCompanyConversationAction(
+  input: CreateInternalConversationInput
+): Promise<MessagingResult<CreateInternalConversationResult>> {
+  if (!isRecord(input)) {
+    return toMessagingFailure("invalid_input", "Conversation request is invalid.");
+  }
+
+  if (input.kind !== "direct" && input.kind !== "group") {
+    return toMessagingFailure("invalid_input", "Conversation kind is invalid.");
+  }
+
+  return createInternalCompanyConversationMutation({
+    kind: input.kind,
+    participantUserIds: Array.isArray(input.participantUserIds)
+      ? input.participantUserIds.filter(
+          (participantUserId): participantUserId is string =>
+            typeof participantUserId === "string"
+        )
+      : [],
+    title: typeof input.title === "string" ? input.title : undefined,
+  });
+}
+
+export async function sendInternalCompanyMessageAction(
+  input: SendInternalConversationMessageInput
+): Promise<
+  MessagingResult<{
+    conversationId: string;
+    message: MessagingInternalMessageRecord;
+  }>
+> {
+  if (!isRecord(input) || typeof input.conversationId !== "string") {
+    return toMessagingFailure("invalid_input", "Conversation reference is invalid.");
+  }
+
+  return sendInternalCompanyMessageMutation({
+    conversationId: input.conversationId,
+    body: typeof input.body === "string" ? input.body : "",
+  });
+}
+
+export async function markInternalCompanyConversationReadAction(
+  input: MarkInternalConversationReadInput
+): Promise<MessagingResult<ConversationReadResult>> {
+  if (!isRecord(input) || typeof input.conversationId !== "string") {
+    return toMessagingFailure("invalid_input", "Conversation reference is invalid.");
+  }
+
+  return markInternalCompanyConversationReadMutation(input.conversationId);
 }

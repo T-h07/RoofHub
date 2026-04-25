@@ -1,4 +1,9 @@
-import { formatConversationActivityLabel, formatConversationActivityTitle } from "@/lib/messaging/presentation";
+import {
+  formatConversationActivityLabel,
+  formatConversationActivityTitle,
+  normalizeMessagingSection,
+  type MessagingSection,
+} from "@/lib/messaging/presentation";
 
 import type {
   NotificationCategory,
@@ -46,6 +51,7 @@ const CATEGORY_LABELS: Record<NotificationCategory, string> = {
 const TYPE_LABELS: Record<string, string> = {
   [NOTIFICATION_TYPES.inquiryReceived]: "New inquiry",
   [NOTIFICATION_TYPES.messageReceived]: "Message",
+  [NOTIFICATION_TYPES.internalCompanyMessageReceived]: "Team message",
   [NOTIFICATION_TYPES.conversationAssigned]: "Assigned",
   [NOTIFICATION_TYPES.conversationReassigned]: "Reassigned",
   [NOTIFICATION_TYPES.conversationUnassigned]: "Unassigned",
@@ -216,6 +222,23 @@ function getConversationLane(notification: NotificationRecord) {
   return null;
 }
 
+function getMessageSection(notification: NotificationRecord): MessagingSection {
+  const metadataSection = getMetadataStringValue(notification, "message_section");
+  if (metadataSection === "in_company") {
+    return "in_company";
+  }
+
+  if (metadataSection === "outer_company") {
+    return "outer_company";
+  }
+
+  if (notification.type === NOTIFICATION_TYPES.internalCompanyMessageReceived) {
+    return "in_company";
+  }
+
+  return "outer_company";
+}
+
 function withMessageContext(
   href: string,
   notification: NotificationRecord
@@ -232,10 +255,20 @@ function withMessageContext(
     parsedUrl.searchParams.set("conversationId", conversationId);
   }
 
-  const lane =
-    parsedUrl.searchParams.get("lane") ?? getConversationLane(notification);
-  if (lane) {
-    parsedUrl.searchParams.set("lane", lane);
+  const section = normalizeMessagingSection(
+    parsedUrl.searchParams.get("section") ?? getMessageSection(notification),
+    "outer_company"
+  );
+  parsedUrl.searchParams.set("section", section);
+
+  if (section === "outer_company") {
+    const lane =
+      parsedUrl.searchParams.get("lane") ?? getConversationLane(notification);
+    if (lane) {
+      parsedUrl.searchParams.set("lane", lane);
+    }
+  } else {
+    parsedUrl.searchParams.delete("lane");
   }
 
   const queryString = parsedUrl.searchParams.toString();
@@ -308,7 +341,16 @@ export function getNotificationActionLabel(notification: NotificationRecord) {
   const href = getNotificationActionHref(notification);
 
   if (href.startsWith("/messages")) {
-    const lane = new URL(href, "http://localhost").searchParams.get("lane");
+    const parsedHref = new URL(href, "http://localhost");
+    const section = normalizeMessagingSection(
+      parsedHref.searchParams.get("section"),
+      "outer_company"
+    );
+    if (section === "in_company") {
+      return "Open team thread";
+    }
+
+    const lane = parsedHref.searchParams.get("lane");
 
     if (
       notification.type === NOTIFICATION_TYPES.conversationAssigned ||

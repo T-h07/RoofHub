@@ -6,6 +6,11 @@ import { isPreferredContactMethod } from "@/lib/auth/roles";
 import { createSchemaDriftMessage, isSupabaseSchemaDriftError, logSupabaseSchemaDrift } from "@/lib/supabase/schema-drift";
 import { createListingImageSignedUrl } from "@/lib/supabase/storage/listing-images";
 import type { Database } from "@/types/database";
+import {
+  LISTING_EDIT_PATCH_COLUMNS,
+  loadActorListingEditSubmission,
+  sanitizeListingEditPatch,
+} from "@/lib/listings/company-workflow/edit-submissions";
 
 import type {
   ProviderContactSettings,
@@ -74,6 +79,27 @@ const PROVIDER_DRAFT_EDITOR_SELECT = `
 const PROVIDER_CONTACT_SELECT =
   "preferred_contact_method, contact_methods, phone, contact_email, whatsapp_phone, viber_phone";
 
+function applyActorEditSubmissionPatch(
+  draft: ProviderDraftEditorRecord,
+  actorSubmissionPatch: unknown
+) {
+  const sanitizedPatch = sanitizeListingEditPatch(actorSubmissionPatch);
+  if (Object.keys(sanitizedPatch).length === 0) {
+    return draft;
+  }
+
+  const mergedDraft = { ...draft } as ProviderDraftEditorRecord;
+  for (const field of LISTING_EDIT_PATCH_COLUMNS) {
+    if (!(field in sanitizedPatch)) {
+      continue;
+    }
+
+    (mergedDraft as Record<string, unknown>)[field] = sanitizedPatch[field] ?? null;
+  }
+
+  return mergedDraft;
+}
+
 export async function loadProviderDraftSummaries(
   supabase: SupabaseClient<Database>,
   userId: string
@@ -133,9 +159,24 @@ export async function loadProviderDraftForEditor(
   const { data, error } = await query.maybeSingle();
 
   if (!error && data) {
+    const draft = data as ProviderDraftEditorRecord;
+    if (draft.organization_id && draft.listing_status === "published") {
+      const actorSubmission = await loadActorListingEditSubmission({
+        listingId: draft.id,
+        actorUserId: userId,
+      });
+
+      if (actorSubmission) {
+        return {
+          ok: true as const,
+          draft: applyActorEditSubmissionPatch(draft, actorSubmission.proposed_patch),
+        };
+      }
+    }
+
     return {
       ok: true as const,
-      draft: data as ProviderDraftEditorRecord,
+      draft,
     };
   }
 
