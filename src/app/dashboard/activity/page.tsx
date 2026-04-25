@@ -45,8 +45,8 @@ export default async function DashboardActivityPage() {
           workspaceOptions={listingCreationContext.company.workspaceOptions}
           activeOrganizationId={listingCreationContext.company.activeOrganizationId}
           redirectTo="/dashboard/activity"
-          title="Choose the company workspace for activity history"
-          description="Activity history is company-scoped. Select the active RoofHub workspace before opening the internal operational timeline."
+          title="Choose the company context for activity history"
+          description="Activity history is company-scoped. Select the active RoofHub company context before opening the internal operational timeline."
           submitLabel="Open selected activity log"
         />
       </MainContainer>
@@ -58,10 +58,10 @@ export default async function DashboardActivityPage() {
       <MainContainer size="content">
         <PageState
           icon={ShieldAlert}
-          title="Company activity log requires an active company workspace"
+          title="Company activity log requires an active company context"
           description={
             listingCreationContext.ok
-              ? "Switch to an active company workspace to view internal operational history."
+              ? "Switch to an active company context to view internal operational history."
               : listingCreationContext.message
           }
           action={
@@ -133,10 +133,16 @@ export default async function DashboardActivityPage() {
           listingCount={workspace.overview.publishedCount}
           actions={
             <>
-              <Link href="/dashboard" className={buttonVariants({ variant: "outline", size: "sm" })}>
+              <Link
+                href="/dashboard"
+                className={buttonVariants({ variant: "outline", size: "sm" })}
+              >
                 Dashboard
               </Link>
-              <Link href="/dashboard/listings" className={buttonVariants({ variant: "ghost", size: "sm" })}>
+              <Link
+                href="/dashboard/listings"
+                className={buttonVariants({ variant: "ghost", size: "sm" })}
+              >
                 Listings
               </Link>
               <Link href="/messages" className={buttonVariants({ variant: "ghost", size: "sm" })}>

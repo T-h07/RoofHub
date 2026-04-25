@@ -1,14 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import {
-  useActionState,
-  useEffect,
-  useMemo,
-  useState,
-  useTransition,
-  type FormEvent,
-} from "react";
+import { useActionState, useEffect, useMemo, useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import {
   Copy,
@@ -152,8 +145,12 @@ export function CompanyTeamManagement({
     COMPANY_TEAM_INVITE_IDLE_STATE
   );
   const [isMutationPending, startMutation] = useTransition();
-  const [memberStatusDialog, setMemberStatusDialog] = useState<MemberStatusDialogState | null>(null);
-  const [memberRemovalDialog, setMemberRemovalDialog] = useState<MemberRemovalDialogState | null>(null);
+  const [memberStatusDialog, setMemberStatusDialog] = useState<MemberStatusDialogState | null>(
+    null
+  );
+  const [memberRemovalDialog, setMemberRemovalDialog] = useState<MemberRemovalDialogState | null>(
+    null
+  );
   const [inviteRevocationDialog, setInviteRevocationDialog] =
     useState<InviteRevocationDialogState | null>(null);
 
@@ -301,7 +298,10 @@ export function CompanyTeamManagement({
             <AuthStatusMessage tone="success" message={inviteState.message} />
           ) : null}
 
-          <form action={inviteFormAction} className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_14rem_auto]">
+          <form
+            action={inviteFormAction}
+            className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_14rem_auto]"
+          >
             <input type="hidden" name="organizationId" value={organizationId} />
             <input type="hidden" name="inviteMethod" value={inviteMethod} />
 
@@ -396,7 +396,7 @@ export function CompanyTeamManagement({
           <EmptyState
             icon={UserRound}
             title="No active members"
-            description="Invite teammates to turn this company workspace into a multi-member operation."
+            description="Invite teammates to turn this company context into a multi-member operation."
           />
         ) : (
           <ul className="space-y-3">
@@ -427,7 +427,9 @@ export function CompanyTeamManagement({
                           {toInitials(memberName)}
                         </div>
                         <p className="truncate text-sm font-semibold">{memberName}</p>
-                        <Badge variant="outline">{ORGANIZATION_MEMBER_ROLE_LABELS[member.role]}</Badge>
+                        <Badge variant="outline">
+                          {ORGANIZATION_MEMBER_ROLE_LABELS[member.role]}
+                        </Badge>
                         <Badge variant={getStatusBadgeVariant(member.member_status)}>
                           {ORGANIZATION_MEMBER_STATUS_LABELS[member.member_status]}
                         </Badge>
@@ -473,7 +475,9 @@ export function CompanyTeamManagement({
                             size="sm"
                             disabled={isMutationPending || !canManageRole}
                           >
-                            {isMutationPending ? <LoaderCircle className="size-4 animate-spin" /> : null}
+                            {isMutationPending ? (
+                              <LoaderCircle className="size-4 animate-spin" />
+                            ) : null}
                             Update
                           </Button>
                         </div>
@@ -547,10 +551,13 @@ export function CompanyTeamManagement({
                     <div className="space-y-2">
                       <div className="flex flex-wrap items-center gap-2">
                         <p className="text-sm font-semibold">{inviteTarget}</p>
-                        <Badge variant="outline">{ORGANIZATION_MEMBER_ROLE_LABELS[invite.role]}</Badge>
+                        <Badge variant="outline">
+                          {ORGANIZATION_MEMBER_ROLE_LABELS[invite.role]}
+                        </Badge>
                       </div>
                       <p className="text-muted-foreground text-xs">
-                        Expires {formatDateLabel(invite.expires_at)} • Sent {formatDateLabel(invite.created_at)}
+                        Expires {formatDateLabel(invite.expires_at)} • Sent{" "}
+                        {formatDateLabel(invite.created_at)}
                       </p>
                       <div className="flex flex-wrap items-center gap-2">
                         <button
@@ -561,7 +568,10 @@ export function CompanyTeamManagement({
                           <Copy className="size-4" />
                           Copy link
                         </button>
-                        <Link href={invitePath} className={buttonVariants({ variant: "ghost", size: "sm" })}>
+                        <Link
+                          href={invitePath}
+                          className={buttonVariants({ variant: "ghost", size: "sm" })}
+                        >
                           Open invite
                         </Link>
                         <button
@@ -604,7 +614,8 @@ export function CompanyTeamManagement({
               {suspendedMembers.map((member) => {
                 const memberName = getMemberDisplayName(member);
                 const adminRestricted =
-                  viewerMembershipRole === "admin" && (member.role === "owner" || member.role === "admin");
+                  viewerMembershipRole === "admin" &&
+                  (member.role === "owner" || member.role === "admin");
 
                 return (
                   <li
@@ -643,16 +654,21 @@ export function CompanyTeamManagement({
         </div>
       </section>
 
-      <Dialog open={Boolean(memberStatusDialog)} onOpenChange={(open) => !open && setMemberStatusDialog(null)}>
+      <Dialog
+        open={Boolean(memberStatusDialog)}
+        onOpenChange={(open) => !open && setMemberStatusDialog(null)}
+      >
         <DialogContent showClose={!isMutationPending}>
           <DialogHeader>
             <DialogTitle>
-              {memberStatusDialog?.nextStatus === "inactive" ? "Suspend team member" : "Reactivate team member"}
+              {memberStatusDialog?.nextStatus === "inactive"
+                ? "Suspend team member"
+                : "Reactivate team member"}
             </DialogTitle>
             <DialogDescription>
               {memberStatusDialog?.nextStatus === "inactive"
-                ? `${memberStatusDialog?.memberName} will lose active company workspace access until reactivated.`
-                : `${memberStatusDialog?.memberName} will regain active company workspace access.`}
+                ? `${memberStatusDialog?.memberName} will lose active company access until reactivated.`
+                : `${memberStatusDialog?.memberName} will regain active company access.`}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -672,13 +688,16 @@ export function CompanyTeamManagement({
         </DialogContent>
       </Dialog>
 
-      <Dialog open={Boolean(memberRemovalDialog)} onOpenChange={(open) => !open && setMemberRemovalDialog(null)}>
+      <Dialog
+        open={Boolean(memberRemovalDialog)}
+        onOpenChange={(open) => !open && setMemberRemovalDialog(null)}
+      >
         <DialogContent showClose={!isMutationPending}>
           <DialogHeader>
             <DialogTitle>Remove team member</DialogTitle>
             <DialogDescription>
-              {memberRemovalDialog?.memberName} will be removed from this company workspace. Historical
-              audit records remain intact.
+              {memberRemovalDialog?.memberName} will be removed from this company context.
+              Historical audit records remain intact.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

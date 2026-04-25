@@ -3,12 +3,7 @@ import { PlusSquare } from "lucide-react";
 
 import { CompanyWorkspaceSwitcher } from "@/components/company/company-workspace-switcher";
 import { ProviderAccessRequired } from "@/components/dashboard/provider-access-required";
-import {
-  PageIntro,
-  PageSection,
-  PageShell,
-  PageState,
-} from "@/components/layout/page-shell";
+import { PageIntro, PageSection, PageShell, PageState } from "@/components/layout/page-shell";
 import { MainContainer } from "@/components/layout/main-container";
 import { ProviderListingWizard } from "@/components/listings/provider-listing-wizard";
 import { Badge } from "@/components/ui/badge";
@@ -27,7 +22,7 @@ export default async function NewDashboardListingPage() {
       <MainContainer size="content">
         <PageState
           icon={PlusSquare}
-          title="Provider workflow unavailable"
+          title="Listing workflow unavailable"
           description={context.message}
         />
       </MainContainer>
@@ -54,9 +49,9 @@ export default async function NewDashboardListingPage() {
           workspaceOptions={listingCreationContextResult.company.workspaceOptions}
           activeOrganizationId={listingCreationContextResult.company.activeOrganizationId}
           redirectTo="/dashboard/listings/new"
-          title="Choose the company workspace for new listings"
-          description="New company-owned listings must be created inside one explicit active RoofHub workspace. Select it first so draft ownership and routing are deterministic."
-          submitLabel="Start listing in selected workspace"
+          title="Choose the company context for new listings"
+          description="New company-owned listings must be created inside one explicit active RoofHub company context. Select it first so draft ownership and routing are deterministic."
+          submitLabel="Start listing in selected context"
         />
       </MainContainer>
     );
@@ -91,22 +86,28 @@ export default async function NewDashboardListingPage() {
     <MainContainer size="wide" className="space-y-5">
       <PageShell>
         <PageIntro
-          eyebrow={<Badge variant="primary">Provider wizard</Badge>}
+          eyebrow={<Badge variant="primary">Listing workflow</Badge>}
           title="Create a listing draft in guided steps."
           description="Build listing identity, pricing, facts, map pin placement, media, and publish readiness in sequence."
           meta={
-            <span className="inline-flex items-center rounded-full border border-border/70 bg-muted/25 px-3 py-1.5 text-xs text-muted-foreground">
+            <span className="border-border/70 bg-muted/25 text-muted-foreground inline-flex items-center rounded-full border px-3 py-1.5 text-xs">
               {listingCreationContext.ownershipMode === "company"
-                ? `New listings will be owned by ${listingCreationContext.organizationName ?? "your company workspace"}.`
-                : "New listings will be created as individual listings for this provider account."}
+                ? `New listings will be owned by ${listingCreationContext.organizationName ?? "your company"}.`
+                : "New listings will be created as individual listings for this account."}
             </span>
           }
           actions={
             <>
-              <Link href="/dashboard" className={buttonVariants({ variant: "outline", size: "sm" })}>
+              <Link
+                href="/dashboard"
+                className={buttonVariants({ variant: "outline", size: "sm" })}
+              >
                 Back to dashboard
               </Link>
-              <Link href="/dashboard/listings" className={buttonVariants({ variant: "ghost", size: "sm" })}>
+              <Link
+                href="/dashboard/listings"
+                className={buttonVariants({ variant: "ghost", size: "sm" })}
+              >
                 My listings
               </Link>
             </>

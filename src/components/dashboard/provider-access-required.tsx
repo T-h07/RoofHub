@@ -11,8 +11,8 @@ type ProviderAccessRequiredProps = {
 };
 
 export function ProviderAccessRequired({
-  title = "Provider access required",
-  description = "Switch your profile role to provider before managing listing drafts and lifecycle states.",
+  title = "Workspace access required",
+  description = "Switch your profile role before managing listing drafts and lifecycle states.",
 }: ProviderAccessRequiredProps) {
   return (
     <MainContainer size="content">

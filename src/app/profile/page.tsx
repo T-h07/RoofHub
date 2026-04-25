@@ -174,13 +174,13 @@ async function loadProviderProfileExperience(
   const completion = buildProfileCompletion(profile);
 
   return {
-    heroTitle: "Marketplace-facing provider identity",
+    heroTitle: "Company-facing account identity",
     heroDescription:
-      "Your provider profile shapes trust on listing detail pages, contact surfaces, and lead response expectations.",
-    roleDescriptor: "Provider profile",
-    previewTitle: "How seekers evaluate your profile",
+      "Your account profile supports listing work, inquiry response, and internal company activity history.",
+    roleDescriptor: "Workspace profile",
+    previewTitle: "How your account supports company work",
     previewDescription:
-      "Provider-facing identity should feel professional, responsive, and consistent across listing and messaging flows.",
+      "Keep contact readiness and profile context consistent for listing operations and messaging flows.",
     completionPercent: completion.completionPercent,
     completionSummary: completion.completionSummary,
     missingItems: completion.missingItems,
@@ -188,7 +188,7 @@ async function loadProviderProfileExperience(
       {
         label: "Published listings",
         value: overviewResult.ok ? formatCount(overviewResult.metrics.published) : "--",
-        hint: "Public inventory currently visible to seekers.",
+        hint: "Company inventory currently visible to public visitors.",
         tone: "primary",
       },
       {
@@ -200,7 +200,7 @@ async function loadProviderProfileExperience(
       {
         label: "Unread leads",
         value: overviewResult.ok ? formatCount(overviewResult.metrics.unreadLeadsCount) : "--",
-        hint: "New inbound threads requiring provider follow-up.",
+        hint: "New inbound threads requiring company follow-up.",
         tone: "success",
       },
       {
@@ -268,9 +268,7 @@ export default async function ProfilePage() {
       const ownedOrganization = ownedWorkspaceOptions[0].organization;
       const { data: transferMemberRows, error: transferMembersError } = await supabase
         .from("organization_members")
-        .select(
-          "user_id, role, profile:profiles!organization_members_user_id_fkey(display_name)"
-        )
+        .select("user_id, role, profile:profiles!organization_members_user_id_fkey(display_name)")
         .eq("organization_id", ownedOrganization.id)
         .eq("member_status", "active")
         .neq("user_id", profile.id)
@@ -336,15 +334,15 @@ export default async function ProfilePage() {
               workspaceOptions={companyContextResult.company.workspaceOptions}
               activeOrganizationId={companyContextResult.company.activeOrganizationId}
               redirectTo="/profile/company"
-              title="Choose your active company workspace"
-              description="This account belongs to more than one RoofHub company workspace. Select the workspace you want profile, dashboard, and listing flows to use."
+              title="Choose your active company context"
+              description="This account belongs to more than one RoofHub company context. Select the company you want profile, dashboard, and listing flows to use."
             />
           ) : companyContextResult.company.activeOrganization ? (
             <PageSection
               eyebrow={
                 <div className="inline-flex items-center gap-2 text-sm font-semibold tracking-tight">
                   <Building2 className="text-primary size-4" />
-                  Company workspace active
+                  Company context active
                 </div>
               }
               title={companyContextResult.company.activeOrganization.name}
@@ -352,29 +350,23 @@ export default async function ProfilePage() {
                 <>
                   Active role:{" "}
                   {companyContextResult.company.activeMembership
-                    ? ORGANIZATION_MEMBER_ROLE_LABELS[companyContextResult.company.activeMembership.role]
+                    ? ORGANIZATION_MEMBER_ROLE_LABELS[
+                        companyContextResult.company.activeMembership.role
+                      ]
                     : "Company member"}
-                  . Continue in the workspace to manage the company context this account is currently operating in.
+                  . Company governance is managed separately from operational dashboard work.
                 </>
               }
             >
               <div className="flex flex-wrap gap-2">
                 <Link href="/profile/company" className={buttonVariants({ size: "sm" })}>
-                  Open company workspace
+                  Open company governance
                 </Link>
-                {companyContextResult.company.canManageTeam ? (
-                  <Link
-                    href="/profile/company/team"
-                    className={buttonVariants({ variant: "outline", size: "sm" })}
-                  >
-                    Manage team members
-                  </Link>
-                ) : null}
                 <Link
-                  href={`/companies/${companyContextResult.company.activeOrganization.slug}`}
-                  className={buttonVariants({ variant: "ghost", size: "sm" })}
+                  href="/dashboard"
+                  className={buttonVariants({ variant: "outline", size: "sm" })}
                 >
-                  View public company page
+                  Open operations
                 </Link>
               </div>
             </PageSection>
@@ -383,15 +375,15 @@ export default async function ProfilePage() {
               eyebrow={
                 <div className="inline-flex items-center gap-2 text-sm font-semibold tracking-tight">
                   <Building2 className="text-primary size-4" />
-                  Company workspace
+                  Company governance
                 </div>
               }
               title="Create a company account foundation"
-              description="Set up a company workspace to operate as a company provider while keeping account ownership and session handling anchored to trusted server-side membership records."
+              description="Set up company governance so identity, team membership, and settings have one trusted internal home."
             >
               <div className="flex flex-wrap gap-2">
                 <Link href="/profile/company/new" className={buttonVariants({ size: "sm" })}>
-                  Create company workspace
+                  Create company governance
                 </Link>
                 <Link
                   href="/profile/company"

@@ -5,12 +5,7 @@ import { ArrowLeft, Building2 } from "lucide-react";
 import { AuthStatusMessage } from "@/components/auth/auth-status-message";
 import { CompanyWorkspaceCreateForm } from "@/components/company/company-workspace-create-form";
 import { CompanyWorkspaceSwitcher } from "@/components/company/company-workspace-switcher";
-import {
-  PageIntro,
-  PageSection,
-  PageShell,
-  PageState,
-} from "@/components/layout/page-shell";
+import { PageIntro, PageSection, PageShell, PageState } from "@/components/layout/page-shell";
 import { MainContainer } from "@/components/layout/main-container";
 import { buttonVariants } from "@/components/ui/button";
 import { getCurrentUserProfile } from "@/lib/auth/profile";
@@ -54,12 +49,15 @@ export default async function CompanyWorkspaceCreatePage() {
       <PageShell>
         <PageIntro
           eyebrow={<span className="type-label">Company setup</span>}
-          title="Create a RoofHub company workspace"
+          title="Create RoofHub company governance"
           description="Set up company identity and governance foundations before team, listings, and workflow routing are activated."
           actions={
-            <Link href="/profile/company" className={buttonVariants({ variant: "ghost", size: "sm" })}>
+            <Link
+              href="/profile/company"
+              className={buttonVariants({ variant: "ghost", size: "sm" })}
+            >
               <ArrowLeft className="size-4" />
-              Back to company workspace
+              Back to governance
             </Link>
           }
         />
@@ -77,9 +75,9 @@ export default async function CompanyWorkspaceCreatePage() {
             workspaceOptions={companyContextResult.company.workspaceOptions}
             activeOrganizationId={companyContextResult.company.activeOrganizationId}
             redirectTo="/profile/company"
-            title="Choose the workspace you are operating in now"
-            description="This account already belongs to more than one RoofHub company workspace. Pick the active one before continuing with company onboarding or workspace operations."
-            submitLabel="Open selected workspace"
+            title="Choose the company context you are operating in now"
+            description="This account already belongs to more than one RoofHub company context. Pick the active one before continuing with governance onboarding."
+            submitLabel="Open selected governance"
           />
         ) : (
           <PageSection

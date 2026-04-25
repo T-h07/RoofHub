@@ -34,15 +34,14 @@ export function CompanyWorkspaceCreateForm() {
         <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(118deg,color-mix(in_oklch,var(--primary)_10%,transparent)_0%,transparent_55%),linear-gradient(332deg,color-mix(in_oklch,var(--accent)_12%,transparent)_0%,transparent_70%)] opacity-55" />
         <div className="relative space-y-5">
           <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="primary">Company provider setup</Badge>
+            <Badge variant="primary">Company governance setup</Badge>
             <Badge variant="outline">RoofHub workspace</Badge>
           </div>
           <div className="space-y-2">
-            <h1 className="type-page-title">Create your company workspace</h1>
+            <h1 className="type-page-title">Create your company governance context</h1>
             <p className="type-body-muted max-w-3xl">
-              Set up a branded company workspace for RoofHub. Your account is automatically assigned
-              as owner so future member management and company listing workflows can be added on top
-              of a trusted foundation.
+              Set up the company context for RoofHub. Your account is automatically assigned as
+              owner so team management and listing workflows can build on a trusted foundation.
             </p>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
@@ -99,7 +98,7 @@ export function CompanyWorkspaceCreateForm() {
               aria-invalid={Boolean(state.errors?.name)}
             />
             {state.errors?.name ? <FieldError>{state.errors.name}</FieldError> : null}
-            <FieldHelp>This name appears as your RoofHub company workspace identity.</FieldHelp>
+            <FieldHelp>This name appears as the RoofHub company identity.</FieldHelp>
           </Field>
 
           <Field>
@@ -121,7 +120,7 @@ export function CompanyWorkspaceCreateForm() {
       <section className="border-border bg-card/96 sticky bottom-4 rounded-2xl border px-4 py-3 shadow-[0_24px_44px_-30px_color-mix(in_oklch,var(--nav-background)_36%,transparent)] backdrop-blur-sm">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-muted-foreground text-sm leading-6">
-            Company creation upgrades your provider account mode to company workspace.
+            Company creation activates the governance context for this account.
           </p>
           <Button type="submit" disabled={isPending} className="sm:min-w-52">
             {isPending ? (
@@ -129,7 +128,7 @@ export function CompanyWorkspaceCreateForm() {
             ) : (
               <ArrowRight className="size-4" />
             )}
-            {isPending ? "Creating workspace..." : "Create company workspace"}
+            {isPending ? "Creating context..." : "Create company context"}
           </Button>
         </div>
       </section>
