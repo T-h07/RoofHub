@@ -21,15 +21,7 @@ import { siteConfig } from "@/lib/config/site";
 import { getCtaForViewer, getNavigationForViewer } from "@/lib/navigation/role-navigation";
 import { cn } from "@/lib/utils";
 
-function MobileNavLink({
-  href,
-  label,
-  active,
-}: {
-  href: string;
-  label: string;
-  active: boolean;
-}) {
+function MobileNavLink({ href, label, active }: { href: string; label: string; active: boolean }) {
   return (
     <Link
       href={href}
@@ -99,7 +91,7 @@ export function MobileNavSheet({ authState }: MobileNavSheetProps) {
           <SheetDescription className="text-nav-muted text-sm">
             {isAuthenticated && authState.role
               ? `${getRoleLabel(authState.role)} account navigation`
-              : "Explore listings, map results, and account actions."}
+              : "Browse RoofHub listings, map search, and company information."}
           </SheetDescription>
         </SheetHeader>
 
@@ -172,7 +164,10 @@ export function MobileNavSheet({ authState }: MobileNavSheetProps) {
                 ) : null}
                 <Link
                   href={cta.href}
-                  className={cn(buttonVariants({ size: "sm" }), "w-full justify-center shadow-none")}
+                  className={cn(
+                    buttonVariants({ size: "sm" }),
+                    "w-full justify-center shadow-none"
+                  )}
                 >
                   {cta.label}
                   <Sparkles className="size-4" aria-hidden="true" />
@@ -187,14 +182,17 @@ export function MobileNavSheet({ authState }: MobileNavSheetProps) {
                   href="/auth/sign-in"
                   className={cn(
                     buttonVariants({ variant: "outline", size: "sm" }),
-                    "w-full justify-center border-nav-muted/45 bg-transparent text-nav-foreground hover:bg-nav-active/24 hover:text-nav-foreground"
+                    "border-nav-muted/45 text-nav-foreground hover:bg-nav-active/24 hover:text-nav-foreground w-full justify-center bg-transparent"
                   )}
                 >
                   Sign in
                 </Link>
                 <Link
                   href="/auth/sign-up"
-                  className={cn(buttonVariants({ size: "sm" }), "w-full justify-center shadow-none")}
+                  className={cn(
+                    buttonVariants({ size: "sm" }),
+                    "w-full justify-center shadow-none"
+                  )}
                 >
                   Create account
                   <Sparkles className="size-4" aria-hidden="true" />

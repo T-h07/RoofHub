@@ -21,7 +21,7 @@ export function FeaturedListingsSection({
   return (
     <Section
       eyebrow="Featured and new"
-      title="Fresh listings from the RoofHub marketplace"
+      title="Fresh listings from RoofHub"
       description="Recent published listings appear here so you can jump straight into detail pages or continue in explore view."
       action={
         <Link href="/explore" className={buttonVariants({ variant: "outline", size: "sm" })}>
@@ -54,11 +54,7 @@ export function FeaturedListingsSection({
       ) : (
         <div className="grid gap-4 lg:grid-cols-2">
           {listings.map((listing) => (
-            <ListingCard
-              key={listing.id}
-              listing={listing}
-              isAuthenticated={isAuthenticated}
-            />
+            <ListingCard key={listing.id} listing={listing} isAuthenticated={isAuthenticated} />
           ))}
         </div>
       )}

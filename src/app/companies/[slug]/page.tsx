@@ -1,10 +1,19 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { AlertTriangle, Compass, MapPin } from "lucide-react";
+import {
+  AlertTriangle,
+  BriefcaseBusiness,
+  Compass,
+  MapPin,
+  MessageSquareMore,
+  UsersRound,
+} from "lucide-react";
 
 import { CompanyIdentityHeader } from "@/components/company/company-identity-header";
 import { CompanyPublicListingsShell } from "@/components/company/company-public-listings-shell";
 import { MainContainer } from "@/components/layout/main-container";
+import { PageSection } from "@/components/layout/page-shell";
+import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { loadPublicCompanyProfileBySlug } from "@/lib/company/public-profile";
@@ -47,6 +56,11 @@ export default async function PublicCompanyPage({ params }: PublicCompanyPagePro
   }
 
   const { company, listings, totalListings, viewerUserId } = companyResult;
+  const contactHref = company.contact_email
+    ? `mailto:${company.contact_email}`
+    : company.contact_phone
+      ? `tel:${company.contact_phone}`
+      : "/explore";
 
   return (
     <MainContainer size="wide" className="space-y-5">
@@ -67,7 +81,7 @@ export default async function PublicCompanyPage({ params }: PublicCompanyPagePro
             Open map
           </Link>
         </div>
-        <p className="text-muted-foreground text-xs">RoofHub company profile</p>
+        <p className="text-muted-foreground text-xs">RoofHub public company website</p>
       </section>
 
       <CompanyIdentityHeader
@@ -81,12 +95,86 @@ export default async function PublicCompanyPage({ params }: PublicCompanyPagePro
           websiteUrl: company.website_url,
           coverageArea: company.coverage_area,
         }}
-        contextLabel="Public company profile"
-        supportingLabel="Review brand details, contact context, and current public inventory from this RoofHub company workspace."
+        contextLabel="Public company website"
+        supportingLabel="Browse the company's public inventory, service area, contact context, and inquiry path from one RoofHub website."
         listingCount={totalListings}
+        actions={
+          <>
+            <Link href="#listings" className={buttonVariants({ size: "sm" })}>
+              View listings
+            </Link>
+            <Link href={contactHref} className={buttonVariants({ variant: "outline", size: "sm" })}>
+              Contact company
+            </Link>
+          </>
+        }
       />
 
+      <section className="grid gap-5 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,0.75fr)]">
+        <PageSection
+          eyebrow={<Badge variant="outline">Services</Badge>}
+          title="Company real estate services"
+          description="RoofHub keeps public discovery connected to the same company team that manages listing operations behind the scenes."
+        >
+          <div className="grid gap-3 sm:grid-cols-3">
+            {[
+              {
+                title: "Rental search",
+                detail: "Find available rentals with list and map context kept in sync.",
+                icon: MapPin,
+              },
+              {
+                title: "Homes for sale",
+                detail: "Compare sale inventory by price, location, and property details.",
+                icon: BriefcaseBusiness,
+              },
+              {
+                title: "Inquiry handling",
+                detail: "Send listing inquiries into the company's internal response workflow.",
+                icon: MessageSquareMore,
+              },
+            ].map((service) => {
+              const Icon = service.icon;
+
+              return (
+                <div
+                  key={service.title}
+                  className="border-border/70 bg-surface-soft rounded-xl border px-3.5 py-3"
+                >
+                  <Icon className="text-primary size-4.5" aria-hidden="true" />
+                  <p className="mt-2 text-sm font-semibold tracking-tight">{service.title}</p>
+                  <p className="text-muted-foreground mt-1 text-xs leading-5">{service.detail}</p>
+                </div>
+              );
+            })}
+          </div>
+        </PageSection>
+
+        <PageSection
+          eyebrow={<Badge variant="outline">Team</Badge>}
+          title="One company team"
+          description="Listing inquiries and public contact requests route back to the internal RoofHub workspace."
+        >
+          <div className="space-y-3">
+            <div className="border-border/70 bg-surface-soft rounded-xl border px-3.5 py-3">
+              <p className="inline-flex items-center gap-2 text-sm font-semibold tracking-tight">
+                <UsersRound className="text-primary size-4" aria-hidden="true" />
+                Company-managed response
+              </p>
+              <p className="text-muted-foreground mt-1 text-xs leading-5">
+                The public website and internal operations workspace share one company context.
+              </p>
+            </div>
+            <Link href={contactHref} className={buttonVariants({ size: "sm" })}>
+              Contact company
+            </Link>
+          </div>
+        </PageSection>
+      </section>
+
       <CompanyPublicListingsShell
+        id="listings"
+        className="scroll-mt-24"
         companyName={company.name}
         listings={listings}
         isAuthenticated={Boolean(viewerUserId)}

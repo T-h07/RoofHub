@@ -34,11 +34,7 @@ function buildExploreHref(city: string, listingType: "rent" | "sale") {
   return `/explore?${params.toString()}`;
 }
 
-function buildMapHref(
-  city: string,
-  neighborhood: string | null,
-  listingType: "rent" | "sale"
-) {
+function buildMapHref(city: string, neighborhood: string | null, listingType: "rent" | "sale") {
   const params = new URLSearchParams();
   params.set("city", city);
   params.set("listingType", listingType);
@@ -73,9 +69,7 @@ function formatAvailableFrom(value: string | null) {
   return `Available from ${formatted}`;
 }
 
-export default async function ListingDetailPage({
-  params,
-}: ListingDetailPageProps) {
+export default async function ListingDetailPage({ params }: ListingDetailPageProps) {
   const resolvedParams = await params;
   const listingResult = await loadPublicListingDetailBySlug(resolvedParams.slug);
 
@@ -92,10 +86,7 @@ export default async function ListingDetailPage({
           description={listingResult.message}
           action={
             <div className="flex flex-wrap items-center justify-center gap-2">
-              <Link
-                href="/explore"
-                className={buttonVariants({ size: "sm", variant: "outline" })}
-              >
+              <Link href="/explore" className={buttonVariants({ size: "sm", variant: "outline" })}>
                 Back to explore
               </Link>
               <Link href="/" className={buttonVariants({ size: "sm" })}>
@@ -112,15 +103,9 @@ export default async function ListingDetailPage({
   const isAuthenticated = Boolean(viewerUserId);
   const listingHref = `/listing/${listing.slug}`;
   const exploreHref = buildExploreHref(listing.city, listing.listing_type);
-  const mapHref = buildMapHref(
-    listing.city,
-    listing.neighborhood,
-    listing.listing_type
-  );
+  const mapHref = buildMapHref(listing.city, listing.neighborhood, listing.listing_type);
   const contactThreadHref = `/messages?listingId=${listing.id}`;
-  const contactHref = isAuthenticated
-    ? contactThreadHref
-    : toSignInPath(contactThreadHref);
+  const contactHref = isAuthenticated ? contactThreadHref : toSignInPath(contactThreadHref);
   const signInHref = toSignInPath(listingHref);
   const mapStyleUrl = getMapStyleUrl();
   const descriptionParagraphs = listing.description
@@ -156,7 +141,7 @@ export default async function ListingDetailPage({
       <ListingDetailSummary listing={listing} />
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
-        <aside className="order-1 space-y-4 xl:order-2 xl:sticky xl:top-[5.5rem] xl:self-start">
+        <aside className="order-1 space-y-4 xl:sticky xl:top-[5.5rem] xl:order-2 xl:self-start">
           {listing.company ? (
             <ListingCompanyTrustPanel
               company={listing.company}
@@ -185,9 +170,7 @@ export default async function ListingDetailPage({
             <header className="space-y-1.5">
               <h2 className="type-section-title text-xl sm:text-2xl">Location</h2>
               <p className="text-muted-foreground text-sm">
-                {listing.neighborhood
-                  ? `${listing.neighborhood}, ${listing.city}`
-                  : listing.city}
+                {listing.neighborhood ? `${listing.neighborhood}, ${listing.city}` : listing.city}
               </p>
               {listing.public_location_mode === "exact" && listing.address_text ? (
                 <p className="text-muted-foreground text-sm">{listing.address_text}</p>
@@ -197,7 +180,7 @@ export default async function ListingDetailPage({
                 </p>
               ) : (
                 <p className="text-muted-foreground text-sm">
-                  Exact map placement is hidden until direct provider contact.
+                  Exact map placement is hidden until direct company contact.
                 </p>
               )}
             </header>
@@ -237,7 +220,7 @@ export default async function ListingDetailPage({
             <header className="space-y-1">
               <h2 className="type-section-title text-xl sm:text-2xl">Description</h2>
               <p className="text-muted-foreground text-sm">
-                Listing narrative provided by the property provider.
+                Listing narrative provided by the company team.
               </p>
             </header>
 

@@ -10,14 +10,15 @@ const intentItems = [
   {
     title: "Rent a home",
     description:
-      "Open rental-focused discovery with city and neighborhood intent carried into explore.",
+      "Open RoofHub rental inventory with city and neighborhood intent carried into explore.",
     href: "/explore?intent=rent",
     ctaLabel: "Browse rentals",
     icon: Home,
   },
   {
     title: "Buy a property",
-    description: "Start with sale inventory and compare locations before opening detail pages.",
+    description:
+      "Start with RoofHub sale inventory and compare locations before opening detail pages.",
     href: "/explore?intent=sale",
     ctaLabel: "Browse homes for sale",
     icon: Building2,
@@ -31,11 +32,11 @@ const intentItems = [
     icon: Map,
   },
   {
-    title: "List your property",
+    title: "Meet RoofHub",
     description:
-      "Create your provider account to publish listings and manage inquiries from your workspace.",
-    href: "/auth/sign-up?next=%2Fdashboard",
-    ctaLabel: "Start provider path",
+      "Review company details, service area, contact channels, and current public inventory.",
+    href: "/company",
+    ctaLabel: "Open company page",
     icon: Compass,
   },
 ];
@@ -45,7 +46,7 @@ export function BrowseIntentSection() {
     <Section
       eyebrow="Browse by intent"
       title="Choose the fastest path into RoofHub"
-      description="Each route is structured for a specific goal so first-time visitors can enter discovery without friction."
+      description="Each route supports a clear public goal: browse listings, scan by map, or contact the company."
     >
       <div className="grid gap-4 sm:grid-cols-2">
         {intentItems.map((item) => {

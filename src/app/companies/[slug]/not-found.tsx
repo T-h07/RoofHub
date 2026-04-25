@@ -17,11 +17,8 @@ export default function CompanyProfileNotFound() {
             <Link href="/explore" className={buttonVariants({ size: "sm" })}>
               Explore listings
             </Link>
-            <Link
-              href="/profile/company"
-              className={buttonVariants({ size: "sm", variant: "outline" })}
-            >
-              Company workspace
+            <Link href="/map" className={buttonVariants({ size: "sm", variant: "outline" })}>
+              Open map
             </Link>
           </div>
         }
