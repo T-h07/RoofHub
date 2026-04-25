@@ -18,6 +18,11 @@ Provider account classification (foundation for NM-PT31):
   - `individual`: provider acts as an individual account.
   - `company`: provider acts through an owned company workspace.
 - Company ownership authority is derived from `organization_members` with `role = 'owner'` and `member_status = 'active'`.
+- Active company workspace authority is deterministic:
+  - persisted `profiles.active_organization_id` is used only when it matches an active membership
+  - a single active company membership may be resolved without persisting a profile mutation
+  - multiple active memberships require explicit server-validated selection
+  - company-context read helpers must not silently rewrite profile workspace state
 
 ## Route-level access boundaries
 
@@ -69,6 +74,7 @@ Route protection improves UX but is not an authorization substitute.
   - `assigned_agent_user_id` tracks current responsible agent when applicable
   - `published_by_user_id` tracks publish actor when applicable
 - Server-side listing creation resolves company ownership from persisted profile + organization membership context, not client-submitted organization ids.
+- Account mode changes check actual active company membership before changing provider/company state; `profiles.provider_account_type` alone is not treated as company authority.
 - Listings insert/update/delete RLS checks enforce:
   - provider ownership (`owner_id = auth.uid()`) or admin
   - active organization membership when `organization_id` is set

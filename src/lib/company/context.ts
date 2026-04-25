@@ -59,6 +59,7 @@ export type CompanyMembershipContext = {
   activeMemberships: CompanyMembershipSummary[];
   workspaceOptions: CompanyWorkspaceOption[];
   workspaceState: CompanyWorkspaceState;
+  activeSelectionSource: "profile" | "single_membership" | null;
   activeOrganizationId: string | null;
   activeOrganization: CompanyWorkspaceSummary | null;
   activeMembership: CompanyMembershipSummary | null;
@@ -103,9 +104,11 @@ function sortMemberships(left: CompanyMembershipSummary, right: CompanyMembershi
     return roleDelta;
   }
 
-  return left.organization?.name.localeCompare(right.organization?.name ?? "", undefined, {
-    sensitivity: "base",
-  }) ?? 0;
+  return (
+    left.organization?.name.localeCompare(right.organization?.name ?? "", undefined, {
+      sensitivity: "base",
+    }) ?? 0
+  );
 }
 
 function buildEmptyCompanyMembershipContext(): CompanyMembershipContext {
@@ -115,6 +118,7 @@ function buildEmptyCompanyMembershipContext(): CompanyMembershipContext {
     activeMemberships: [],
     workspaceOptions: [],
     workspaceState: "no_membership",
+    activeSelectionSource: null,
     activeOrganizationId: null,
     activeOrganization: null,
     activeMembership: null,
@@ -125,18 +129,6 @@ function buildEmptyCompanyMembershipContext(): CompanyMembershipContext {
     canManageTeam: false,
     canEditProfile: false,
   };
-}
-
-async function persistActiveOrganizationId(
-  supabase: SupabaseClient<Database>,
-  input: { userId: string; organizationId: string | null }
-) {
-  const { error } = await supabase
-    .from("profiles")
-    .update({ active_organization_id: input.organizationId })
-    .eq("id", input.userId);
-
-  return !error;
 }
 
 async function loadResolvedCompanyMembershipContext(
@@ -225,13 +217,6 @@ async function loadResolvedCompanyMembershipContext(
     .sort(sortMemberships);
 
   if (activeMemberships.length === 0) {
-    if (profile.active_organization_id !== null) {
-      await persistActiveOrganizationId(supabase, {
-        userId: profile.id,
-        organizationId: null,
-      });
-    }
-
     return buildEmptyCompanyMembershipContext();
   }
 
@@ -239,27 +224,21 @@ async function loadResolvedCompanyMembershipContext(
     activeMemberships.find(
       (membership) => membership.organization_id === profile.active_organization_id
     ) ?? null;
+  let activeSelectionSource: CompanyMembershipContext["activeSelectionSource"] = activeMembership
+    ? "profile"
+    : null;
 
   if (!activeMembership && activeMemberships.length === 1) {
     activeMembership = activeMemberships[0] ?? null;
-    if (profile.active_organization_id !== activeMembership.organization_id) {
-      await persistActiveOrganizationId(supabase, {
-        userId: profile.id,
-        organizationId: activeMembership.organization_id,
-      });
-    }
-  }
-
-  if (!activeMembership && profile.active_organization_id !== null) {
-    await persistActiveOrganizationId(supabase, {
-      userId: profile.id,
-      organizationId: null,
-    });
+    activeSelectionSource = activeMembership ? "single_membership" : null;
   }
 
   const workspaceOptions = activeMemberships
-    .filter((membership): membership is CompanyMembershipSummary & { organization: CompanyWorkspaceSummary } =>
-      membership.organization !== null
+    .filter(
+      (
+        membership
+      ): membership is CompanyMembershipSummary & { organization: CompanyWorkspaceSummary } =>
+        membership.organization !== null
     )
     .map((membership) => ({
       organization: membership.organization,
@@ -276,6 +255,7 @@ async function loadResolvedCompanyMembershipContext(
     activeMemberships,
     workspaceOptions,
     workspaceState: activeMembership ? "resolved" : "selection_required",
+    activeSelectionSource,
     activeOrganizationId: activeMembership?.organization_id ?? null,
     activeOrganization: activeMembership?.organization ?? null,
     activeMembership,
@@ -304,7 +284,10 @@ export async function getCurrentUserCompanyContext(
     };
   }
 
-  const companyContext = await loadResolvedCompanyMembershipContext(supabase, profileResult.profile);
+  const companyContext = await loadResolvedCompanyMembershipContext(
+    supabase,
+    profileResult.profile
+  );
 
   if (!companyContext.ok) {
     return companyContext;

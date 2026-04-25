@@ -44,6 +44,7 @@ Audit and observability execution details are defined in `docs/audit-observabili
 
 - Enforce ownership server-side for listing/profile/storage/messaging mutations.
 - Enforce company workspace ownership from persisted `organization_members` records, not client mode toggles.
+- Resolve active company context from persisted profile selection or an unambiguous single active membership only; company-context reads must not mutate `profiles.active_organization_id`.
 - Enforce company profile and branding mutations (name/contact/coverage/logo) through persisted owner membership checks.
 - Enforce company invite creation, invite revocation, role updates, status updates, and member removal through persisted owner/admin membership checks.
 - Keep `organization_members` RLS policies free of self-referential table subqueries that can break membership/context resolution; use trusted helper functions for owner/admin checks.

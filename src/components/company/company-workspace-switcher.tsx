@@ -39,8 +39,8 @@ export function CompanyWorkspaceSwitcher({
   );
 
   const defaultOrganizationId = useMemo(() => {
-    return activeOrganizationId ?? workspaceOptions[0]?.organization.id ?? "";
-  }, [activeOrganizationId, workspaceOptions]);
+    return activeOrganizationId ?? "";
+  }, [activeOrganizationId]);
 
   useEffect(() => {
     if (state.status === "success" && state.redirectTo) {
@@ -84,13 +84,13 @@ export function CompanyWorkspaceSwitcher({
                   </Badge>
                 ) : null}
               </div>
-              <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-muted-foreground">
-                <span className="inline-flex items-center gap-1 rounded-full border border-border/70 px-2 py-1">
+              <div className="text-muted-foreground mt-3 flex flex-wrap gap-2 text-[11px]">
+                <span className="border-border/70 inline-flex items-center gap-1 rounded-full border px-2 py-1">
                   <Building2 className="size-3.5" />
                   /companies/{option.organization.slug}
                 </span>
                 {option.canManageTeam ? (
-                  <span className="inline-flex items-center gap-1 rounded-full border border-border/70 px-2 py-1">
+                  <span className="border-border/70 inline-flex items-center gap-1 rounded-full border px-2 py-1">
                     <ShieldCheck className="size-3.5" />
                     Team access
                   </span>
@@ -107,7 +107,10 @@ export function CompanyWorkspaceSwitcher({
           <AuthStatusMessage tone="success" message={state.message} />
         ) : null}
 
-        <form action={formAction} className="space-y-4 rounded-2xl border border-border/70 bg-card/94 p-4">
+        <form
+          action={formAction}
+          className="border-border/70 bg-card/94 space-y-4 rounded-2xl border p-4"
+        >
           <input type="hidden" name="nextPath" value={redirectTo} />
           <Field>
             <Label htmlFor="active-organization-id">Choose workspace</Label>
@@ -117,9 +120,13 @@ export function CompanyWorkspaceSwitcher({
               defaultValue={defaultOrganizationId}
               disabled={isPending}
             >
+              <option value="" disabled>
+                Select a company workspace
+              </option>
               {workspaceOptions.map((option) => (
                 <option key={option.organization.id} value={option.organization.id}>
-                  {option.organization.name} - {ORGANIZATION_MEMBER_ROLE_LABELS[option.membership.role]}
+                  {option.organization.name} -{" "}
+                  {ORGANIZATION_MEMBER_ROLE_LABELS[option.membership.role]}
                 </option>
               ))}
             </Select>
