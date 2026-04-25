@@ -5,7 +5,10 @@ import {
   type AppRole,
   type ProviderAccountType,
 } from "@/lib/auth/roles";
-import { ORGANIZATION_MEMBER_ROLE_LABELS, type OrganizationMemberRole } from "@/lib/company/team-types";
+import {
+  ORGANIZATION_MEMBER_ROLE_LABELS,
+  type OrganizationMemberRole,
+} from "@/lib/company/team-types";
 import {
   COMPANY_CANONICAL_PATHS,
   canAccessCompanyActivityInNav,
@@ -29,8 +32,9 @@ export type ViewerNavigation = {
 const GUEST_NAVIGATION: ViewerNavigation = {
   primary: [
     { title: "Home", href: "/" },
-    { title: "Explore", href: "/explore" },
+    { title: "Listings", href: "/explore" },
     { title: "Map", href: "/map" },
+    { title: "Company", href: COMPANY_CANONICAL_PATHS.publicCompanyHome },
   ],
   secondary: [],
   account: [],
@@ -38,12 +42,12 @@ const GUEST_NAVIGATION: ViewerNavigation = {
 
 const AUTH_COMMUNICATION_PRIMARY_NAV: NavItem[] = [
   { title: "Messages", href: COMPANY_CANONICAL_PATHS.inbox },
-  { title: "Notifications", href: COMPANY_CANONICAL_PATHS.notifications },
 ];
 
 const AUTH_DISCOVERY_PRIMARY_NAV: NavItem[] = [
-  { title: "Explore", href: "/explore" },
+  { title: "Listings", href: "/explore" },
   { title: "Map", href: "/map" },
+  { title: "Company", href: COMPANY_CANONICAL_PATHS.publicCompanyHome },
 ];
 
 const AUTH_ACCOUNT_NAV: NavItem[] = [
@@ -52,7 +56,7 @@ const AUTH_ACCOUNT_NAV: NavItem[] = [
 ];
 
 const PROVIDER_OPERATIONS_NAV: NavItem[] = [
-  { title: "Dashboard", href: COMPANY_CANONICAL_PATHS.operationalHome },
+  { title: "Operations", href: COMPANY_CANONICAL_PATHS.operationalHome },
   { title: "Listings", href: COMPANY_CANONICAL_PATHS.listingsInventory },
 ];
 
@@ -61,39 +65,32 @@ const APP_ADMIN_NAV: NavItem[] = [{ title: "Moderation", href: "/admin/moderatio
 function buildCompanyPrimaryNav(viewer: NavViewer): NavItem[] {
   const nav: NavItem[] = [];
 
-  if (
-    viewer.companyMembershipRole === "owner" ||
-    viewer.companyMembershipRole === "admin" ||
-    viewer.companyMembershipRole === "manager" ||
-    viewer.companyMembershipRole === null
-  ) {
-    nav.push(...PROVIDER_OPERATIONS_NAV);
-  } else {
+  if (viewer.companyMembershipRole === "agent") {
     nav.push({
       title: "Listings",
       href: COMPANY_CANONICAL_PATHS.listingsInventory,
     });
+  } else if (viewer.companyMembershipRole === "manager") {
+    nav.push(
+      { title: "Review", href: COMPANY_CANONICAL_PATHS.operationalHome },
+      { title: "Listings", href: COMPANY_CANONICAL_PATHS.listingsInventory }
+    );
+  } else {
+    nav.push(...PROVIDER_OPERATIONS_NAV);
   }
 
   nav.push(...AUTH_COMMUNICATION_PRIMARY_NAV);
-  nav.push({
-    title: "Company",
-    href: COMPANY_CANONICAL_PATHS.governanceHome,
-  });
-  nav.push(...AUTH_DISCOVERY_PRIMARY_NAV);
+  nav.push({ title: "Public site", href: COMPANY_CANONICAL_PATHS.publicCompanyHome });
 
   return nav;
 }
 
-function buildProviderCompanyNavigation(
-  viewer: NavViewer,
-  navigation: ViewerNavigation
-) {
+function buildProviderCompanyNavigation(viewer: NavViewer, navigation: ViewerNavigation) {
   navigation.primary = buildCompanyPrimaryNav(viewer);
 
   if (viewer.companyMembershipRole === "agent") {
     navigation.secondary.push({
-      title: "Operations dashboard",
+      title: "Operations",
       href: COMPANY_CANONICAL_PATHS.operationalHome,
     });
   }
@@ -106,6 +103,10 @@ function buildProviderCompanyNavigation(
   }
 
   if (canAccessCompanyTeamInNav(viewer.companyMembershipRole)) {
+    navigation.secondary.push({
+      title: "Governance",
+      href: COMPANY_CANONICAL_PATHS.governanceHome,
+    });
     navigation.secondary.push({
       title: "Team",
       href: COMPANY_CANONICAL_PATHS.companyTeam,
@@ -172,10 +173,7 @@ function getCompanyProviderCta(viewer: NavViewer) {
     };
   }
 
-  if (
-    viewer.companyMembershipRole === "manager" ||
-    viewer.companyMembershipRole === "admin"
-  ) {
+  if (viewer.companyMembershipRole === "manager" || viewer.companyMembershipRole === "admin") {
     return {
       label: "Review queue",
       href: `${COMPANY_CANONICAL_PATHS.operationalHome}#pending-review-queue`,
@@ -185,14 +183,14 @@ function getCompanyProviderCta(viewer: NavViewer) {
 
   if (viewer.companyMembershipRole === "owner") {
     return {
-      label: "Operations dashboard",
+      label: "Operations",
       href: COMPANY_CANONICAL_PATHS.operationalHome,
       detail: "Company owner",
     };
   }
 
   return {
-    label: "Company",
+    label: "Governance",
     href: COMPANY_CANONICAL_PATHS.governanceHome,
     detail: getRoleLabel(viewer.role ?? "seeker"),
   };
@@ -224,8 +222,8 @@ export function getCtaForViewer(viewer: NavViewer) {
   }
 
   return {
-    label: "Become provider",
-    href: "/profile",
+    label: "Saved homes",
+    href: "/favorites",
     detail: getRoleLabel(viewer.role ?? "seeker"),
   };
 }
