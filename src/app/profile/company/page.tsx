@@ -272,11 +272,27 @@ export default async function CompanyWorkspacePage({ searchParams }: CompanyWork
           contextLabel="Company governance workspace"
           supportingLabel={`Active role: ${ORGANIZATION_MEMBER_ROLE_LABELS[membership.role]}. This page is dedicated to governance: profile identity, team administration, invites, and public presence.`}
           actions={
-            company.canEditProfile ? (
-              <Link href="/profile/company/edit" className={buttonVariants({ size: "sm" })}>
-                Edit company profile
+            <>
+              {company.canEditProfile ? (
+                <Link href="/profile/company/edit" className={buttonVariants({ size: "sm" })}>
+                  Edit company profile
+                </Link>
+              ) : null}
+              {company.canManageTeam ? (
+                <Link
+                  href="/profile/company/team"
+                  className={buttonVariants({ variant: "outline", size: "sm" })}
+                >
+                  Open team and invites
+                </Link>
+              ) : null}
+              <Link
+                href={`/companies/${organization.slug}`}
+                className={buttonVariants({ variant: "ghost", size: "sm" })}
+              >
+                View public company page
               </Link>
-            ) : null
+            </>
           }
         />
 

@@ -186,6 +186,12 @@ export default async function DashboardPage() {
                 <Rows3 className="size-4" aria-hidden="true" />
                 My listings
               </Link>
+              <Link
+                href="/profile/company"
+                className={buttonVariants({ variant: "ghost", size: "sm" })}
+              >
+                Company governance
+              </Link>
             </>
           }
         />
