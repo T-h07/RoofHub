@@ -2,7 +2,6 @@ import type { Tables } from "@/types/database";
 
 export type ListingOwnershipMode = "individual" | "company";
 export type ListingWorkflowMode = "provider_lifecycle" | "company_workflow";
-export type CompanyListingActorRole = "agent" | "reviewer";
 
 type ListingWorkspaceQuery<TQuery> = {
   eq(column: string, value: unknown): TQuery;
@@ -44,7 +43,9 @@ export function getListingOwnershipMode(input: {
   return input.organization_id ? "company" : "individual";
 }
 
-export function isCompanyOwnedListing(input: { organization_id: string | null }) {
+export function isCompanyOwnedListing(input: {
+  organization_id: string | null;
+}) {
   return getListingOwnershipMode(input) === "company";
 }
 
@@ -134,28 +135,8 @@ export function buildListingDraftOwnershipPayload(input: {
   >;
 }
 
-export function canPublishFromProviderControls(input: { organization_id: string | null }) {
-  return getListingWorkflowMode(input) === "provider_lifecycle";
-}
-
-export function canActOnCompanyListing(input: {
-  actorUserId: string;
-  actorRole: CompanyListingActorRole;
-  listing: Pick<
-    Tables<"listings">,
-    "organization_id" | "created_by_user_id" | "assigned_agent_user_id"
-  >;
+export function canPublishFromProviderControls(input: {
+  organization_id: string | null;
 }) {
-  if (!isCompanyOwnedListing(input.listing)) {
-    return false;
-  }
-
-  if (input.actorRole === "reviewer") {
-    return true;
-  }
-
-  return (
-    input.listing.created_by_user_id === input.actorUserId ||
-    input.listing.assigned_agent_user_id === input.actorUserId
-  );
+  return getListingWorkflowMode(input) === "provider_lifecycle";
 }

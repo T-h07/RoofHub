@@ -4,7 +4,6 @@ import test from "node:test";
 import {
   applyProviderListingWorkspaceScope,
   buildListingDraftOwnershipPayload,
-  canActOnCompanyListing,
   canPublishFromProviderControls,
   createProviderListingWorkspaceScope,
   listingBelongsToProviderWorkspace,
@@ -145,50 +144,6 @@ test("provider publish controls stay individual-only and workspace matching is d
         organization_id: null,
       },
       scope: companyScope,
-    }),
-    false
-  );
-});
-
-test("company listing actor checks centralize reviewer and responsible-agent access", () => {
-  const listing = {
-    organization_id: "org-a",
-    created_by_user_id: "creator-user",
-    assigned_agent_user_id: "assigned-user",
-  };
-
-  assert.equal(
-    canActOnCompanyListing({
-      actorUserId: "reviewer-user",
-      actorRole: "reviewer",
-      listing,
-    }),
-    true
-  );
-  assert.equal(
-    canActOnCompanyListing({
-      actorUserId: "assigned-user",
-      actorRole: "agent",
-      listing,
-    }),
-    true
-  );
-  assert.equal(
-    canActOnCompanyListing({
-      actorUserId: "other-agent",
-      actorRole: "agent",
-      listing,
-    }),
-    false
-  );
-  assert.equal(
-    canActOnCompanyListing({
-      actorUserId: "creator-user",
-      actorRole: "agent",
-      listing: {
-        ...listing,
-        organization_id: null,
-      },
     }),
     false
   );
