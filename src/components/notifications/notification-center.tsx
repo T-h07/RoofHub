@@ -32,7 +32,6 @@ import {
   archiveLowPriorityNotificationsAction,
   archiveNotificationAction,
   dismissNotificationAction,
-  loadCurrentUserNotificationsAction,
   markAllNotificationsReadAction,
   markNotificationReadAction,
   restoreNotificationAction,
@@ -47,10 +46,8 @@ import {
 import { cn } from "@/lib/utils";
 
 import { NotificationRow } from "./notification-row";
-import { useRealtimeNotifications } from "./use-realtime-notifications";
 
 type NotificationCenterProps = {
-  viewerUserId: string | null;
   initialNotifications: NotificationRecord[];
   initialPreferences: NotificationPreferenceRecord;
 };
@@ -118,11 +115,11 @@ function categoryFilterLabel(value: NotificationCategoryFilter) {
 }
 
 export function NotificationCenter({
-  viewerUserId,
   initialNotifications,
   initialPreferences,
 }: NotificationCenterProps) {
   const router = useRouter();
+  const [notifications, setNotifications] = useState(initialNotifications);
   const [preferences, setPreferences] = useState(initialPreferences);
   const [feedFilter, setFeedFilter] = useState<NotificationFeedFilter>("active");
   const [scopeFilter, setScopeFilter] = useState<NotificationScopeFilter>("all");
@@ -140,25 +137,6 @@ export function NotificationCenter({
   const [isArchiveLowPriorityPending, startArchiveLowPriorityTransition] =
     useTransition();
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
-
-  const { notifications, setNotifications } = useRealtimeNotifications({
-    viewerUserId,
-    initialNotifications,
-    initialUnreadCount: countUnreadNotifications(initialNotifications, { activeOnly: true }),
-    refreshFromServer: async () => {
-      const result = await loadCurrentUserNotificationsAction({
-        limit: 250,
-        scope: "all",
-      });
-
-      if (!result.ok) {
-        setStatusMessage(result.message);
-        return null;
-      }
-
-      return result.data.notifications;
-    },
-  });
 
   const activeUnreadCount = useMemo(
     () => countUnreadNotifications(notifications, { activeOnly: true }),

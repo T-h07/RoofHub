@@ -3,7 +3,6 @@ import type { Tables } from "@/types/database";
 export const NOTIFICATION_TYPES = {
   inquiryReceived: "messaging.inquiry.received",
   messageReceived: "messaging.message.received",
-  internalCompanyMessageReceived: "messaging.internal.message.received",
   conversationAssigned: "messaging.conversation.assigned",
   conversationReassigned: "messaging.conversation.reassigned",
   conversationUnassigned: "messaging.conversation.unassigned",
@@ -19,10 +18,6 @@ export const NOTIFICATION_TYPES = {
   listingApproved: "listing.workflow.approved",
   listingPublished: "listing.workflow.published",
   listingUnpublished: "listing.workflow.unpublished",
-  listingEditReviewNeeded: "listing.edit.review_needed",
-  listingEditApproved: "listing.edit.approved",
-  listingEditNeedsChanges: "listing.edit.needs_changes",
-  listingEditRejected: "listing.edit.rejected",
 } as const;
 
 export type NotificationType =
@@ -146,7 +141,7 @@ export function getNotificationCategoryFromType(type: string): NotificationCateg
     return "messages";
   }
 
-  if (type.startsWith("listing.")) {
+  if (type.startsWith("listing.workflow.")) {
     return "listings";
   }
 

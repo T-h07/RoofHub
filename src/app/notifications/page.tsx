@@ -70,7 +70,6 @@ export default async function NotificationsPage() {
       />
 
       <NotificationCenter
-        viewerUserId={user.id}
         initialNotifications={notificationsResult.data.notifications}
         initialPreferences={preferenceResult.data.preferences}
       />

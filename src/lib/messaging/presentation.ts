@@ -1,31 +1,3 @@
-export const MESSAGING_SECTIONS = ["outer_company", "in_company"] as const;
-
-export type MessagingSection = (typeof MESSAGING_SECTIONS)[number];
-
-export function normalizeMessagingSection(
-  value: string | null | undefined,
-  fallback: MessagingSection = "outer_company"
-): MessagingSection {
-  if (typeof value !== "string") {
-    return fallback;
-  }
-
-  const normalizedValue = value.trim().toLowerCase();
-  if ((MESSAGING_SECTIONS as readonly string[]).includes(normalizedValue)) {
-    return normalizedValue as MessagingSection;
-  }
-
-  return fallback;
-}
-
-export function isMessagingSection(value: string | null | undefined): value is MessagingSection {
-  if (typeof value !== "string") {
-    return false;
-  }
-
-  return (MESSAGING_SECTIONS as readonly string[]).includes(value.trim().toLowerCase());
-}
-
 const SHORT_DATE_FORMATTER = new Intl.DateTimeFormat("en", {
   month: "short",
   day: "numeric",

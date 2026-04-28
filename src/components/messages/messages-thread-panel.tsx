@@ -117,11 +117,6 @@ export function MessagesThreadPanel({
   const listingHref = thread.listing?.slug ? `/listing/${thread.listing.slug}` : null;
   const priceLabel = formatPrice(thread);
   const routingStatusLabel = getRoutingStatusLabel(thread);
-  const quickReplies = [
-    "Thanks, I will follow up.",
-    "Can you share a preferred viewing time?",
-    "I will confirm availability.",
-  ];
 
   useEffect(() => {
     const container = messageScrollContainerRef.current;
@@ -141,7 +136,8 @@ export function MessagesThreadPanel({
     const lastMessage = thread.messages[nextCount - 1];
     const distanceFromBottom =
       container.scrollHeight - container.scrollTop - container.clientHeight;
-    const shouldStickToBottom = distanceFromBottom < 140 || lastMessage?.sender_id === viewerUserId;
+    const shouldStickToBottom =
+      distanceFromBottom < 140 || lastMessage?.sender_id === viewerUserId;
 
     if (shouldStickToBottom) {
       window.requestAnimationFrame(() => {
@@ -179,19 +175,6 @@ export function MessagesThreadPanel({
     setIsUpdatingRouting(false);
   }
 
-  function appendQuickReplyToDraft(reply: string) {
-    setDraftBody((currentDraft) => {
-      if (currentDraft.length >= MESSAGE_BODY_MAX_LENGTH) {
-        return currentDraft;
-      }
-
-      const withSpacing =
-        currentDraft.length === 0 || /\s$/.test(currentDraft) ? currentDraft : `${currentDraft} `;
-      const nextDraft = `${withSpacing}${reply}`;
-      return nextDraft.slice(0, MESSAGE_BODY_MAX_LENGTH);
-    });
-  }
-
   return (
     <section className="border-border/75 bg-card/60 flex min-h-[68dvh] flex-col overflow-hidden rounded-xl border">
       <header className="border-border/70 bg-card/80 space-y-3 border-b px-4 py-3 sm:px-5">
@@ -201,11 +184,7 @@ export function MessagesThreadPanel({
               <div className="border-border/70 relative size-12 shrink-0 overflow-hidden rounded-lg border">
                 <Image
                   src={thread.listingCoverImageUrl}
-                  alt={
-                    thread.listing?.title
-                      ? `Cover image for ${thread.listing.title}`
-                      : "Listing cover image"
-                  }
+                  alt={thread.listing?.title ? `Cover image for ${thread.listing.title}` : "Listing cover image"}
                   fill
                   sizes="48px"
                   className="h-full w-full object-cover"
@@ -255,10 +234,7 @@ export function MessagesThreadPanel({
             <button
               type="button"
               onClick={onBack}
-              className={cn(
-                buttonVariants({ variant: "outline", size: "sm" }),
-                "h-7 gap-1 px-2.5 text-xs"
-              )}
+              className={cn(buttonVariants({ variant: "outline", size: "sm" }), "h-7 gap-1 px-2.5 text-xs")}
             >
               <ArrowLeft className="size-3.5" aria-hidden="true" />
               Back
@@ -288,8 +264,7 @@ export function MessagesThreadPanel({
               {!thread.companyRouting.assignedMemberActive &&
               thread.companyRouting.routingStatus === "assigned_member" ? (
                 <p className="text-warning text-xs">
-                  The current handler is no longer active in this workspace. Reassign this thread to
-                  keep follow-up moving.
+                  The current handler is no longer active in this workspace. Reassign this thread to keep follow-up moving.
                 </p>
               ) : null}
             </div>
@@ -370,9 +345,7 @@ export function MessagesThreadPanel({
                           : "border-border/70 bg-card/72 rounded-bl-sm border"
                       )}
                     >
-                      <p className="text-sm leading-6 break-words whitespace-pre-wrap">
-                        {message.body}
-                      </p>
+                      <p className="text-sm leading-6 whitespace-pre-wrap break-words">{message.body}</p>
                       <div
                         className={cn(
                           "mt-1 inline-flex items-center gap-1 text-[11px]",
@@ -431,35 +404,19 @@ export function MessagesThreadPanel({
           ) : null}
 
           <div className="flex items-center justify-between gap-2">
-            <div className="flex flex-wrap items-center gap-1.5">
-              <span className="text-muted-foreground text-[11px]">Quick reply</span>
-              {quickReplies.map((reply) => (
-                <button
-                  key={reply}
-                  type="button"
-                  onClick={() => appendQuickReplyToDraft(reply)}
-                  disabled={isSending}
-                  className="border-border/70 hover:bg-accent/70 rounded-md border px-2 py-1 text-[11px] transition-colors disabled:cursor-not-allowed disabled:opacity-70"
-                >
-                  {reply}
-                </button>
-              ))}
-            </div>
+            <p className="text-muted-foreground text-xs">
+              {characterCount}/{MESSAGE_BODY_MAX_LENGTH}
+            </p>
             <button
               type="submit"
               disabled={isSending || !normalizedDraft}
               className={cn(buttonVariants({ size: "sm" }), "gap-1.5")}
             >
-              {isSending ? (
-                <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
-              ) : null}
+              {isSending ? <LoaderCircle className="size-4 animate-spin" aria-hidden="true" /> : null}
               Send
               <SendHorizontal className="size-3.5" aria-hidden="true" />
             </button>
           </div>
-          <p className="text-muted-foreground text-xs">
-            {characterCount}/{MESSAGE_BODY_MAX_LENGTH}
-          </p>
         </form>
       </footer>
     </section>

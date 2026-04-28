@@ -33,20 +33,19 @@ import type {
   MessagingMessageRecord,
   MessagingThreadResult,
 } from "@/lib/messaging/types";
-import type { MessagingInboxLane, MessagingSection } from "@/lib/messaging/presentation";
+import type { MessagingInboxLane } from "@/lib/messaging/presentation";
 import { toMessagePreview } from "@/lib/messaging/validation";
 import { createClient as createBrowserSupabaseClient } from "@/lib/supabase/client";
 import type { Database } from "@/types/database";
 import { createUuid } from "@/lib/utils/id";
 import { cn } from "@/lib/utils";
 
-const FALLBACK_REFRESH_INTERVAL_MS = 8_000;
+const FALLBACK_REFRESH_INTERVAL_MS = 15_000;
 
 type MessagesWorkspaceProps = {
   initialSummaries: MessagingConversationSummary[];
   initialInbox: MessagingInboxContext;
   initialLane: MessagingInboxLane;
-  messageSection?: MessagingSection | null;
   selectedConversationId: string | null;
   initialThread: MessagingThreadResult | null;
   initialThreadError: string | null;
@@ -206,7 +205,6 @@ export function MessagesWorkspace({
   initialSummaries,
   initialInbox,
   initialLane,
-  messageSection,
   selectedConversationId,
   initialThread,
   initialThreadError,
@@ -676,10 +674,6 @@ export function MessagesWorkspace({
     const params = new URLSearchParams();
     const conversationId = options?.conversationId;
     const lane = options?.lane ?? activeLane;
-
-    if (messageSection) {
-      params.set("section", messageSection);
-    }
 
     if (conversationId) {
       params.set("conversationId", conversationId);

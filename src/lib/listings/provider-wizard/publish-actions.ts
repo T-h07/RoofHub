@@ -22,10 +22,6 @@ import {
   logSupabaseSchemaDrift,
 } from "@/lib/supabase/schema-drift";
 import { canPublishFromProviderControls } from "@/lib/listings/ownership";
-import {
-  isCompanyWorkflowReviewerRole,
-  loadActiveOrganizationMembershipRole,
-} from "@/lib/listings/company-workflow/edit-submissions";
 
 import { buildWizardValuesFromDraft } from "./mapping";
 import { loadProviderDraftForEditor } from "./queries";
@@ -64,34 +60,6 @@ type ProviderDraftAccess = {
   listing_status: ProviderListingStatus;
   slug: string;
 };
-
-async function shouldGatePublishedCompanyPhotoSync(input: {
-  listing: ProviderDraftAccess;
-  actorUserId: string;
-}) {
-  if (input.listing.organization_id === null || input.listing.listing_status !== "published") {
-    return { ok: true as const, shouldGate: false };
-  }
-
-  const membershipRole = await loadActiveOrganizationMembershipRole({
-    organizationId: input.listing.organization_id,
-    userId: input.actorUserId,
-  });
-
-  if (!membershipRole) {
-    return {
-      ok: false as const,
-      shouldGate: true,
-      message:
-        "Active company membership is required to edit photos for this live company listing.",
-    };
-  }
-
-  return {
-    ok: true as const,
-    shouldGate: !isCompanyWorkflowReviewerRole(membershipRole),
-  };
-}
 
 export type ProviderPhotoMutationImage = {
   storagePath: string;
@@ -490,28 +458,6 @@ export async function syncProviderListingPhotosAction(
     return {
       ok: false,
       message: draftAccess.ok ? "Draft listing could not be resolved." : draftAccess.message,
-      images: [],
-    };
-  }
-
-  const photoSyncGate = await shouldGatePublishedCompanyPhotoSync({
-    listing: draftAccess.listing,
-    actorUserId: profile.id,
-  });
-
-  if (!photoSyncGate.ok) {
-    return {
-      ok: false,
-      message: photoSyncGate.message,
-      images: [],
-    };
-  }
-
-  if (photoSyncGate.shouldGate) {
-    return {
-      ok: false,
-      message:
-        "Live company listing photo edits must be reviewed by an owner, admin, or manager before they can replace public images.",
       images: [],
     };
   }

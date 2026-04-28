@@ -34,158 +34,6 @@ export type Database = {
   }
   public: {
     Tables: {
-      company_internal_conversation_participants: {
-        Row: {
-          added_by_user_id: string | null
-          conversation_id: string
-          created_at: string
-          id: string
-          joined_at: string
-          last_read_at: string | null
-          organization_id: string
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          added_by_user_id?: string | null
-          conversation_id: string
-          created_at?: string
-          id?: string
-          joined_at?: string
-          last_read_at?: string | null
-          organization_id: string
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          added_by_user_id?: string | null
-          conversation_id?: string
-          created_at?: string
-          id?: string
-          joined_at?: string
-          last_read_at?: string | null
-          organization_id?: string
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "company_internal_conversation_participants_added_by_user_id_fkey"
-            columns: ["added_by_user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "company_internal_conversation_participants_conversation_id_fkey"
-            columns: ["conversation_id"]
-            isOneToOne: false
-            referencedRelation: "company_internal_conversations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "company_internal_conversation_participants_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "company_internal_conversation_participants_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      company_internal_conversations: {
-        Row: {
-          created_at: string
-          created_by_user_id: string
-          id: string
-          kind: Database["public"]["Enums"]["company_internal_conversation_kind"]
-          last_message_at: string
-          organization_id: string
-          title: string | null
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          created_by_user_id: string
-          id?: string
-          kind?: Database["public"]["Enums"]["company_internal_conversation_kind"]
-          last_message_at?: string
-          organization_id: string
-          title?: string | null
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          created_by_user_id?: string
-          id?: string
-          kind?: Database["public"]["Enums"]["company_internal_conversation_kind"]
-          last_message_at?: string
-          organization_id?: string
-          title?: string | null
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "company_internal_conversations_created_by_user_id_fkey"
-            columns: ["created_by_user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "company_internal_conversations_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      company_internal_messages: {
-        Row: {
-          body: string
-          conversation_id: string
-          created_at: string
-          id: string
-          sender_user_id: string
-        }
-        Insert: {
-          body: string
-          conversation_id: string
-          created_at?: string
-          id?: string
-          sender_user_id: string
-        }
-        Update: {
-          body?: string
-          conversation_id?: string
-          created_at?: string
-          id?: string
-          sender_user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "company_internal_messages_conversation_id_fkey"
-            columns: ["conversation_id"]
-            isOneToOne: false
-            referencedRelation: "company_internal_conversations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "company_internal_messages_sender_user_id_fkey"
-            columns: ["sender_user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       conversations: {
         Row: {
           assigned_at: string | null
@@ -294,83 +142,6 @@ export type Database = {
           {
             foreignKeyName: "favorites_user_id_fkey"
             columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      listing_edit_submissions: {
-        Row: {
-          applied_at: string | null
-          created_at: string
-          id: string
-          listing_id: string
-          organization_id: string
-          proposed_patch: Json
-          review_note: string | null
-          reviewed_at: string | null
-          reviewer_user_id: string | null
-          status: Database["public"]["Enums"]["listing_edit_submission_status"]
-          submitted_at: string | null
-          submitted_by_user_id: string
-          updated_at: string
-        }
-        Insert: {
-          applied_at?: string | null
-          created_at?: string
-          id?: string
-          listing_id: string
-          organization_id: string
-          proposed_patch?: Json
-          review_note?: string | null
-          reviewed_at?: string | null
-          reviewer_user_id?: string | null
-          status?: Database["public"]["Enums"]["listing_edit_submission_status"]
-          submitted_at?: string | null
-          submitted_by_user_id: string
-          updated_at?: string
-        }
-        Update: {
-          applied_at?: string | null
-          created_at?: string
-          id?: string
-          listing_id?: string
-          organization_id?: string
-          proposed_patch?: Json
-          review_note?: string | null
-          reviewed_at?: string | null
-          reviewer_user_id?: string | null
-          status?: Database["public"]["Enums"]["listing_edit_submission_status"]
-          submitted_at?: string | null
-          submitted_by_user_id?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "listing_edit_submissions_listing_id_fkey"
-            columns: ["listing_id"]
-            isOneToOne: false
-            referencedRelation: "listings"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "listing_edit_submissions_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "listing_edit_submissions_reviewer_user_id_fkey"
-            columns: ["reviewer_user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "listing_edit_submissions_submitted_by_user_id_fkey"
-            columns: ["submitted_by_user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -1494,7 +1265,6 @@ export type Database = {
     }
     Enums: {
       app_role: "seeker" | "provider" | "admin"
-      company_internal_conversation_kind: "direct" | "group"
       conversation_owner_mode: "individual_provider" | "company_workspace"
       conversation_routing_status:
         | "direct_provider"
@@ -1514,12 +1284,6 @@ export type Database = {
         | "approved"
         | "unpublished"
       listing_type: "rent" | "sale"
-      listing_edit_submission_status:
-        | "draft"
-        | "pending_review"
-        | "needs_changes"
-        | "approved"
-        | "rejected"
       listing_workflow_event_type:
         | "created"
         | "submitted_for_review"
@@ -1527,10 +1291,6 @@ export type Database = {
         | "approved"
         | "published"
         | "unpublished"
-        | "edit_submission_submitted"
-        | "edit_submission_needs_changes"
-        | "edit_submission_approved"
-        | "edit_submission_rejected"
       organization_invite_status: "pending" | "accepted" | "revoked" | "expired"
       organization_member_role: "owner" | "admin" | "manager" | "agent"
       organization_member_status: "active" | "invited" | "inactive"
@@ -1683,7 +1443,6 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["seeker", "provider", "admin"],
-      company_internal_conversation_kind: ["direct", "group"],
       conversation_owner_mode: ["individual_provider", "company_workspace"],
       conversation_routing_status: [
         "direct_provider",
@@ -1705,13 +1464,6 @@ export const Constants = {
         "unpublished",
       ],
       listing_type: ["rent", "sale"],
-      listing_edit_submission_status: [
-        "draft",
-        "pending_review",
-        "needs_changes",
-        "approved",
-        "rejected",
-      ],
       listing_workflow_event_type: [
         "created",
         "submitted_for_review",
@@ -1719,10 +1471,6 @@ export const Constants = {
         "approved",
         "published",
         "unpublished",
-        "edit_submission_submitted",
-        "edit_submission_needs_changes",
-        "edit_submission_approved",
-        "edit_submission_rejected",
       ],
       organization_invite_status: ["pending", "accepted", "revoked", "expired"],
       organization_member_role: ["owner", "admin", "manager", "agent"],

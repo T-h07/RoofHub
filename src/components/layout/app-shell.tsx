@@ -16,7 +16,6 @@ type AppShellProps = {
 
 type HeaderAuthState = {
   isAuthenticated: boolean;
-  userId: string | null;
   email: string | null;
   displayName: string | null;
   role: AppRole | null;
@@ -36,7 +35,6 @@ async function getHeaderAuthState(): Promise<HeaderAuthState> {
     if (!user) {
       return {
         isAuthenticated: false,
-        userId: null,
         email: null,
         displayName: null,
         role: null,
@@ -57,7 +55,6 @@ async function getHeaderAuthState(): Promise<HeaderAuthState> {
     if (!profileResult.ok) {
       return {
         isAuthenticated: true,
-        userId: user.id,
         email: user.email ?? null,
         displayName: null,
         role: null,
@@ -81,7 +78,6 @@ async function getHeaderAuthState(): Promise<HeaderAuthState> {
 
     return {
       isAuthenticated: true,
-      userId: user.id,
       email: user?.email ?? null,
       displayName: profileResult.profile.display_name,
       role: profileResult.profile.role,
@@ -93,7 +89,6 @@ async function getHeaderAuthState(): Promise<HeaderAuthState> {
   } catch {
     return {
       isAuthenticated: false,
-      userId: null,
       email: null,
       displayName: null,
       role: null,

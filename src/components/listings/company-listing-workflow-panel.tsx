@@ -10,7 +10,6 @@ import {
   MessageSquarePlus,
   Send,
   ShieldCheck,
-  XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -29,14 +28,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { formatProviderListingStatus } from "@/lib/listings/provider-dashboard/status";
 import { cn } from "@/lib/utils";
 
-import {
-  reviewCompanyListingEditSubmissionAction,
-  transitionCompanyListingWorkflowAction,
-} from "@/lib/listings/company-workflow/actions";
+import { transitionCompanyListingWorkflowAction } from "@/lib/listings/company-workflow/actions";
 import { COMPANY_LISTING_WORKFLOW_EVENT_LABELS } from "@/lib/listings/company-workflow/types";
 import type {
-  CompanyListingEditReviewAction,
-  CompanyListingEditSubmissionSummary,
   CompanyListingWorkflowAction,
   CompanyListingWorkflowCapabilities,
   CompanyListingWorkflowTimelineEvent,
@@ -50,7 +44,6 @@ type CompanyListingWorkflowPanelProps = {
   viewerRole: string;
   capabilities: CompanyListingWorkflowCapabilities;
   timeline: CompanyListingWorkflowTimelineEvent[];
-  activeEditSubmission: CompanyListingEditSubmissionSummary | null;
 };
 
 type ActionDefinition = {
@@ -59,15 +52,6 @@ type ActionDefinition = {
   tone: "default" | "outline" | "secondary";
   requiresNote: boolean;
   noteOptional?: boolean;
-  description: string;
-  icon: typeof Send;
-};
-
-type LiveEditReviewActionDefinition = {
-  action: CompanyListingEditReviewAction;
-  label: string;
-  tone: "default" | "outline" | "secondary" | "destructive";
-  requiresNote: boolean;
   description: string;
   icon: typeof Send;
 };
@@ -158,52 +142,6 @@ function buildWorkflowActions(capabilities: CompanyListingWorkflowCapabilities) 
   return actions;
 }
 
-function formatEditSubmissionStatusLabel(status: CompanyListingEditSubmissionSummary["status"]) {
-  switch (status) {
-    case "draft":
-      return "Draft";
-    case "pending_review":
-      return "Pending review";
-    case "needs_changes":
-      return "Needs changes";
-    case "approved":
-      return "Approved";
-    case "rejected":
-      return "Rejected";
-    default:
-      return status;
-  }
-}
-
-function buildLiveEditReviewActions(): LiveEditReviewActionDefinition[] {
-  return [
-    {
-      action: "approve",
-      label: "Approve and apply",
-      tone: "default",
-      requiresNote: false,
-      description: "Apply approved staged edits to the public listing.",
-      icon: CheckCircle2,
-    },
-    {
-      action: "needs_changes",
-      label: "Needs changes",
-      tone: "secondary",
-      requiresNote: true,
-      description: "Send this submission back to the agent with required updates.",
-      icon: MessageSquarePlus,
-    },
-    {
-      action: "reject",
-      label: "Reject",
-      tone: "destructive",
-      requiresNote: false,
-      description: "Reject this staged submission without applying it to the live listing.",
-      icon: XCircle,
-    },
-  ];
-}
-
 export function CompanyListingWorkflowPanel({
   listingId,
   listingTitle,
@@ -211,20 +149,13 @@ export function CompanyListingWorkflowPanel({
   viewerRole,
   capabilities,
   timeline,
-  activeEditSubmission,
 }: CompanyListingWorkflowPanelProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [openAction, setOpenAction] = useState<ActionDefinition | null>(null);
-  const [workflowNote, setWorkflowNote] = useState("");
-  const [openLiveEditAction, setOpenLiveEditAction] = useState<LiveEditReviewActionDefinition | null>(null);
-  const [liveEditNote, setLiveEditNote] = useState("");
+  const [note, setNote] = useState("");
 
   const actions = useMemo(() => buildWorkflowActions(capabilities), [capabilities]);
-  const liveEditActions = useMemo(() => buildLiveEditReviewActions(), []);
-  const isReviewerRole = viewerRole === "owner" || viewerRole === "admin" || viewerRole === "manager";
-  const canReviewLiveSubmission =
-    isReviewerRole && activeEditSubmission?.status === "pending_review";
   const reviewerNotesTimeline = useMemo(
     () =>
       timeline.filter((event) => typeof event.note === "string" && event.note.trim().length > 0),
@@ -237,28 +168,6 @@ export function CompanyListingWorkflowPanel({
         listingId,
         action: action.action,
         note: workflowNote,
-      });
-
-      if (!result.ok) {
-        toast.error(result.message);
-        return;
-      }
-
-      toast.success(result.message);
-      router.refresh();
-    });
-  }
-
-  function runLiveEditReviewAction(action: LiveEditReviewActionDefinition, note?: string) {
-    if (!activeEditSubmission) {
-      return;
-    }
-
-    startTransition(async () => {
-      const result = await reviewCompanyListingEditSubmissionAction({
-        submissionId: activeEditSubmission.id,
-        action: action.action,
-        note,
       });
 
       if (!result.ok) {
@@ -304,7 +213,7 @@ export function CompanyListingWorkflowPanel({
                 onClick={() => {
                   if (action.requiresNote) {
                     setOpenAction(action);
-                    setWorkflowNote("");
+                    setNote("");
                     return;
                   }
 
@@ -325,110 +234,6 @@ export function CompanyListingWorkflowPanel({
         ) : (
           <div className="border-border/70 bg-surface-soft mt-4 rounded-xl border px-4 py-3 text-sm text-muted-foreground">
             {actions[0]?.description}
-          </div>
-        )}
-      </section>
-
-      <section className="border-border bg-card rounded-2xl border p-5 sm:p-6">
-        <header className="border-border/70 mb-4 flex items-center justify-between gap-3 border-b pb-4">
-          <div className="space-y-1">
-            <p className="type-label">Live listing edit review</p>
-            <h3 className="type-section-title">Pending change submission</h3>
-          </div>
-          <Badge variant="outline">
-            {activeEditSubmission
-              ? formatEditSubmissionStatusLabel(activeEditSubmission.status)
-              : "No active submission"}
-          </Badge>
-        </header>
-
-        {!activeEditSubmission ? (
-          <EmptyState
-            icon={ClipboardCheck}
-            title="No active live-edit submission"
-            description="Staged edits to a published company listing will appear here when submitted for review."
-          />
-        ) : (
-          <div className="space-y-4">
-            <div className="border-border/70 bg-surface-soft rounded-xl border px-4 py-3 text-sm text-muted-foreground">
-              <p>
-                Submitted by{" "}
-                <span className="font-medium text-foreground">
-                  {activeEditSubmission.submittedByDisplayName ?? "Unknown member"}
-                </span>
-                {activeEditSubmission.submittedAt
-                  ? ` on ${formatTimelineDate(activeEditSubmission.submittedAt)}`
-                  : ""}
-                .
-              </p>
-              {activeEditSubmission.reviewNote ? (
-                <p className="mt-2 border-l border-border/70 pl-3 text-xs text-foreground/90">
-                  Reviewer note: {activeEditSubmission.reviewNote}
-                </p>
-              ) : null}
-            </div>
-
-            {activeEditSubmission.diff.length === 0 ? (
-              <div className="border-border/70 bg-card/55 rounded-xl border px-4 py-3 text-sm text-muted-foreground">
-                No field-level changes were detected in this submission.
-              </div>
-            ) : (
-              <ol className="space-y-2">
-                {activeEditSubmission.diff.map((diff) => (
-                  <li
-                    key={`${activeEditSubmission.id}:${diff.field}`}
-                    className="border-border/70 bg-card/55 rounded-xl border px-3.5 py-3"
-                  >
-                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                      {diff.label}
-                    </p>
-                    <div className="mt-1.5 grid gap-1.5 sm:grid-cols-2">
-                      <p className="text-xs text-muted-foreground">
-                        Live: <span className="font-medium text-foreground">{diff.currentValue}</span>
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        Proposed: <span className="font-medium text-foreground">{diff.proposedValue}</span>
-                      </p>
-                    </div>
-                  </li>
-                ))}
-              </ol>
-            )}
-
-            {canReviewLiveSubmission ? (
-              <div className="flex flex-wrap items-center gap-2">
-                {liveEditActions.map((action) => (
-                  <button
-                    key={action.action}
-                    type="button"
-                    className={cn(buttonVariants({ variant: action.tone, size: "sm" }), "gap-1.5")}
-                    disabled={isPending}
-                    onClick={() => {
-                      if (action.requiresNote) {
-                        setOpenLiveEditAction(action);
-                        setLiveEditNote("");
-                        return;
-                      }
-
-                      runLiveEditReviewAction(action);
-                    }}
-                  >
-                    {isPending ? (
-                      <LoaderCircle className="size-4 animate-spin" />
-                    ) : (
-                      <action.icon className="size-4" />
-                    )}
-                    {action.label}
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <div className="border-border/70 bg-surface-soft rounded-xl border px-4 py-3 text-sm text-muted-foreground">
-                {activeEditSubmission.status === "pending_review"
-                  ? "Only owner, admin, or manager reviewers can approve, reject, or request changes."
-                  : "This submission is no longer pending review actions."}
-              </div>
-            )}
           </div>
         )}
       </section>
@@ -530,8 +335,8 @@ export function CompanyListingWorkflowPanel({
             </label>
             <Textarea
               id="workflow-note"
-              value={workflowNote}
-              onChange={(event) => setWorkflowNote(event.currentTarget.value)}
+              value={note}
+              onChange={(event) => setNote(event.currentTarget.value)}
               rows={4}
               placeholder={
                 openAction?.action === "needs_changes"
@@ -550,80 +355,16 @@ export function CompanyListingWorkflowPanel({
               disabled={
                 isPending ||
                 !openAction ||
-                (openAction.requiresNote &&
-                  !openAction.noteOptional &&
-                  workflowNote.trim().length === 0)
+                (openAction.requiresNote && !openAction.noteOptional && note.trim().length === 0)
               }
               onClick={() => {
                 if (!openAction) {
                   return;
                 }
 
-                runAction(openAction, workflowNote);
+                runAction(openAction, note);
                 setOpenAction(null);
-                setWorkflowNote("");
-              }}
-            >
-              {isPending ? <LoaderCircle className="size-4 animate-spin" /> : null}
-              Confirm
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog
-        open={Boolean(openLiveEditAction)}
-        onOpenChange={(open) => !open && setOpenLiveEditAction(null)}
-      >
-        <DialogContent showClose={!isPending}>
-          <DialogHeader>
-            <DialogTitle>{openLiveEditAction?.label}</DialogTitle>
-            <DialogDescription>{openLiveEditAction?.description}</DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-2">
-            <label htmlFor="live-edit-review-note" className="text-sm font-medium">
-              Reviewer note{openLiveEditAction?.requiresNote ? "" : " (optional)"}
-            </label>
-            <Textarea
-              id="live-edit-review-note"
-              value={liveEditNote}
-              onChange={(event) => setLiveEditNote(event.currentTarget.value)}
-              rows={4}
-              placeholder={
-                openLiveEditAction?.action === "needs_changes"
-                  ? "Describe exactly what must be fixed before these live edits can be approved."
-                  : "Optional context for this live-edit review decision."
-              }
-            />
-          </div>
-
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              disabled={isPending}
-              onClick={() => setOpenLiveEditAction(null)}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              variant={openLiveEditAction?.tone === "destructive" ? "destructive" : "default"}
-              disabled={
-                isPending ||
-                !openLiveEditAction ||
-                (openLiveEditAction.requiresNote && liveEditNote.trim().length === 0) ||
-                !activeEditSubmission
-              }
-              onClick={() => {
-                if (!openLiveEditAction || !activeEditSubmission) {
-                  return;
-                }
-
-                runLiveEditReviewAction(openLiveEditAction, liveEditNote);
-                setOpenLiveEditAction(null);
-                setLiveEditNote("");
+                setNote("");
               }}
             >
               {isPending ? <LoaderCircle className="size-4 animate-spin" /> : null}
