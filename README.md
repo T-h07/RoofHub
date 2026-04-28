@@ -162,10 +162,19 @@ Rules:
 - do not hardcode keys in source
 - do not expose privileged keys (for example service role) to browser code
 - do not place direct DB credentials in client code or `NEXT_PUBLIC_*` env vars
+- run `npm run check:secrets` before pushing changes that touch docs, config, environment handling, Supabase, Vercel, OAuth, or deployment setup
 - configure the same variables in Vercel for Development, Preview, and Production environments
 - ensure `AUTH_ALLOWED_ORIGINS` in Vercel includes every trusted preview + production origin used by auth callbacks
 - `NEXT_PUBLIC_SITE_URL` should point to the canonical app origin for each environment (required for production-safe auth redirect fallback and metadata base)
 - after adding or changing `SUPABASE_SERVICE_ROLE_KEY` (or `SUPABASE_URL`) restart local dev server and redeploy Vercel environments so server runtime picks up updated values
+
+Local guardrail setup for each clone:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+The hook runs `npm run check:secrets:staged` and blocks commits containing real Supabase URLs/project refs/keys, database URLs, Vercel tokens/project identifiers, Google client secrets, or JWT-like keys.
 
 Connectivity check:
 
@@ -454,6 +463,7 @@ Useful scripts:
 
 - `npm run lint`
 - `npm run typecheck`
+- `npm run check:secrets`
 - `npm run build`
 - `npm run format`
 

@@ -7,6 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
+    "check:secrets": "node tools/scan-secrets.mjs",
+    "check:secrets:staged": "node tools/scan-secrets.mjs --staged",
     "typecheck": "tsc --noEmit",
     "supabase:db:reset": "npx supabase db reset --local --no-seed --yes",
     "supabase:types:generate": "npx supabase gen types --local --lang typescript > src/types/database.ts",
