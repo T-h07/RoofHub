@@ -19,6 +19,7 @@ export type CompanyListingWorkflowAction =
   | "unpublish";
 
 export type CompanyListingWorkflowEventType = Enums<"listing_workflow_event_type">;
+export type CompanyListingEditSubmissionStatus = Enums<"listing_edit_submission_status">;
 
 export type CompanyListingWorkflowAccessRole =
   | Tables<"organization_members">["role"]
@@ -62,6 +63,33 @@ export type CompanyListingWorkflowCapabilities = {
   canManageWorkflow: boolean;
 };
 
+export type CompanyListingEditReviewAction = "approve" | "needs_changes" | "reject";
+
+export type CompanyListingEditFieldDiff = {
+  field: string;
+  label: string;
+  currentValue: string;
+  proposedValue: string;
+};
+
+export type CompanyListingEditSubmissionSummary = {
+  id: string;
+  listingId: string;
+  organizationId: string;
+  status: CompanyListingEditSubmissionStatus;
+  submittedByUserId: string;
+  submittedByDisplayName: string | null;
+  reviewerUserId: string | null;
+  reviewerDisplayName: string | null;
+  reviewNote: string | null;
+  submittedAt: string | null;
+  reviewedAt: string | null;
+  appliedAt: string | null;
+  updatedAt: string;
+  diff: CompanyListingEditFieldDiff[];
+  changedFieldCount: number;
+};
+
 export const COMPANY_LISTING_WORKFLOW_EVENT_LABELS: Record<
   CompanyListingWorkflowEventType,
   string
@@ -72,4 +100,8 @@ export const COMPANY_LISTING_WORKFLOW_EVENT_LABELS: Record<
   approved: "Approved",
   published: "Published",
   unpublished: "Unpublished",
+  edit_submission_submitted: "Live edit submitted",
+  edit_submission_needs_changes: "Live edit needs changes",
+  edit_submission_approved: "Live edit approved",
+  edit_submission_rejected: "Live edit rejected",
 };

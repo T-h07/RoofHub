@@ -148,6 +148,83 @@ export type Database = {
           },
         ]
       }
+      listing_edit_submissions: {
+        Row: {
+          applied_at: string | null
+          created_at: string
+          id: string
+          listing_id: string
+          organization_id: string
+          proposed_patch: Json
+          review_note: string | null
+          reviewed_at: string | null
+          reviewer_user_id: string | null
+          status: Database["public"]["Enums"]["listing_edit_submission_status"]
+          submitted_at: string | null
+          submitted_by_user_id: string
+          updated_at: string
+        }
+        Insert: {
+          applied_at?: string | null
+          created_at?: string
+          id?: string
+          listing_id: string
+          organization_id: string
+          proposed_patch?: Json
+          review_note?: string | null
+          reviewed_at?: string | null
+          reviewer_user_id?: string | null
+          status?: Database["public"]["Enums"]["listing_edit_submission_status"]
+          submitted_at?: string | null
+          submitted_by_user_id: string
+          updated_at?: string
+        }
+        Update: {
+          applied_at?: string | null
+          created_at?: string
+          id?: string
+          listing_id?: string
+          organization_id?: string
+          proposed_patch?: Json
+          review_note?: string | null
+          reviewed_at?: string | null
+          reviewer_user_id?: string | null
+          status?: Database["public"]["Enums"]["listing_edit_submission_status"]
+          submitted_at?: string | null
+          submitted_by_user_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "listing_edit_submissions_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "listing_edit_submissions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "listing_edit_submissions_reviewer_user_id_fkey"
+            columns: ["reviewer_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "listing_edit_submissions_submitted_by_user_id_fkey"
+            columns: ["submitted_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       listing_images: {
         Row: {
           created_at: string
@@ -1284,6 +1361,12 @@ export type Database = {
         | "approved"
         | "unpublished"
       listing_type: "rent" | "sale"
+      listing_edit_submission_status:
+        | "draft"
+        | "pending_review"
+        | "needs_changes"
+        | "approved"
+        | "rejected"
       listing_workflow_event_type:
         | "created"
         | "submitted_for_review"
@@ -1291,6 +1374,10 @@ export type Database = {
         | "approved"
         | "published"
         | "unpublished"
+        | "edit_submission_submitted"
+        | "edit_submission_needs_changes"
+        | "edit_submission_approved"
+        | "edit_submission_rejected"
       organization_invite_status: "pending" | "accepted" | "revoked" | "expired"
       organization_member_role: "owner" | "admin" | "manager" | "agent"
       organization_member_status: "active" | "invited" | "inactive"
@@ -1464,6 +1551,13 @@ export const Constants = {
         "unpublished",
       ],
       listing_type: ["rent", "sale"],
+      listing_edit_submission_status: [
+        "draft",
+        "pending_review",
+        "needs_changes",
+        "approved",
+        "rejected",
+      ],
       listing_workflow_event_type: [
         "created",
         "submitted_for_review",
@@ -1471,6 +1565,10 @@ export const Constants = {
         "approved",
         "published",
         "unpublished",
+        "edit_submission_submitted",
+        "edit_submission_needs_changes",
+        "edit_submission_approved",
+        "edit_submission_rejected",
       ],
       organization_invite_status: ["pending", "accepted", "revoked", "expired"],
       organization_member_role: ["owner", "admin", "manager", "agent"],

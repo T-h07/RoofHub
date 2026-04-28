@@ -1,6 +1,9 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
+
 import { createServerSupabaseClient } from "@/lib/supabase";
+import { createAdminSupabaseClient } from "@/lib/supabase/admin";
 import { getCurrentUserProfile } from "@/lib/auth/profile";
 import { isProviderRole } from "@/lib/auth/roles";
 import {
@@ -9,9 +12,16 @@ import {
   resolveProviderListingCreationContext,
 } from "@/lib/listings/ownership";
 import { recordCompanyListingCreatedWorkflowEvent } from "@/lib/listings/company-workflow/actions";
+import {
+  isCompanyWorkflowReviewerRole,
+  loadActiveOrganizationMembershipRole,
+  stageListingEditSubmissionDraft,
+  submitListingEditSubmissionForReview,
+} from "@/lib/listings/company-workflow/edit-submissions";
+import { notifyListingEditReviewSubmission } from "@/lib/notifications";
 import { AUDIT_EVENT_TYPES, recordSecurityAuditEvent } from "@/lib/security/audit";
 import { enforceTrafficControl, TRAFFIC_CONTROL_RULES } from "@/lib/security/traffic-control";
-import type { Enums } from "@/types/database";
+import type { Enums, Json } from "@/types/database";
 import {
   createSchemaDriftMessage,
   isSupabaseSchemaDriftError,
@@ -68,6 +78,28 @@ export type SaveProviderWizardStepResult = {
   fieldErrors?: ProviderWizardFieldErrors;
   reviewBlockers?: string[];
 };
+
+type DraftAccessRecord = {
+  id: string;
+  owner_id: string;
+  organization_id: string | null;
+  listing_status: Enums<"listing_status">;
+};
+
+type LiveEditSubmissionGate =
+  | {
+      ok: true;
+      shouldGate: boolean;
+      organizationId: string | null;
+      actorMembershipRole: Enums<"organization_member_role"> | null;
+    }
+  | {
+      ok: false;
+      shouldGate: false;
+      organizationId: string | null;
+      actorMembershipRole: Enums<"organization_member_role"> | null;
+      message: string;
+    };
 
 type ProviderWizardStringFieldKey = {
   [K in keyof ProviderDraftWizardValues]: ProviderDraftWizardValues[K] extends string ? K : never;
@@ -301,12 +333,7 @@ async function ensureDraftAccess(
   if (!error && data) {
     return {
       ok: true as const,
-      listing: data as {
-        id: string;
-        owner_id: string;
-        organization_id: string | null;
-        listing_status: string;
-      },
+      listing: data as DraftAccessRecord,
     };
   }
 
@@ -327,12 +354,7 @@ async function ensureDraftAccess(
     return {
       ok: false as const,
       message: createSchemaDriftMessage("Listing draft"),
-      listing: null as {
-        id: string;
-        owner_id: string;
-        organization_id: string | null;
-        listing_status: string;
-      } | null,
+      listing: null as DraftAccessRecord | null,
     };
   }
 
@@ -340,24 +362,14 @@ async function ensureDraftAccess(
     return {
       ok: false as const,
       message: "Draft listing not found or inaccessible.",
-      listing: null as {
-        id: string;
-        owner_id: string;
-        organization_id: string | null;
-        listing_status: string;
-      } | null,
+      listing: null as DraftAccessRecord | null,
     };
   }
 
   return {
     ok: false as const,
     message: "Draft listing not found or inaccessible.",
-    listing: null as {
-      id: string;
-      owner_id: string;
-      organization_id: string | null;
-      listing_status: string;
-    } | null,
+    listing: null as DraftAccessRecord | null,
   };
 }
 
@@ -398,6 +410,133 @@ async function updateDraftListing(
   };
 }
 
+function isPublishedCompanyListing(
+  listing: DraftAccessRecord
+): listing is DraftAccessRecord & { organization_id: string; listing_status: "published" } {
+  return listing.organization_id !== null && listing.listing_status === "published";
+}
+
+async function resolveLiveEditSubmissionGate(input: {
+  listing: DraftAccessRecord;
+  actorUserId: string;
+}): Promise<LiveEditSubmissionGate> {
+  if (!isPublishedCompanyListing(input.listing)) {
+    return {
+      ok: true,
+      shouldGate: false,
+      organizationId: input.listing.organization_id,
+      actorMembershipRole: null,
+    };
+  }
+
+  const actorMembershipRole = await loadActiveOrganizationMembershipRole({
+    organizationId: input.listing.organization_id,
+    userId: input.actorUserId,
+  });
+
+  if (!actorMembershipRole) {
+    return {
+      ok: false,
+      shouldGate: false,
+      organizationId: input.listing.organization_id,
+      actorMembershipRole: null,
+      message:
+        "Active company membership is required to edit this live company listing.",
+    };
+  }
+
+  return {
+    ok: true,
+    shouldGate: !isCompanyWorkflowReviewerRole(actorMembershipRole),
+    organizationId: input.listing.organization_id,
+    actorMembershipRole,
+  };
+}
+
+async function stageLiveListingEditSubmissionPatch(input: {
+  supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>;
+  actorUserId: string;
+  actorRole: Enums<"app_role">;
+  listing: DraftAccessRecord;
+  step: ProviderWizardStep;
+  patch: Record<string, Json>;
+}) {
+  if (!input.listing.organization_id) {
+    return {
+      ok: false as const,
+      message: "Live edit review staging requires a company-owned listing.",
+    };
+  }
+
+  const stageResult = await stageListingEditSubmissionDraft({
+    listingId: input.listing.id,
+    organizationId: input.listing.organization_id,
+    actorUserId: input.actorUserId,
+    patch: input.patch,
+  });
+
+  if (!stageResult.ok) {
+    return {
+      ok: false as const,
+      message: stageResult.message,
+    };
+  }
+
+  await recordSecurityAuditEvent({
+    supabase: input.supabase,
+    event: {
+      eventType: AUDIT_EVENT_TYPES.listingLiveEditSubmissionStaged,
+      actorUserId: input.actorUserId,
+      actorRole: input.actorRole,
+      targetType: "listing",
+      targetId: input.listing.id,
+      listingId: input.listing.id,
+      fromStatus: input.listing.listing_status,
+      toStatus: input.listing.listing_status,
+      metadata: {
+        source_step: input.step,
+        organization_id: input.listing.organization_id,
+        submission_id: stageResult.submission?.id ?? null,
+        created_submission: stageResult.created,
+        staged_field_count: Object.keys(input.patch).length,
+      },
+    },
+  });
+
+  return {
+    ok: true as const,
+    message:
+      input.step === "review"
+        ? "Changes staged. Submit this review to request manager approval."
+        : "Live listing changes staged. Submit from review to request approval before going live.",
+  };
+}
+
+async function appendListingEditSubmissionWorkflowEvent(input: {
+  listingId: string;
+  organizationId: string;
+  actorUserId: string;
+  note?: string;
+  submissionId: string;
+}) {
+  const adminSupabase = createAdminSupabaseClient();
+  const { error } = await adminSupabase.from("listing_workflow_events").insert({
+    listing_id: input.listingId,
+    organization_id: input.organizationId,
+    actor_user_id: input.actorUserId,
+    event_type: "edit_submission_submitted",
+    from_status: "published",
+    to_status: "published",
+    note: input.note ?? null,
+    metadata: {
+      source: "provider_wizard_live_edit_submission",
+      submission_id: input.submissionId,
+    } satisfies Record<string, Json>,
+  });
+
+  return !error;
+}
+
 async function recordProviderDraftStepSavedAudit(input: {
   supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>;
   actorUserId: string;
@@ -421,6 +560,53 @@ async function recordProviderDraftStepSavedAudit(input: {
       },
     },
   });
+}
+
+async function persistListingStepMutation(input: {
+  supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>;
+  actorUserId: string;
+  actorRole: Enums<"app_role">;
+  listing: DraftAccessRecord;
+  step: Extract<ProviderWizardStep, "basics" | "pricing" | "facts" | "location" | "amenities">;
+  patch: Record<string, Json>;
+  successMessage: string;
+  liveEditGate: LiveEditSubmissionGate;
+}) {
+  if (!input.liveEditGate.ok) {
+    return {
+      ok: false as const,
+      message: input.liveEditGate.message,
+    };
+  }
+
+  if (input.liveEditGate.shouldGate) {
+    return stageLiveListingEditSubmissionPatch({
+      supabase: input.supabase,
+      actorUserId: input.actorUserId,
+      actorRole: input.actorRole,
+      listing: input.listing,
+      step: input.step,
+      patch: input.patch,
+    });
+  }
+
+  const updateResult = await updateDraftListing(input.supabase, {
+    draftId: input.listing.id,
+    userId: input.actorUserId,
+    patch: input.patch,
+  });
+
+  if (!updateResult.ok) {
+    return {
+      ok: false as const,
+      message: updateResult.message,
+    };
+  }
+
+  return {
+    ok: true as const,
+    message: input.successMessage,
+  };
 }
 
 export async function saveProviderWizardStepAction(
@@ -480,10 +666,31 @@ export async function saveProviderWizardStepAction(
       }
 
       if (candidateDraftId && isUuid(candidateDraftId)) {
-        const updateResult = await updateDraftListing(supabase, {
-          draftId: candidateDraftId,
-          userId: profile.id,
-          patch: basicsValidation.payload,
+        const existingDraftAccess = await ensureDraftAccess(candidateDraftId, profile.id, supabase);
+        if (!existingDraftAccess.ok || !existingDraftAccess.listing) {
+          return {
+            ok: false,
+            draftId: candidateDraftId,
+            message: existingDraftAccess.ok
+              ? "Draft listing not found or inaccessible."
+              : existingDraftAccess.message,
+          };
+        }
+
+        const liveEditGate = await resolveLiveEditSubmissionGate({
+          listing: existingDraftAccess.listing,
+          actorUserId: profile.id,
+        });
+
+        const updateResult = await persistListingStepMutation({
+          supabase,
+          actorUserId: profile.id,
+          actorRole: profile.role,
+          listing: existingDraftAccess.listing,
+          step: "basics",
+          patch: basicsValidation.payload as Record<string, Json>,
+          successMessage: "Basics saved.",
+          liveEditGate,
         });
 
         if (!updateResult.ok) {
@@ -506,7 +713,7 @@ export async function saveProviderWizardStepAction(
         return {
           ok: true,
           draftId: candidateDraftId,
-          message: "Basics saved.",
+          message: updateResult.message,
         };
       }
 
@@ -643,6 +850,18 @@ export async function saveProviderWizardStepAction(
       };
     }
 
+    const liveEditGate = await resolveLiveEditSubmissionGate({
+      listing: accessResult.listing,
+      actorUserId: profile.id,
+    });
+    if (!liveEditGate.ok) {
+      return {
+        ok: false,
+        draftId: candidateDraftId,
+        message: liveEditGate.message,
+      };
+    }
+
     if (step === "pricing") {
       const pricingValidation = validatePricingStep(values);
 
@@ -669,10 +888,15 @@ export async function saveProviderWizardStepAction(
         };
       }
 
-      const updateResult = await updateDraftListing(supabase, {
-        draftId: candidateDraftId,
-        userId: profile.id,
-        patch: pricingValidation.payload,
+      const updateResult = await persistListingStepMutation({
+        supabase,
+        actorUserId: profile.id,
+        actorRole: profile.role,
+        listing: accessResult.listing,
+        step: "pricing",
+        patch: pricingValidation.payload as Record<string, Json>,
+        successMessage: "Pricing details saved.",
+        liveEditGate,
       });
 
       if (updateResult.ok) {
@@ -689,7 +913,7 @@ export async function saveProviderWizardStepAction(
       return {
         ok: updateResult.ok,
         draftId: candidateDraftId,
-        message: updateResult.ok ? "Pricing details saved." : updateResult.message,
+        message: updateResult.message,
       };
     }
 
@@ -705,10 +929,15 @@ export async function saveProviderWizardStepAction(
         };
       }
 
-      const updateResult = await updateDraftListing(supabase, {
-        draftId: candidateDraftId,
-        userId: profile.id,
-        patch: factsValidation.payload,
+      const updateResult = await persistListingStepMutation({
+        supabase,
+        actorUserId: profile.id,
+        actorRole: profile.role,
+        listing: accessResult.listing,
+        step: "facts",
+        patch: factsValidation.payload as Record<string, Json>,
+        successMessage: "Property facts saved.",
+        liveEditGate,
       });
 
       if (updateResult.ok) {
@@ -725,7 +954,7 @@ export async function saveProviderWizardStepAction(
       return {
         ok: updateResult.ok,
         draftId: candidateDraftId,
-        message: updateResult.ok ? "Property facts saved." : updateResult.message,
+        message: updateResult.message,
       };
     }
 
@@ -741,10 +970,15 @@ export async function saveProviderWizardStepAction(
         };
       }
 
-      const updateResult = await updateDraftListing(supabase, {
-        draftId: candidateDraftId,
-        userId: profile.id,
-        patch: locationValidation.payload,
+      const updateResult = await persistListingStepMutation({
+        supabase,
+        actorUserId: profile.id,
+        actorRole: profile.role,
+        listing: accessResult.listing,
+        step: "location",
+        patch: locationValidation.payload as Record<string, Json>,
+        successMessage: "Location pin saved.",
+        liveEditGate,
       });
 
       if (updateResult.ok) {
@@ -761,7 +995,7 @@ export async function saveProviderWizardStepAction(
       return {
         ok: updateResult.ok,
         draftId: candidateDraftId,
-        message: updateResult.ok ? "Location pin saved." : updateResult.message,
+        message: updateResult.message,
       };
     }
 
@@ -777,10 +1011,15 @@ export async function saveProviderWizardStepAction(
         };
       }
 
-      const updateResult = await updateDraftListing(supabase, {
-        draftId: candidateDraftId,
-        userId: profile.id,
-        patch: amenitiesValidation.payload,
+      const updateResult = await persistListingStepMutation({
+        supabase,
+        actorUserId: profile.id,
+        actorRole: profile.role,
+        listing: accessResult.listing,
+        step: "amenities",
+        patch: amenitiesValidation.payload as Record<string, Json>,
+        successMessage: "Amenities saved.",
+        liveEditGate,
       });
 
       if (updateResult.ok) {
@@ -797,7 +1036,7 @@ export async function saveProviderWizardStepAction(
       return {
         ok: updateResult.ok,
         draftId: candidateDraftId,
-        message: updateResult.ok ? "Amenities saved." : updateResult.message,
+        message: updateResult.message,
       };
     }
 
@@ -899,6 +1138,78 @@ export async function saveProviderWizardStepAction(
         draftId: candidateDraftId,
         message: "Draft is missing required information.",
         reviewBlockers: reviewValidation.blockers,
+      };
+    }
+
+    if (liveEditGate.shouldGate && accessResult.listing.organization_id) {
+      const submitResult = await submitListingEditSubmissionForReview({
+        listingId: accessResult.listing.id,
+        actorUserId: profile.id,
+      });
+
+      if (!submitResult.ok || !submitResult.submission) {
+        if (
+          !submitResult.ok &&
+          submitResult.message.toLowerCase().includes("no staged live-listing edits")
+        ) {
+          return {
+            ok: true,
+            draftId: candidateDraftId,
+            message: "No new live listing field changes were staged for review.",
+          };
+        }
+
+        return {
+          ok: false,
+          draftId: candidateDraftId,
+          message: submitResult.message,
+        };
+      }
+
+      if (!submitResult.alreadyPending) {
+        await appendListingEditSubmissionWorkflowEvent({
+          listingId: accessResult.listing.id,
+          organizationId: accessResult.listing.organization_id,
+          actorUserId: profile.id,
+          submissionId: submitResult.submission.id,
+        });
+
+        await recordSecurityAuditEvent({
+          supabase,
+          event: {
+            eventType: AUDIT_EVENT_TYPES.listingLiveEditSubmissionSent,
+            actorUserId: profile.id,
+            actorRole: profile.role,
+            targetType: "listing",
+            targetId: accessResult.listing.id,
+            listingId: accessResult.listing.id,
+            fromStatus: accessResult.listing.listing_status,
+            toStatus: accessResult.listing.listing_status,
+            metadata: {
+              organization_id: accessResult.listing.organization_id,
+              submission_id: submitResult.submission.id,
+              submission_status: submitResult.submission.status,
+            },
+          },
+        });
+
+        await notifyListingEditReviewSubmission({
+          listingId: accessResult.listing.id,
+          listingTitle: values.title,
+          organizationId: accessResult.listing.organization_id,
+          actorUserId: profile.id,
+          submittedByUserId: profile.id,
+        });
+
+        revalidatePath("/dashboard/listings");
+        revalidatePath(`/dashboard/listings/${accessResult.listing.id}/workflow`);
+        revalidatePath(`/dashboard/listings/${accessResult.listing.id}/edit`);
+      }
+
+      return {
+        ok: true,
+        draftId: candidateDraftId,
+        message: submitResult.message,
       };
     }
 

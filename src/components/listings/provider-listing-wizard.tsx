@@ -51,6 +51,8 @@ type ProviderListingWizardProps = {
   providerOwnerId: string;
   providerEmail: string | null;
   mapStyleUrl: string;
+  isLiveCompanyEditReviewGate?: boolean;
+  activeLiveEditSubmissionStatus?: "draft" | "pending_review" | "needs_changes" | null;
 };
 
 type ContactMethodValue = Exclude<
@@ -207,6 +209,8 @@ export function ProviderListingWizard({
   providerOwnerId,
   providerEmail,
   mapStyleUrl,
+  isLiveCompanyEditReviewGate = false,
+  activeLiveEditSubmissionStatus = null,
 }: ProviderListingWizardProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -289,6 +293,8 @@ export function ProviderListingWizard({
   const previousStep = getPreviousProviderWizardStep(currentStep);
   const nextStep = getNextProviderWizardStep(currentStep);
   const canPublishFromCurrentStatus = canTransitionProviderListingStatus(listingStatus, "published");
+  const hasLiveCompanyEditReviewGate = mode === "edit" && isLiveCompanyEditReviewGate;
+  const hasPendingLiveEditReview = activeLiveEditSubmissionStatus === "pending_review";
 
   function queuePhotoMetadataSync() {
     setPhotoAutosaveRevision((current) => current + 1);
@@ -642,6 +648,15 @@ export function ProviderListingWizard({
 
     startTransition(async () => {
       if (currentStep === "photos") {
+        if (hasLiveCompanyEditReviewGate) {
+          const message =
+            "Photo updates for live company listings must be reviewed by an owner, admin, or manager before public images can change.";
+          setStatusTone("error");
+          setStatusMessage(message);
+          toast.error(message);
+          return;
+        }
+
         const photosResult = await persistPhotosStepCore();
         if (!photosResult.ok) {
           setStatusTone("error");
@@ -1179,10 +1194,17 @@ export function ProviderListingWizard({
 
     return (
       <div className="space-y-4">
+        {hasLiveCompanyEditReviewGate ? (
+          <div className="border-border/70 bg-surface-soft rounded-lg border px-3.5 py-3 text-sm text-muted-foreground">
+            Live company listing photo edits are reviewer-controlled. Use an owner, admin, or manager reviewer
+            to update public media.
+          </div>
+        ) : null}
+
         <ProviderListingPhotoStep
           images={draftImages}
           selectionIssues={photoSelectionIssues}
-          disabled={isPending}
+          disabled={isPending || hasLiveCompanyEditReviewGate}
           onAddFiles={addPhotoFiles}
           onSetCover={setCoverPhoto}
           onMoveImage={movePhoto}
@@ -1211,7 +1233,9 @@ export function ProviderListingWizard({
         </div>
 
         <p className="text-muted-foreground text-xs">
-          {isPhotoMetadataSyncing
+          {hasLiveCompanyEditReviewGate
+            ? "Photo uploads and ordering are disabled while this published company listing is under edit-review gate."
+            : isPhotoMetadataSyncing
             ? "Saving photo order and cover selection..."
             : "Cover and order changes are auto-saved. Use Save step to upload new files."}
         </p>
@@ -1523,6 +1547,12 @@ export function ProviderListingWizard({
                   You can update listing content, but public visibility is locked until moderation state changes.
                 </p>
               </div>
+            ) : listingStatus === "published" && hasLiveCompanyEditReviewGate ? (
+              <div className="border-amber-500/35 bg-amber-500/10 rounded-lg border px-4 py-3 text-sm text-amber-100">
+                {hasPendingLiveEditReview
+                  ? "Live edit submission is pending review. Public listing data stays unchanged until owner/admin/manager approval."
+                  : "Live listing stays unchanged until your staged edits are submitted and approved by owner/admin/manager reviewers."}
+              </div>
             ) : listingStatus === "published" ? (
               <div className="border-emerald-500/35 bg-emerald-500/10 rounded-lg border px-4 py-3 text-sm text-emerald-100">
                 Listing remains active. Save review updates to keep this public listing up to date.
@@ -1659,6 +1689,12 @@ export function ProviderListingWizard({
             Current status: <span className="font-medium">{listingStatus.replaceAll("_", " ")}</span> • Public
             visibility: {listingStatus === "published" ? "visible" : "hidden from discovery"}
           </p>
+          {hasLiveCompanyEditReviewGate ? (
+            <p className="text-muted-foreground text-xs">
+              Live company listing gate: reviewer approval is required before staged edits can update public
+              listing content.
+            </p>
+          ) : null}
         </div>
       </CardHeader>
 
@@ -1752,7 +1788,7 @@ export function ProviderListingWizard({
                 Publish listing
               </>
             ) : currentStep === "review" ? (
-              "Save review"
+              hasLiveCompanyEditReviewGate ? "Submit changes for review" : "Save review"
             ) : (
               <>
                 Save & continue

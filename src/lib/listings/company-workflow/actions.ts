@@ -7,7 +7,10 @@ import {
   getCompanyAdminClient,
   requireCurrentUserScopedCompanyAccess,
 } from "@/lib/company/server-authorization";
-import { notifyListingWorkflowTransition } from "@/lib/notifications";
+import {
+  notifyListingEditReviewOutcome,
+  notifyListingWorkflowTransition,
+} from "@/lib/notifications";
 import { buildWizardValuesFromDraft } from "@/lib/listings/provider-wizard/mapping";
 import {
   evaluateProviderPublishReadiness,
@@ -19,10 +22,16 @@ import { createServerSupabaseClient } from "@/lib/supabase";
 import type { Enums, Json } from "@/types/database";
 
 import type {
+  CompanyListingEditReviewAction,
+  CompanyListingEditSubmissionStatus,
   CompanyListingWorkflowAction,
   CompanyListingWorkflowEventType,
   CompanyListingWorkflowStatus,
 } from "./types";
+import {
+  LISTING_EDIT_PATCH_COLUMNS,
+  sanitizeListingEditPatch,
+} from "./edit-submissions";
 
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -59,6 +68,89 @@ type WorkflowTransitionListingRow = {
   published_at: string | null;
   published_by_user_id: string | null;
   slug: string | null;
+};
+
+type WorkflowLiveEditReviewListingRow = WorkflowTransitionListingRow & {
+  listing_type: Enums<"listing_type">;
+  property_type: Enums<"property_type">;
+  price_amount: number;
+  currency_code: string;
+  deposit_amount: number | null;
+  area_m2: number;
+  bedrooms: number | null;
+  bathrooms: number | null;
+  floor_number: number | null;
+  total_floors: number | null;
+  city: string;
+  neighborhood: string | null;
+  address_text: string | null;
+  available_from: string | null;
+  furnished: boolean;
+  parking: boolean;
+  pets_allowed: boolean;
+  elevator: boolean;
+  balcony: boolean;
+  internet_included: boolean;
+  utilities_included: boolean;
+  heating_type: Enums<"heating_type"> | null;
+  public_location_mode: Enums<"public_location_mode">;
+  latitude: number | null;
+  longitude: number | null;
+};
+
+const WORKFLOW_LIVE_EDIT_LISTING_SELECT = `
+  id,
+  title,
+  organization_id,
+  created_by_user_id,
+  assigned_agent_user_id,
+  listing_status,
+  published_at,
+  published_by_user_id,
+  slug,
+  listing_type,
+  property_type,
+  price_amount,
+  currency_code,
+  deposit_amount,
+  area_m2,
+  bedrooms,
+  bathrooms,
+  floor_number,
+  total_floors,
+  city,
+  neighborhood,
+  address_text,
+  available_from,
+  furnished,
+  parking,
+  pets_allowed,
+  elevator,
+  balcony,
+  internet_included,
+  utilities_included,
+  heating_type,
+  public_location_mode,
+  latitude,
+  longitude
+`;
+
+const LIVE_EDIT_REVIEW_ACTION_VALUES: readonly CompanyListingEditReviewAction[] = [
+  "approve",
+  "needs_changes",
+  "reject",
+] as const;
+
+type ReviewCompanyListingEditSubmissionInput = {
+  submissionId: string;
+  action: CompanyListingEditReviewAction;
+  note?: string;
+};
+
+export type ReviewCompanyListingEditSubmissionResult = {
+  ok: boolean;
+  message: string;
+  submissionStatus?: CompanyListingEditSubmissionStatus;
 };
 
 const WORKFLOW_REVIEW_READINESS_LISTING_SELECT = `
@@ -116,6 +208,13 @@ function isUuid(value: string | null | undefined) {
 
 function isWorkflowAction(value: unknown): value is CompanyListingWorkflowAction {
   return typeof value === "string" && WORKFLOW_ACTION_VALUES.includes(value as CompanyListingWorkflowAction);
+}
+
+function isLiveEditReviewAction(value: unknown): value is CompanyListingEditReviewAction {
+  return (
+    typeof value === "string" &&
+    LIVE_EDIT_REVIEW_ACTION_VALUES.includes(value as CompanyListingEditReviewAction)
+  );
 }
 
 function mapWorkflowActionError(message: string) {
@@ -183,6 +282,67 @@ function toSuccessMessage(action: CompanyListingWorkflowAction) {
     default:
       return "Workflow action completed.";
   }
+}
+
+function toLiveEditReviewSuccessMessage(action: CompanyListingEditReviewAction) {
+  switch (action) {
+    case "approve":
+      return "Live listing edits approved and applied.";
+    case "needs_changes":
+      return "Live listing edits were returned with requested changes.";
+    case "reject":
+      return "Live listing edit submission rejected.";
+    default:
+      return "Live listing review action completed.";
+  }
+}
+
+function mapLiveEditReviewError(message: string) {
+  const normalized = message.toLowerCase();
+
+  if (normalized.includes("membership")) {
+    return "Active company membership is required to review live listing edits.";
+  }
+
+  if (normalized.includes("permission")) {
+    return "Only owner, admin, or manager members can review live listing edits.";
+  }
+
+  if (normalized.includes("pending review")) {
+    return "Only submissions pending review can be actioned.";
+  }
+
+  if (normalized.includes("note")) {
+    return "Add a clear reviewer note before requesting changes.";
+  }
+
+  return "Live listing edit review action failed. Please retry.";
+}
+
+function buildLiveListingPatchUpdate(input: {
+  patch: Record<string, Json>;
+}) {
+  const updatePayload: Record<string, unknown> = {};
+
+  for (const field of LISTING_EDIT_PATCH_COLUMNS) {
+    if (!(field in input.patch)) {
+      continue;
+    }
+
+    const nextValue = input.patch[field];
+    if (nextValue === undefined) {
+      continue;
+    }
+
+    updatePayload[field] = nextValue;
+  }
+
+  if (Object.keys(updatePayload).length === 0) {
+    return null;
+  }
+
+  updatePayload.updated_at = new Date().toISOString();
+  return updatePayload;
 }
 
 async function ensureSubmitForReviewReadiness(input: {
@@ -731,6 +891,274 @@ export async function transitionCompanyListingWorkflowAction(
     message: toSuccessMessage(input.action),
     previousStatus: listing.listing_status,
     nextStatus: transition.nextStatus,
+  };
+}
+
+export async function reviewCompanyListingEditSubmissionAction(
+  input: ReviewCompanyListingEditSubmissionInput
+): Promise<ReviewCompanyListingEditSubmissionResult> {
+  if (!input || typeof input !== "object") {
+    return {
+      ok: false,
+      message: "Live edit review payload is invalid.",
+    };
+  }
+
+  if (!isUuid(input.submissionId)) {
+    return {
+      ok: false,
+      message: "Live edit submission id is invalid.",
+    };
+  }
+
+  if (!isLiveEditReviewAction(input.action)) {
+    return {
+      ok: false,
+      message: "Live edit review action is invalid.",
+    };
+  }
+
+  const normalizedNote = typeof input.note === "string" ? input.note.trim() : "";
+  if (normalizedNote.length > 2000) {
+    return {
+      ok: false,
+      message: "Reviewer note must be 2000 characters or less.",
+    };
+  }
+
+  if (input.action === "needs_changes" && normalizedNote.length === 0) {
+    return {
+      ok: false,
+      message: "Add a reviewer note before requesting listing edit changes.",
+    };
+  }
+
+  const supabase = await createServerSupabaseClient();
+  const profileResult = await getCurrentUserProfile(supabase);
+
+  if (!profileResult.ok) {
+    return {
+      ok: false,
+      message: profileResult.message,
+    };
+  }
+
+  const reviewTrafficControl = await enforceTrafficControl({
+    supabase,
+    rule: TRAFFIC_CONTROL_RULES.providerStatusUpdatePerListing,
+    identity: {
+      userId: profileResult.profile.id,
+      scope: `${input.submissionId}:${input.action}`,
+      includeIp: false,
+    },
+    throttledMessage:
+      "Too many live listing review actions were attempted. Please wait and retry.",
+    unavailableMessage: "Live listing edit review is temporarily unavailable. Please retry shortly.",
+  });
+
+  if (!reviewTrafficControl.ok) {
+    return {
+      ok: false,
+      message: reviewTrafficControl.message,
+    };
+  }
+
+  const adminSupabase = getCompanyAdminClient();
+  const { data: submissionRow, error: submissionError } = await adminSupabase
+    .from("listing_edit_submissions")
+    .select(
+      "id, listing_id, organization_id, submitted_by_user_id, status, proposed_patch, submitted_at, reviewed_at"
+    )
+    .eq("id", input.submissionId)
+    .maybeSingle();
+
+  if (submissionError || !submissionRow) {
+    return {
+      ok: false,
+      message: "Live listing edit submission could not be found.",
+    };
+  }
+
+  const scopedAccess = await requireCurrentUserScopedCompanyAccess(supabase, {
+    organizationId: submissionRow.organization_id,
+    permission: "workflow_review",
+    membershipRequiredMessage:
+      "An active company membership is required to review live listing edits.",
+    forbiddenMessage:
+      "Only owner, admin, or manager members can review live listing edits.",
+  });
+
+  if (!scopedAccess.ok) {
+    return {
+      ok: false,
+      message: scopedAccess.message,
+    };
+  }
+
+  if (submissionRow.status !== "pending_review") {
+    return {
+      ok: false,
+      message: "Only pending review submissions can be actioned.",
+    };
+  }
+
+  const sanitizedPatch = sanitizeListingEditPatch(submissionRow.proposed_patch);
+  if (Object.keys(sanitizedPatch).length === 0) {
+    return {
+      ok: false,
+      message: "This live listing edit submission has no proposed changes to apply.",
+    };
+  }
+
+  const { data: listingData, error: listingError } = await adminSupabase
+    .from("listings")
+    .select(WORKFLOW_LIVE_EDIT_LISTING_SELECT)
+    .eq("id", submissionRow.listing_id)
+    .eq("organization_id", submissionRow.organization_id)
+    .maybeSingle();
+
+  if (listingError || !listingData) {
+    return {
+      ok: false,
+      message: "Listing context for this review submission is unavailable.",
+    };
+  }
+
+  const listing = listingData as WorkflowLiveEditReviewListingRow;
+  const reviewTimestamp = new Date().toISOString();
+
+  if (input.action === "approve") {
+    const liveListingPatch = buildLiveListingPatchUpdate({
+      patch: sanitizedPatch,
+    });
+
+    if (!liveListingPatch) {
+      return {
+        ok: false,
+        message: "No valid listing field changes were found in this submission.",
+      };
+    }
+
+    const { error: applyError } = await adminSupabase
+      .from("listings")
+      .update(liveListingPatch)
+      .eq("id", listing.id)
+      .eq("organization_id", listing.organization_id);
+
+    if (applyError) {
+      return {
+        ok: false,
+        message: mapLiveEditReviewError(applyError.message),
+      };
+    }
+  }
+
+  const nextSubmissionStatus: CompanyListingEditSubmissionStatus =
+    input.action === "approve"
+      ? "approved"
+      : input.action === "needs_changes"
+        ? "needs_changes"
+        : "rejected";
+  const submissionUpdatePayload = {
+    status: nextSubmissionStatus,
+    reviewer_user_id: profileResult.profile.id,
+    review_note: normalizedNote.length > 0 ? normalizedNote : null,
+    reviewed_at: reviewTimestamp,
+    applied_at: input.action === "approve" ? reviewTimestamp : null,
+    updated_at: reviewTimestamp,
+  };
+
+  const { data: updatedSubmissionRow, error: submissionUpdateError } = await adminSupabase
+    .from("listing_edit_submissions")
+    .update(submissionUpdatePayload)
+    .eq("id", submissionRow.id)
+    .eq("status", "pending_review")
+    .select("id, status, submitted_by_user_id")
+    .maybeSingle();
+
+  if (submissionUpdateError || !updatedSubmissionRow) {
+    return {
+      ok: false,
+      message: mapLiveEditReviewError(submissionUpdateError?.message ?? "submission_update_failed"),
+    };
+  }
+
+  const eventTypeByAction: Record<CompanyListingEditReviewAction, CompanyListingWorkflowEventType> = {
+    approve: "edit_submission_approved",
+    needs_changes: "edit_submission_needs_changes",
+    reject: "edit_submission_rejected",
+  };
+
+  try {
+    await appendListingWorkflowEvent({
+      listingId: listing.id,
+      organizationId: listing.organization_id,
+      actorUserId: profileResult.profile.id,
+      eventType: eventTypeByAction[input.action],
+      fromStatus: listing.listing_status,
+      toStatus: listing.listing_status,
+      note: normalizedNote,
+      metadata: {
+        source: "listing_edit_review",
+        action: input.action,
+        submission_id: submissionRow.id,
+        changed_field_count: Object.keys(sanitizedPatch).length,
+      },
+    });
+  } catch {
+    return {
+      ok: false,
+      message: "Live listing edit review could not be completed. Please retry.",
+    };
+  }
+
+  await recordSecurityAuditEvent({
+    supabase,
+    event: {
+      eventType:
+        input.action === "approve"
+          ? AUDIT_EVENT_TYPES.listingLiveEditApproved
+          : input.action === "needs_changes"
+            ? AUDIT_EVENT_TYPES.listingLiveEditNeedsChanges
+            : AUDIT_EVENT_TYPES.listingLiveEditRejected,
+      actorUserId: profileResult.profile.id,
+      actorRole: profileResult.profile.role,
+      targetType: "listing",
+      targetId: listing.id,
+      listingId: listing.id,
+      fromStatus: listing.listing_status,
+      toStatus: listing.listing_status,
+      metadata: {
+        source: "listing_edit_review",
+        action: input.action,
+        submission_id: submissionRow.id,
+        organization_id: listing.organization_id,
+        review_note_present: normalizedNote.length > 0,
+        changed_field_count: Object.keys(sanitizedPatch).length,
+      },
+    },
+  });
+
+  await notifyListingEditReviewOutcome({
+    listingId: listing.id,
+    listingTitle: listing.title,
+    organizationId: listing.organization_id,
+    action: input.action,
+    actorUserId: profileResult.profile.id,
+    submitterUserId: updatedSubmissionRow.submitted_by_user_id,
+    reviewerNote: normalizedNote,
+  });
+
+  await revalidateListingWorkflowPaths({
+    listingId: listing.id,
+    listingSlug: listing.slug ?? null,
+    organizationId: listing.organization_id,
+  });
+
+  return {
+    ok: true,
+    message: toLiveEditReviewSuccessMessage(input.action),
+    submissionStatus: updatedSubmissionRow.status,
   };
 }
 
