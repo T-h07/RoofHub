@@ -8,11 +8,10 @@ import { MainContainer } from "@/components/layout/main-container";
 import { PageIntro, PageSection, PageShell, PageState } from "@/components/layout/page-shell";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
+import { ORGANIZATION_MEMBER_ROLE_LABELS, type OrganizationMemberRole } from "@/lib/company/team-types";
 import {
-  ORGANIZATION_MEMBER_ROLE_LABELS,
-  type OrganizationMemberRole,
-} from "@/lib/company/team-types";
-import { PROVIDER_LISTING_FILTER_LABELS } from "@/lib/listings/provider-dashboard/status";
+  PROVIDER_LISTING_FILTER_LABELS,
+} from "@/lib/listings/provider-dashboard/status";
 import {
   isProviderListingStatusFilter,
   PROVIDER_LISTING_STATUS_FILTERS,
@@ -102,23 +101,20 @@ function buildFilterHref(filter: ProviderListingStatusFilter) {
   return `/dashboard/listings?status=${filter}`;
 }
 
-function formatFilterCount(
-  filter: ProviderListingStatusFilter,
-  counts: {
-    total: number;
-    published: number;
-    draft: number;
-    submittedForReview: number;
-    needsChanges: number;
-    approved: number;
-    unpublished: number;
-    paused: number;
-    sold: number;
-    rented: number;
-    archived: number;
-    hiddenByAdmin: number;
-  }
-) {
+function formatFilterCount(filter: ProviderListingStatusFilter, counts: {
+  total: number;
+  published: number;
+  draft: number;
+  submittedForReview: number;
+  needsChanges: number;
+  approved: number;
+  unpublished: number;
+  paused: number;
+  sold: number;
+  rented: number;
+  archived: number;
+  hiddenByAdmin: number;
+}) {
   switch (filter) {
     case "all":
       return counts.total;
@@ -164,8 +160,8 @@ export default async function DashboardListingsPage({ searchParams }: DashboardL
   if (!context.isProvider) {
     return (
       <ProviderAccessRequired
-        title="Listing workspace access required"
-        description="Switch your profile role before managing owned listings."
+        title="Provider listings require provider role"
+        description="Switch your profile role to provider to manage owned listings."
       />
     );
   }
@@ -188,8 +184,8 @@ export default async function DashboardListingsPage({ searchParams }: DashboardL
           workspaceOptions={listingCreationContext.company.workspaceOptions}
           activeOrganizationId={listingCreationContext.company.activeOrganizationId}
           redirectTo="/dashboard/listings"
-          title="Choose the company context for listing operations"
-          description="Listing inventory is scoped to one active RoofHub company context. Select the company before filtering or managing company-owned listings."
+          title="Choose the company workspace for listing operations"
+          description="Listing inventory is scoped to one active RoofHub company workspace. Select the workspace before filtering or managing company-owned listings."
           submitLabel="Open selected inventory"
         />
       </MainContainer>
@@ -205,7 +201,7 @@ export default async function DashboardListingsPage({ searchParams }: DashboardL
           description={listingCreationContext.message}
           action={
             <Link href="/profile/company" className={buttonVariants({ size: "sm" })}>
-              Open company governance
+              Open company workspace
             </Link>
           }
         />
@@ -219,7 +215,7 @@ export default async function DashboardListingsPage({ searchParams }: DashboardL
       : null;
   const activeCompanyRole =
     listingCreationContext.ok && listingCreationContext.context.ownershipMode === "company"
-      ? (listingCreationContext.company?.activeRole ?? null)
+      ? listingCreationContext.company?.activeRole ?? null
       : null;
   const listingsRoleMode = resolveListingsRoleMode(activeCompanyRole);
   const introCopy = buildListingsIntroCopy(listingsRoleMode);
@@ -246,9 +242,7 @@ export default async function DashboardListingsPage({ searchParams }: DashboardL
             <>
               <Badge variant="primary">Listings workspace</Badge>
               {activeCompanyRole ? (
-                <Badge variant="outline">
-                  Active role: {ORGANIZATION_MEMBER_ROLE_LABELS[activeCompanyRole]}
-                </Badge>
+                <Badge variant="outline">Active role: {ORGANIZATION_MEMBER_ROLE_LABELS[activeCompanyRole]}</Badge>
               ) : null}
             </>
           }
@@ -260,10 +254,7 @@ export default async function DashboardListingsPage({ searchParams }: DashboardL
                 <Link href="/dashboard" className={buttonVariants({ size: "sm" })}>
                   Back to operations dashboard
                 </Link>
-                <Link
-                  href="/dashboard/listings/new"
-                  className={buttonVariants({ variant: "ghost", size: "sm" })}
-                >
+                <Link href="/dashboard/listings/new" className={buttonVariants({ variant: "ghost", size: "sm" })}>
                   <PlusSquare className="size-4" aria-hidden="true" />
                   Create listing draft
                 </Link>
@@ -274,10 +265,7 @@ export default async function DashboardListingsPage({ searchParams }: DashboardL
                   <PlusSquare className="size-4" aria-hidden="true" />
                   Create listing draft
                 </Link>
-                <Link
-                  href="/dashboard"
-                  className={buttonVariants({ variant: "outline", size: "sm" })}
-                >
+                <Link href="/dashboard" className={buttonVariants({ variant: "outline", size: "sm" })}>
                   Back to dashboard
                 </Link>
               </>
@@ -325,34 +313,20 @@ export default async function DashboardListingsPage({ searchParams }: DashboardL
           <div className="grid gap-2.5 md:grid-cols-3">
             <Link
               href="/dashboard/listings?status=draft"
-              className={
-                buttonVariants({ variant: "ghost", size: "sm" }) +
-                " h-auto justify-between px-3.5 py-3"
-              }
+              className={buttonVariants({ variant: "ghost", size: "sm" }) + " h-auto justify-between px-3.5 py-3"}
             >
               <span className="text-left">
-                <span className="block text-sm font-semibold tracking-tight">
-                  1. Edit draft inventory
-                </span>
-                <span className="text-muted-foreground block text-xs">
-                  Continue listing details and media.
-                </span>
+                <span className="block text-sm font-semibold tracking-tight">1. Edit draft inventory</span>
+                <span className="text-muted-foreground block text-xs">Continue listing details and media.</span>
               </span>
-              <span className="text-sm font-semibold">
-                {overviewResult.ok ? overviewResult.metrics.draft : "—"}
-              </span>
+              <span className="text-sm font-semibold">{overviewResult.ok ? overviewResult.metrics.draft : "—"}</span>
             </Link>
             <Link
               href="/dashboard/listings?status=submitted_for_review"
-              className={
-                buttonVariants({ variant: "ghost", size: "sm" }) +
-                " h-auto justify-between px-3.5 py-3"
-              }
+              className={buttonVariants({ variant: "ghost", size: "sm" }) + " h-auto justify-between px-3.5 py-3"}
             >
               <span className="text-left">
-                <span className="block text-sm font-semibold tracking-tight">
-                  2. Follow review queue state
-                </span>
+                <span className="block text-sm font-semibold tracking-tight">2. Follow review queue state</span>
                 <span className="text-muted-foreground block text-xs">
                   Track submitted listings through workflow decisions.
                 </span>
@@ -363,18 +337,11 @@ export default async function DashboardListingsPage({ searchParams }: DashboardL
             </Link>
             <Link
               href="/dashboard/listings?status=needs_changes"
-              className={
-                buttonVariants({ variant: "ghost", size: "sm" }) +
-                " h-auto justify-between px-3.5 py-3"
-              }
+              className={buttonVariants({ variant: "ghost", size: "sm" }) + " h-auto justify-between px-3.5 py-3"}
             >
               <span className="text-left">
-                <span className="block text-sm font-semibold tracking-tight">
-                  3. Resolve change requests
-                </span>
-                <span className="text-muted-foreground block text-xs">
-                  Apply reviewer feedback and resubmit.
-                </span>
+                <span className="block text-sm font-semibold tracking-tight">3. Resolve change requests</span>
+                <span className="text-muted-foreground block text-xs">Apply reviewer feedback and resubmit.</span>
               </span>
               <span className="text-sm font-semibold">
                 {overviewResult.ok ? overviewResult.metrics.needsChanges : "—"}
@@ -384,11 +351,7 @@ export default async function DashboardListingsPage({ searchParams }: DashboardL
         </PageSection>
 
         {!overviewResult.ok ? (
-          <PageState
-            icon={TriangleAlert}
-            title="Listing metrics unavailable"
-            description={overviewResult.message}
-          />
+          <PageState icon={TriangleAlert} title="Listing metrics unavailable" description={overviewResult.message} />
         ) : null}
 
         <PageSection
@@ -446,11 +409,7 @@ export default async function DashboardListingsPage({ searchParams }: DashboardL
           }
         >
           {!listingsResult.ok ? (
-            <PageState
-              icon={Rows3}
-              title="Managed listings unavailable"
-              description={listingsResult.message}
-            />
+            <PageState icon={Rows3} title="Managed listings unavailable" description={listingsResult.message} />
           ) : listingsResult.listings.length === 0 ? (
             <PageState
               icon={Rows3}

@@ -32,18 +32,15 @@ export default async function CompanyTeamPage() {
   }
 
   const companyContextResult = await getCurrentUserCompanyContext(supabase);
-  if (
-    companyContextResult.ok &&
-    companyContextResult.company.workspaceState === "selection_required"
-  ) {
+  if (companyContextResult.ok && companyContextResult.company.workspaceState === "selection_required") {
     return (
       <MainContainer size="content" className="space-y-5">
         <CompanyWorkspaceSwitcher
           workspaceOptions={companyContextResult.company.workspaceOptions}
           activeOrganizationId={companyContextResult.company.activeOrganizationId}
           redirectTo="/profile/company/team"
-          title="Choose the governance context you want to manage"
-          description="Team management is always scoped to one active RoofHub company context. Select the company before editing invites or membership."
+          title="Choose the workspace you want to manage"
+          description="Team management is always scoped to one active RoofHub company workspace. Select the workspace before editing invites or membership."
         />
       </MainContainer>
     );
@@ -63,12 +60,9 @@ export default async function CompanyTeamPage() {
               action={
                 <div className="flex flex-wrap items-center gap-2">
                   <Link href="/profile/company" className={buttonVariants({ size: "sm" })}>
-                    Back to governance
+                    Back to company workspace
                   </Link>
-                  <Link
-                    href="/profile"
-                    className={buttonVariants({ variant: "outline", size: "sm" })}
-                  >
+                  <Link href="/profile" className={buttonVariants({ variant: "outline", size: "sm" })}>
                     Back to profile
                   </Link>
                 </div>
@@ -93,8 +87,7 @@ export default async function CompanyTeamPage() {
   const organization = workspaceResult.organization;
   const logoUrl = toCompanyLogoPublicUrl(supabase, organization.logo_path);
   const viewerMembershipRole =
-    workspaceResult.viewerMembership.role === "owner" ||
-    workspaceResult.viewerMembership.role === "admin"
+    workspaceResult.viewerMembership.role === "owner" || workspaceResult.viewerMembership.role === "admin"
       ? workspaceResult.viewerMembership.role
       : null;
 
@@ -129,14 +122,11 @@ export default async function CompanyTeamPage() {
             coverageArea: organization.coverage_area,
           }}
           contextLabel="Company team"
-          supportingLabel="Invite staff, assign roles, and manage active membership from the governance surface."
+          supportingLabel="Invite staff, assign workspace roles, and manage active membership from the governance workspace."
           actions={
             <>
-              <Link
-                href="/profile/company"
-                className={buttonVariants({ variant: "outline", size: "sm" })}
-              >
-                Back to governance
+              <Link href="/profile/company" className={buttonVariants({ variant: "outline", size: "sm" })}>
+                Back to workspace
               </Link>
               <Link
                 href={`/companies/${organization.slug}`}
@@ -152,7 +142,7 @@ export default async function CompanyTeamPage() {
           <PageSummaryCard
             label="Active members"
             value={new Intl.NumberFormat("en").format(activeMemberCount)}
-            detail="Users with active access to this company context."
+            detail="Users with active access to this company workspace."
             tone="primary"
           />
           <PageSummaryCard

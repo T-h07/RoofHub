@@ -91,7 +91,7 @@ export default async function CompanyWorkspacePage({ searchParams }: CompanyWork
       <MainContainer size="content" className="space-y-5">
         <PageState
           icon={Building2}
-          title="Company governance unavailable"
+          title="Company workspace unavailable"
           description={companyContextResult.message}
         />
       </MainContainer>
@@ -110,8 +110,8 @@ export default async function CompanyWorkspacePage({ searchParams }: CompanyWork
           workspaceOptions={company.workspaceOptions}
           activeOrganizationId={company.activeOrganizationId}
           redirectTo="/profile/company"
-          title="Choose the company governance context"
-          description="This account belongs to more than one RoofHub company context. Pick the active one once, and RoofHub will use it consistently for governance, team management, and operational routing."
+          title="Choose the company workspace you want to use"
+          description="This account belongs to more than one RoofHub company workspace. Pick the active workspace once, and RoofHub will use it consistently for company governance, team management, and operational routing."
         />
       </MainContainer>
     );
@@ -124,24 +124,21 @@ export default async function CompanyWorkspacePage({ searchParams }: CompanyWork
           {status === "invite-accepted" ? (
             <AuthStatusMessage
               tone="success"
-              message="Company invite accepted. Choose a workspace if needed or continue governance setup."
+              message="Company invite accepted. Choose a workspace if needed or continue setting up company mode."
             />
           ) : null}
 
           <PageIntro
-            eyebrow={<Badge variant="outline">Company governance</Badge>}
+            eyebrow={<Badge variant="outline">Company workspace</Badge>}
             title="Set up your RoofHub company account foundation"
-            description="Create the governance foundation for company identity, branding, team access, and public presence."
+            description="Create a company workspace to represent your team under a shared identity while your account remains the trusted owner for workspace access and membership management."
             actions={
               <>
                 <Link href="/profile/company/new" className={buttonVariants({ size: "sm" })}>
                   <Building2 className="size-4" />
-                  Create company governance
+                  Create company workspace
                 </Link>
-                <Link
-                  href="/profile"
-                  className={buttonVariants({ variant: "outline", size: "sm" })}
-                >
+                <Link href="/profile" className={buttonVariants({ variant: "outline", size: "sm" })}>
                   Back to profile
                 </Link>
               </>
@@ -150,8 +147,8 @@ export default async function CompanyWorkspacePage({ searchParams }: CompanyWork
 
           <PageState
             icon={LayoutTemplate}
-            title="No active company governance context yet"
-            description="This account is not currently connected to a company governance context. Create one or accept a pending invite to continue."
+            title="No active company workspace yet"
+            description="This account is not currently operating inside a company workspace. Create one or accept a pending invite to continue in company mode."
           />
 
           {pendingInvites.length > 0 ? (
@@ -169,7 +166,7 @@ export default async function CompanyWorkspacePage({ searchParams }: CompanyWork
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                       <div className="space-y-1">
                         <p className="text-sm font-semibold">
-                          {invite.organization?.name ?? "Company"}
+                          {invite.organization?.name ?? "Company workspace"}
                         </p>
                         <p className="text-muted-foreground text-xs">
                           Role: {ORGANIZATION_MEMBER_ROLE_LABELS[invite.role]} • Expires{" "}
@@ -248,7 +245,7 @@ export default async function CompanyWorkspacePage({ searchParams }: CompanyWork
         {status === "created" ? (
           <AuthStatusMessage
             tone="success"
-            message="Company governance created. Next step: complete your company profile and branding."
+            message="Company workspace created. Next step: complete your company profile and branding."
           />
         ) : null}
         {status === "saved" ? (
@@ -270,7 +267,7 @@ export default async function CompanyWorkspacePage({ searchParams }: CompanyWork
             coverageArea: organization.coverage_area,
           }}
           contextLabel="Company governance workspace"
-          supportingLabel={`Active role: ${ORGANIZATION_MEMBER_ROLE_LABELS[membership.role]}. This page is dedicated to governance: profile identity, team administration, invites, and public presence.`}
+          supportingLabel={`Active role: ${ORGANIZATION_MEMBER_ROLE_LABELS[membership.role]}. This page is dedicated to company governance: profile identity, team administration, invites, and public presence.`}
           actions={
             <>
               {company.canEditProfile ? (
@@ -361,17 +358,13 @@ export default async function CompanyWorkspacePage({ searchParams }: CompanyWork
                 <div className="space-y-4">
                   <div className="grid gap-2 sm:grid-cols-2">
                     <div className="border-border/70 bg-surface-soft rounded-xl border px-3.5 py-3">
-                      <p className="text-muted-foreground text-xs tracking-wide uppercase">
-                        Active members
-                      </p>
+                      <p className="text-muted-foreground text-xs uppercase tracking-wide">Active members</p>
                       <p className="mt-1 text-xl font-semibold tracking-tight">
                         {activeMemberCount ?? "—"}
                       </p>
                     </div>
                     <div className="border-border/70 bg-surface-soft rounded-xl border px-3.5 py-3">
-                      <p className="text-muted-foreground text-xs tracking-wide uppercase">
-                        Pending invites
-                      </p>
+                      <p className="text-muted-foreground text-xs uppercase tracking-wide">Pending invites</p>
                       <p className="mt-1 text-xl font-semibold tracking-tight">
                         {pendingInviteCount ?? "—"}
                       </p>
@@ -379,14 +372,10 @@ export default async function CompanyWorkspacePage({ searchParams }: CompanyWork
                   </div>
 
                   <p className="type-body-muted">
-                    Owner and admin members can invite teammates, assign roles, and manage
-                    membership status.
+                    Owner and admin members can invite teammates, assign roles, and manage membership status.
                   </p>
 
-                  <Link
-                    href="/profile/company/team"
-                    className={buttonVariants({ variant: "outline", size: "sm" })}
-                  >
+                  <Link href="/profile/company/team" className={buttonVariants({ variant: "outline", size: "sm" })}>
                     Open team and invites
                   </Link>
                 </div>
@@ -437,16 +426,14 @@ export default async function CompanyWorkspacePage({ searchParams }: CompanyWork
                         {capability.enabled ? "Available" : "Restricted"}
                       </Badge>
                     </div>
-                    <p className="text-muted-foreground mt-1 text-xs leading-5">
-                      {capability.detail}
-                    </p>
+                    <p className="text-muted-foreground mt-1 text-xs leading-5">{capability.detail}</p>
                   </li>
                 ))}
               </ul>
 
               <p className="type-body-muted pt-2">
-                Operational listing workflow, review queue actions, and inbox routing stay in the
-                dedicated operational surfaces.
+                Operational listing workflow, review queue actions, and inbox routing stay in the dedicated
+                operational surfaces.
               </p>
             </PageSection>
           </div>

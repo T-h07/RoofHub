@@ -30,11 +30,7 @@ export default async function DashboardPage() {
   if (!context.ok) {
     return (
       <MainContainer size="content">
-        <PageState
-          icon={LayoutDashboard}
-          title="Dashboard unavailable"
-          description={context.message}
-        />
+        <PageState icon={LayoutDashboard} title="Dashboard unavailable" description={context.message} />
       </MainContainer>
     );
   }
@@ -42,8 +38,8 @@ export default async function DashboardPage() {
   if (!context.isProvider) {
     return (
       <ProviderAccessRequired
-        title="Operations dashboard access required"
-        description="Switch your profile role before managing listing lifecycle states."
+        title="Provider dashboard requires provider role"
+        description="Switch your profile role to provider to manage listing lifecycle states."
       />
     );
   }
@@ -64,8 +60,8 @@ export default async function DashboardPage() {
           workspaceOptions={listingCreationContext.company.workspaceOptions}
           activeOrganizationId={listingCreationContext.company.activeOrganizationId}
           redirectTo="/dashboard"
-          title="Choose the company context for dashboard operations"
-          description="RoofHub needs one explicit active company context before it can load dashboard, listing, and activity surfaces."
+          title="Choose the company workspace for dashboard operations"
+          description="RoofHub needs one explicit active company workspace before it can load company dashboard, listing, and activity surfaces."
           submitLabel="Open selected dashboard"
         />
       </MainContainer>
@@ -81,7 +77,7 @@ export default async function DashboardPage() {
           description={listingCreationContext.message}
           action={
             <Link href="/profile/company" className={buttonVariants({ size: "sm" })}>
-              Open company governance
+              Open company workspace
             </Link>
           }
         />
@@ -89,7 +85,10 @@ export default async function DashboardPage() {
     );
   }
 
-  if (listingCreationContext.ok && listingCreationContext.context.ownershipMode === "company") {
+  if (
+    listingCreationContext.ok &&
+    listingCreationContext.context.ownershipMode === "company"
+  ) {
     const dashboardResult = await loadCompanyDashboardWorkspace(context.supabase);
 
     if (!dashboardResult.ok) {
@@ -101,7 +100,7 @@ export default async function DashboardPage() {
             description={dashboardResult.message}
             action={
               <Link href="/profile/company" className={buttonVariants({ size: "sm" })}>
-                Open company governance
+                Open company workspace
               </Link>
             }
           />
@@ -109,7 +108,8 @@ export default async function DashboardPage() {
       );
     }
 
-    const shouldLoadInventoryMap = dashboardResult.workspace.membership.role !== "manager";
+    const shouldLoadInventoryMap =
+      dashboardResult.workspace.membership.role !== "manager";
 
     const companyInventoryMapResult = shouldLoadInventoryMap
       ? await loadProviderInventoryMapListings(context.supabase, {
@@ -170,27 +170,21 @@ export default async function DashboardPage() {
     <MainContainer size="wide" className="space-y-5">
       <PageShell>
         <PageIntro
-          eyebrow={<Badge variant="primary">Operations workspace</Badge>}
-          title="Control listing inventory and lifecycle states."
-          description="Review listing volume, manage status transitions, and continue editing listings from the operational dashboard."
+          eyebrow={<Badge variant="primary">Provider workspace</Badge>}
+          title="Control your property inventory and lifecycle states."
+          description="Review listing volume, manage status transitions, and continue editing listings without leaving the provider dashboard."
           actions={
             <>
               <Link href="/dashboard/listings/new" className={buttonVariants({ size: "sm" })}>
                 <PlusSquare className="size-4" aria-hidden="true" />
                 New listing draft
               </Link>
-              <Link
-                href="/dashboard/listings"
-                className={buttonVariants({ variant: "outline", size: "sm" })}
-              >
+              <Link href="/dashboard/listings" className={buttonVariants({ variant: "outline", size: "sm" })}>
                 <Rows3 className="size-4" aria-hidden="true" />
                 My listings
               </Link>
-              <Link
-                href="/profile/company"
-                className={buttonVariants({ variant: "ghost", size: "sm" })}
-              >
-                Company governance
+              <Link href="/profile/company" className={buttonVariants({ variant: "ghost", size: "sm" })}>
+                Company workspace
               </Link>
             </>
           }
@@ -211,7 +205,7 @@ export default async function DashboardPage() {
             mapStyleUrl={mapStyleUrl}
             listings={inventoryMapResult.listings}
             totalCount={inventoryMapResult.totalCount}
-            title="Listing inventory map"
+            title="Provider inventory map"
             description="Track where your in-scope listings are concentrated and jump directly into listing actions."
             emptyDescription="Listings with saved coordinates will appear here once you place map pins in the listing wizard."
             inventoryHref="/dashboard/listings"
@@ -222,10 +216,7 @@ export default async function DashboardPage() {
             title="Inventory map unavailable"
             description={inventoryMapResult.message}
             action={
-              <Link
-                href="/dashboard/listings"
-                className={buttonVariants({ variant: "outline", size: "sm" })}
-              >
+              <Link href="/dashboard/listings" className={buttonVariants({ variant: "outline", size: "sm" })}>
                 Open listing inventory
               </Link>
             }
@@ -237,21 +228,14 @@ export default async function DashboardPage() {
           title="Recent listings"
           description="Continue high-signal edits and workflow actions from the most recent listings in your scope."
           action={
-            <Link
-              href="/dashboard/listings"
-              className={buttonVariants({ variant: "ghost", size: "sm" })}
-            >
+            <Link href="/dashboard/listings" className={buttonVariants({ variant: "ghost", size: "sm" })}>
               Open full list
             </Link>
           }
           contentClassName="pt-5"
         >
           {!recentListingsResult.ok ? (
-            <PageState
-              icon={Rows3}
-              title="Recent listings unavailable"
-              description={recentListingsResult.message}
-            />
+            <PageState icon={Rows3} title="Recent listings unavailable" description={recentListingsResult.message} />
           ) : recentListingsResult.listings.length === 0 ? (
             <PageState
               icon={PlusSquare}

@@ -54,7 +54,7 @@ export default async function CompanyInviteTokenPage({ params }: CompanyInviteTo
           description={inviteResult.message}
           action={
             <Link href="/profile/company" className={buttonVariants({ size: "sm" })}>
-              Open company governance
+              Open company workspace
             </Link>
           }
         />
@@ -70,7 +70,7 @@ export default async function CompanyInviteTokenPage({ params }: CompanyInviteTo
       <MainContainer size="content">
         <EmptyState
           icon={Building2}
-          title="Company governance unavailable"
+          title="Company workspace unavailable"
           description="The organization for this invite is not currently available."
         />
       </MainContainer>
@@ -106,11 +106,11 @@ export default async function CompanyInviteTokenPage({ params }: CompanyInviteTo
           <AuthStatusMessage tone="success" message="This invite has already been accepted." />
           <div className="border-border bg-card rounded-2xl border p-4 sm:p-5">
             <p className="text-muted-foreground text-sm leading-6">
-              Your membership is already active. Continue in company governance.
+              Your membership is already active. Continue in the company workspace.
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
               <Link href="/profile/company" className={buttonVariants({ size: "sm" })}>
-                Open company governance
+                Open company workspace
               </Link>
               <Link
                 href={`/companies/${organization.slug}`}
@@ -127,7 +127,7 @@ export default async function CompanyInviteTokenPage({ params }: CompanyInviteTo
             tone="error"
             message={
               invite.invite_status === "revoked"
-                ? "This invite was revoked by the company."
+                ? "This invite was revoked by the company workspace."
                 : "This invite is no longer active."
             }
           />

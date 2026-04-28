@@ -60,7 +60,7 @@ export default async function CompanyProfileEditPage({
       <MainContainer size="content" className="space-y-5">
         <Link href="/profile/company" className={buttonVariants({ variant: "ghost", size: "sm" })}>
           <ArrowLeft className="size-4" />
-          Back to governance
+          Back to company workspace
         </Link>
 
         <CompanyWorkspaceSwitcher
@@ -68,7 +68,7 @@ export default async function CompanyProfileEditPage({
           activeOrganizationId={companyContextResult.company.activeOrganizationId}
           redirectTo="/profile/company/edit"
           title="Choose the workspace you want to edit"
-          description="Company profile editing is owner-scoped. Select the active owner context you want RoofHub to use for company profile updates."
+          description="Company profile editing is owner-scoped. Select the active owner workspace you want RoofHub to use for company profile updates."
         />
       </MainContainer>
     );
@@ -81,10 +81,10 @@ export default async function CompanyProfileEditPage({
         <PageState
           icon={Building2}
           title="Company profile editing requires an owner workspace"
-          description="Select an owner-managed company context before editing company profile details."
+          description="Select an owner-managed company workspace before editing company profile details."
           action={
             <Link href="/profile/company" className={buttonVariants({ size: "sm" })}>
-              Back to governance
+              Back to company workspace
             </Link>
           }
         />
@@ -114,15 +114,12 @@ export default async function CompanyProfileEditPage({
             coverageArea: ownerOrganization.coverage_area,
           }}
           contextLabel="Company profile editor"
-          supportingLabel="Refine how the company appears on the RoofHub public website before visitors view listings or contact details."
+          supportingLabel="Refine how your company appears in the RoofHub marketplace before seekers view your public profile."
           actions={
             <>
-              <Link
-                href="/profile/company"
-                className={buttonVariants({ variant: "ghost", size: "sm" })}
-              >
+              <Link href="/profile/company" className={buttonVariants({ variant: "ghost", size: "sm" })}>
                 <ArrowLeft className="size-4" />
-                Back to governance
+                Back to company workspace
               </Link>
               <Link
                 href={`/companies/${ownerOrganization.slug}`}

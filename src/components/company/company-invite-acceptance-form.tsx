@@ -56,7 +56,7 @@ export function CompanyInviteAcceptanceForm({
           <div className="space-y-2">
             <h1 className="type-page-title">Join {companyName}</h1>
             <p className="type-body-muted max-w-3xl">
-              Accept this invite to activate company membership and role-based access.
+              Accept this invite to activate company workspace membership and role-based access.
             </p>
           </div>
 
@@ -75,9 +75,7 @@ export function CompanyInviteAcceptanceForm({
                 <Building2 className="text-primary size-4" />
                 Public company profile
               </p>
-              <p className="text-muted-foreground mt-1 text-sm leading-6">
-                /companies/{companySlug}
-              </p>
+              <p className="text-muted-foreground mt-1 text-sm leading-6">/companies/{companySlug}</p>
             </div>
           </div>
         </div>
@@ -96,18 +94,11 @@ export function CompanyInviteAcceptanceForm({
             You can only accept invites that match your signed-in RoofHub account.
           </p>
           <div className="flex flex-wrap items-center gap-2">
-            <Link
-              href="/profile/company"
-              className={buttonVariants({ variant: "outline", size: "sm" })}
-            >
-              Review governance
+            <Link href="/profile/company" className={buttonVariants({ variant: "outline", size: "sm" })}>
+              Review company workspace
             </Link>
             <Button type="submit" disabled={isPending}>
-              {isPending ? (
-                <LoaderCircle className="size-4 animate-spin" />
-              ) : (
-                <ArrowRight className="size-4" />
-              )}
+              {isPending ? <LoaderCircle className="size-4 animate-spin" /> : <ArrowRight className="size-4" />}
               {isPending ? "Accepting..." : "Accept invite"}
             </Button>
           </div>
