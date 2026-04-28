@@ -11,7 +11,6 @@ import {
   type PreferredContactMethod,
   type ProviderAccountType,
 } from "@/lib/auth/roles";
-import { getCurrentUserCompanyContext } from "@/lib/company/context";
 import { AUDIT_EVENT_TYPES, recordSecurityAuditEvent } from "@/lib/security/audit";
 import { createServerSupabaseClient } from "@/lib/supabase";
 import {
@@ -276,9 +275,6 @@ async function persistProfileUpdate(
 function revalidateProfileSurface() {
   revalidatePath("/", "layout");
   revalidatePath("/profile");
-  revalidatePath("/profile/company");
-  revalidatePath("/dashboard");
-  revalidatePath("/dashboard/listings");
 }
 
 export async function updatePublicProfileAction(
@@ -311,10 +307,7 @@ export async function updatePublicProfileAction(
   if (!result.ok) {
     return {
       status: "error",
-      message: toProfileUpdateError(
-        result.message,
-        "Public profile update failed. Please try again."
-      ),
+      message: toProfileUpdateError(result.message, "Public profile update failed. Please try again."),
     };
   }
 
@@ -370,10 +363,7 @@ export async function updateContactPreferencesAction(
   if (!result.ok) {
     return {
       status: "error",
-      message: toProfileUpdateError(
-        result.message,
-        "Contact preferences update failed. Please try again."
-      ),
+      message: toProfileUpdateError(result.message, "Contact preferences update failed. Please try again."),
     };
   }
 
@@ -417,18 +407,8 @@ export async function updateAccountModeAction(
     };
   }
 
-  const companyContextResult = await getCurrentUserCompanyContext(context.supabase);
-  if (!companyContextResult.ok) {
-    return {
-      status: "error",
-      message: companyContextResult.message,
-    };
-  }
-
-  const hasCompanyMembership = companyContextResult.company.activeMemberships.length > 0;
-  const hasCompanyProviderMode = context.profile.provider_account_type === "company";
-
-  if ((hasCompanyMembership || hasCompanyProviderMode) && input.role !== "provider") {
+  const ownsCompanyWorkspace = context.profile.provider_account_type === "company";
+  if (ownsCompanyWorkspace && input.role !== "provider") {
     return {
       status: "error",
       errors: {
@@ -443,7 +423,7 @@ export async function updateAccountModeAction(
     : (input.role as AppRole);
   const nextProviderAccountType: ProviderAccountType =
     nextRole === "provider"
-      ? hasCompanyMembership || hasCompanyProviderMode
+      ? ownsCompanyWorkspace
         ? "company"
         : "individual"
       : "individual";
@@ -456,10 +436,7 @@ export async function updateAccountModeAction(
   if (!result.ok) {
     return {
       status: "error",
-      message: toProfileUpdateError(
-        result.message,
-        "Account mode update failed. Please try again."
-      ),
+      message: toProfileUpdateError(result.message, "Account mode update failed. Please try again."),
     };
   }
 
