@@ -17,17 +17,17 @@ export function HomeHero() {
           <div className="flex flex-wrap items-center gap-2.5">
             <Badge variant="primary">RoofHub</Badge>
             <Badge variant="neutral">Rent + Buy</Badge>
-            <Badge variant="neutral">Company listings</Badge>
+            <Badge variant="neutral">Map-first</Badge>
           </div>
 
           <div className="space-y-3.5">
             <h1 className="type-display max-w-4xl">
-              Browse RoofHub homes through one map-first company website.
+              Find rentals and homes for sale through one map-first discovery flow.
             </h1>
             <p className="type-body-muted max-w-3xl">
-              RoofHub brings company rentals, homes for sale, map search, listing details, and
-              inquiries into one focused public experience backed by an internal operations
-              workspace.
+              RoofHub brings list and map exploration into the same path so seekers can scan faster,
+              while providers get a clear way to publish properties and reach serious renters and
+              buyers.
             </p>
           </div>
 
@@ -39,7 +39,7 @@ export function HomeHero() {
               <ArrowRight className="size-4" aria-hidden="true" />
             </Link>
             <Link href="/map" className={buttonVariants({ variant: "outline" })}>
-              Open map
+              Browse map
             </Link>
           </div>
         </div>
@@ -54,8 +54,7 @@ export function HomeHero() {
                 Search map and list together
               </p>
               <p className="text-muted-foreground mt-1 text-xs leading-5">
-                Keep one search context while switching between visual map scanning and list-first
-                comparison.
+                Keep one search context while switching between visual map scanning and list-first comparison.
               </p>
             </div>
             <div className="border-border/70 bg-background/60 rounded-lg border px-3.5 py-3">
@@ -64,7 +63,7 @@ export function HomeHero() {
                 Trust-aware listing context
               </p>
               <p className="text-muted-foreground mt-1 text-xs leading-5">
-                Listing pages surface company contact context without cluttering the browsing flow.
+                Listing pages surface key provider and contact context without cluttering the browsing flow.
               </p>
             </div>
             <div className="border-border/70 bg-background/60 rounded-lg border px-3.5 py-3">
@@ -73,19 +72,19 @@ export function HomeHero() {
                 Built for renters and buyers
               </p>
               <p className="text-muted-foreground mt-1 text-xs leading-5">
-                Browse RoofHub rental and for-sale inventory through one clean discovery experience.
+                Browse rentals and for-sale inventory through one clean discovery experience.
               </p>
             </div>
           </div>
 
           <Link
-            href="/company"
+            href="/auth/sign-up?next=%2Fdashboard"
             className={cn(
               buttonVariants({ variant: "ghost" }),
               "text-primary mt-4 h-8 w-full justify-start px-0 hover:bg-transparent"
             )}
           >
-            Meet the company
+            List your property
             <ArrowRight className="size-4" aria-hidden="true" />
           </Link>
         </aside>

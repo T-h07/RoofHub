@@ -49,7 +49,9 @@ function clearMapFilters(state: ExploreSearchState): ExploreSearchState {
   };
 }
 
-function toQueryString(params: Record<string, string | string[] | undefined>) {
+function toQueryString(
+  params: Record<string, string | string[] | undefined>
+) {
   const urlSearchParams = new URLSearchParams();
 
   for (const [key, value] of Object.entries(params)) {
@@ -70,7 +72,10 @@ function toQueryString(params: Record<string, string | string[] | undefined>) {
   return urlSearchParams.toString();
 }
 
-function buildMapHrefWithBounds(state: ExploreSearchState, serializedBounds: string | null) {
+function buildMapHrefWithBounds(
+  state: ExploreSearchState,
+  serializedBounds: string | null
+) {
   const baseHref = buildMapHref(state);
   const [path, rawQueryString] = baseHref.split("?");
 
@@ -89,7 +94,9 @@ export default async function MapPage({ searchParams }: MapPageProps) {
   const resolvedSearchParams = await searchParams;
   const searchState = parseExploreSearchParams(resolvedSearchParams);
   const appliedBounds = parseMapSearchBoundsFromParams(resolvedSearchParams);
-  const serializedAppliedBounds = appliedBounds ? serializeMapSearchBounds(appliedBounds) : null;
+  const serializedAppliedBounds = appliedBounds
+    ? serializeMapSearchBounds(appliedBounds)
+    : null;
 
   const hasActiveFilters = hasActiveExploreFilters(searchState);
   const hasAppliedBounds = Boolean(appliedBounds);
@@ -137,11 +144,11 @@ export default async function MapPage({ searchParams }: MapPageProps) {
       <section className="border-border/70 bg-card/88 space-y-3 rounded-xl border p-5 sm:p-6">
         <Badge variant="primary">Map discovery</Badge>
         <h1 className="type-page-title max-w-4xl">
-          Search RoofHub listings spatially with map clusters and area-based filtering.
+          Search listings spatially with map clusters and area-based filtering.
         </h1>
         <p className="type-body-muted max-w-3xl">
-          Move the map, apply filters, and run area searches across company public inventory while
-          keeping your list and map views in sync.
+          Move the map, apply filters, and run area searches while keeping your list and map views in
+          sync.
         </p>
       </section>
 
@@ -157,10 +164,7 @@ export default async function MapPage({ searchParams }: MapPageProps) {
               Refine in list
             </Link>
             {hasActiveFilters ? (
-              <Link
-                href={resetFiltersHref}
-                className={buttonVariants({ variant: "outline", size: "sm" })}
-              >
+              <Link href={resetFiltersHref} className={buttonVariants({ variant: "outline", size: "sm" })}>
                 Clear filters
               </Link>
             ) : null}
@@ -185,10 +189,7 @@ export default async function MapPage({ searchParams }: MapPageProps) {
               <Link href={mapHref} className={buttonVariants({ size: "sm" })}>
                 Retry
               </Link>
-              <Link
-                href={exploreHref}
-                className={buttonVariants({ variant: "outline", size: "sm" })}
-              >
+              <Link href={exploreHref} className={buttonVariants({ variant: "outline", size: "sm" })}>
                 Open list view
               </Link>
             </div>
@@ -229,10 +230,7 @@ export default async function MapPage({ searchParams }: MapPageProps) {
                 action={
                   <div className="flex flex-wrap items-center justify-center gap-2">
                     {hasActiveFilters ? (
-                      <Link
-                        href={resetFiltersHref}
-                        className={buttonVariants({ variant: "outline", size: "sm" })}
-                      >
+                      <Link href={resetFiltersHref} className={buttonVariants({ variant: "outline", size: "sm" })}>
                         Reset filters
                       </Link>
                     ) : null}

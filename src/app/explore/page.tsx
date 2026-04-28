@@ -62,10 +62,12 @@ export default async function ExplorePage({ searchParams }: ExplorePageProps) {
     <MainContainer size="wide" className="space-y-6">
       <section className="border-border/75 bg-card/60 space-y-3 rounded-xl border p-5 sm:p-6">
         <Badge variant="primary">Explore listings</Badge>
-        <h1 className="type-page-title max-w-4xl">Browse RoofHub rentals and homes for sale.</h1>
+        <h1 className="type-page-title max-w-4xl">
+          Browse published rentals and homes for sale across RoofHub.
+        </h1>
         <p className="type-body-muted max-w-3xl">
-          Use keyword search, location filters, and smart sorting to scan company public inventory
-          quickly, then switch to map view without losing your search state.
+          Use keyword search, location filters, and smart sorting to scan listings quickly, then
+          switch to map view without losing your search state.
         </p>
       </section>
 
@@ -94,10 +96,7 @@ export default async function ExplorePage({ searchParams }: ExplorePageProps) {
             title="This page has no listings"
             description="The current result page is out of range for your selected filters. Return to page one to continue browsing."
             action={
-              <Link
-                href={firstPageHref}
-                className={buttonVariants({ variant: "outline", size: "sm" })}
-              >
+              <Link href={firstPageHref} className={buttonVariants({ variant: "outline", size: "sm" })}>
                 Go to page 1
               </Link>
             }
@@ -113,10 +112,7 @@ export default async function ExplorePage({ searchParams }: ExplorePageProps) {
             }
             action={
               hasActiveFilters ? (
-                <Link
-                  href={resetFiltersHref}
-                  className={buttonVariants({ variant: "outline", size: "sm" })}
-                >
+                <Link href={resetFiltersHref} className={buttonVariants({ variant: "outline", size: "sm" })}>
                   Reset filters
                 </Link>
               ) : (

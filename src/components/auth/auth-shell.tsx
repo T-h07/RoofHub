@@ -16,7 +16,7 @@ type AuthShellProps = {
 const trustNotes = [
   "Session-aware access keeps protected routes available only to signed-in users.",
   "Cookie-based authentication keeps account state consistent across page reloads.",
-  "One account connects public favorites with internal workspace access when assigned.",
+  "One account connects your dashboard, favorites, messages, and profile settings.",
 ];
 
 export function AuthShell({ badge, title, description, children, footer }: AuthShellProps) {

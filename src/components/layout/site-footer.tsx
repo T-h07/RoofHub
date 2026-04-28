@@ -14,8 +14,8 @@ export function SiteFooter() {
           <div className="space-y-2">
             <p className="text-base font-semibold tracking-tight">{siteConfig.name}</p>
             <p className="type-body-muted max-w-sm">
-              A single-company real estate website and operations workspace for listings, map
-              search, inquiries, and team workflow.
+              Map-first marketplace for rentals and homes for sale, built for clear discovery,
+              provider publishing, and company-aware inquiry handling.
             </p>
           </div>
 
@@ -40,7 +40,7 @@ export function SiteFooter() {
 
         <div className="text-muted-foreground flex flex-col gap-2 pt-4 text-xs sm:flex-row sm:items-center sm:justify-between">
           <p>{`© ${year} ${siteConfig.name}. All rights reserved.`}</p>
-          <p>Map-first public discovery with internal company operations.</p>
+          <p>Map-first real estate operations for seekers, providers, and company teams.</p>
         </div>
       </MainContainer>
     </footer>

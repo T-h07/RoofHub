@@ -11,7 +11,6 @@ type CompanyPublicListingsShellProps = {
   companyName: string;
   listings: PublicCompanyListingPreview[];
   isAuthenticated: boolean;
-  id?: string;
   className?: string;
 };
 
@@ -19,14 +18,10 @@ export function CompanyPublicListingsShell({
   companyName,
   listings,
   isAuthenticated,
-  id,
   className,
 }: CompanyPublicListingsShellProps) {
   return (
-    <section
-      id={id}
-      className={cn("border-border bg-card rounded-2xl border p-5 sm:p-6", className)}
-    >
+    <section className={cn("border-border bg-card rounded-2xl border p-5 sm:p-6", className)}>
       <header className="border-border/70 mb-5 space-y-2 border-b pb-4">
         <p className="type-label">Public inventory</p>
         <h2 className="type-section-title">Listings from {companyName}</h2>
@@ -51,7 +46,7 @@ export function CompanyPublicListingsShell({
         <EmptyState
           icon={Home}
           title="No public listings yet"
-          description="This company has not published listings on RoofHub yet. Check back soon or open the map for current inventory."
+          description="This company has not published listings on RoofHub yet. Check back soon or explore other live properties."
           action={
             <div className="flex flex-wrap items-center justify-center gap-2">
               <Link href="/explore" className={buttonVariants({ size: "sm" })}>
