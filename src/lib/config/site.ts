@@ -2,38 +2,38 @@ import type { FooterLinkGroup } from "@/types/navigation";
 
 export const footerLinkGroups: FooterLinkGroup[] = [
   {
-    title: "Public website",
+    title: "Browse",
     links: [
-      { title: "Listings", href: "/explore" },
+      { title: "Explore listings", href: "/explore" },
       { title: "Map search", href: "/map" },
-      { title: "Company", href: "/company" },
+      { title: "Saved listings", href: "/favorites" },
     ],
   },
   {
-    title: "Internal workspace",
+    title: "Account",
     links: [
-      { title: "Operations", href: "/dashboard" },
-      { title: "Listing work", href: "/dashboard/listings" },
       { title: "Messages", href: "/messages" },
       { title: "Notifications", href: "/notifications" },
+      { title: "Profile", href: "/profile" },
+      { title: "Create account", href: "/auth/sign-up" },
     ],
   },
   {
-    title: "Governance",
+    title: "Providers",
     links: [
-      { title: "Company settings", href: "/profile/company" },
-      { title: "Team and invites", href: "/profile/company/team" },
-      { title: "Profile", href: "/profile" },
+      { title: "Operations dashboard", href: "/dashboard" },
+      { title: "Listing inventory", href: "/dashboard/listings" },
+      { title: "Company", href: "/profile/company" },
     ],
   },
 ];
 
 export const siteConfig = {
   name: "RoofHub",
-  title: "RoofHub | Company real estate website and workspace",
+  title: "RoofHub | Map-first real estate marketplace",
   description:
-    "RoofHub is a single-company real estate platform with a public listings website, map search, inquiries, and an internal operations workspace.",
-  ctaLabel: "View listings",
-  ctaHref: "/explore",
+    "Map-first real estate marketplace for rentals and homes for sale, with provider, company, and messaging workflows that already run on Vercel and Supabase.",
+  ctaLabel: "List a property",
+  ctaHref: "/dashboard/listings/new",
   footerLinks: footerLinkGroups,
 } as const;

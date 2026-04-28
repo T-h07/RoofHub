@@ -21,7 +21,6 @@ export const COMPANY_CANONICAL_PATHS = {
   companyProfile: "/profile/company/edit",
   companyTeam: "/profile/company/team",
   inviteAcceptance: "/profile/company/invites/[token]",
-  publicCompanyHome: "/company",
   publicCompanyProfile: "/companies/[slug]",
   notifications: "/notifications",
 } as const;
@@ -29,8 +28,8 @@ export const COMPANY_CANONICAL_PATHS = {
 export const COMPANY_ROUTE_CLASSIFICATIONS: readonly CompanyRouteClassification[] = [
   {
     route: "/company",
-    category: "external",
-    purpose: "Public company website entry point for the single-company audience.",
+    category: "operational",
+    purpose: "Role-aware company shortcut that routes to the right workspace home.",
   },
   {
     route: "/dashboard",
@@ -75,12 +74,12 @@ export const COMPANY_ROUTE_CLASSIFICATIONS: readonly CompanyRouteClassification[
   {
     route: "/profile/company",
     category: "governance",
-    purpose: "Company governance home for identity, branding, team, invites, and settings.",
+    purpose: "Company governance home for workspace identity and settings.",
   },
   {
     route: "/profile/company/new",
     category: "governance",
-    purpose: "Create company context and governance root.",
+    purpose: "Create company workspace and governance root.",
   },
   {
     route: "/profile/company/edit",
@@ -100,11 +99,13 @@ export const COMPANY_ROUTE_CLASSIFICATIONS: readonly CompanyRouteClassification[
   {
     route: "/companies/[slug]",
     category: "external",
-    purpose: "Public company website page with identity, contact context, services, and listings.",
+    purpose: "Public company profile reference page.",
   },
 ] as const;
 
-export function getCompanyOperationalHomeForRole(membershipRole: OrganizationMemberRole | null) {
+export function getCompanyOperationalHomeForRole(
+  membershipRole: OrganizationMemberRole | null
+) {
   if (membershipRole === "agent") {
     return "/dashboard/listings";
   }
@@ -112,10 +113,18 @@ export function getCompanyOperationalHomeForRole(membershipRole: OrganizationMem
   return "/dashboard";
 }
 
-export function canAccessCompanyActivityInNav(membershipRole: OrganizationMemberRole | null) {
-  return membershipRole === "owner" || membershipRole === "admin" || membershipRole === "manager";
+export function canAccessCompanyActivityInNav(
+  membershipRole: OrganizationMemberRole | null
+) {
+  return (
+    membershipRole === "owner" ||
+    membershipRole === "admin" ||
+    membershipRole === "manager"
+  );
 }
 
-export function canAccessCompanyTeamInNav(membershipRole: OrganizationMemberRole | null) {
+export function canAccessCompanyTeamInNav(
+  membershipRole: OrganizationMemberRole | null
+) {
   return membershipRole === "owner" || membershipRole === "admin";
 }

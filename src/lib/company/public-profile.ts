@@ -53,7 +53,10 @@ export type PublicCompanyListingPreview = Omit<PublicCompanyListingRow, "listing
   company: PublicListingCompanyAttribution | null;
 };
 
-export type PublicCompanyProfile = Omit<PublicCompanyProfileRow, "logo_path"> & {
+export type PublicCompanyProfile = Omit<
+  PublicCompanyProfileRow,
+  "logo_path"
+> & {
   logoPath: string | null;
   logoUrl: string | null;
 };
@@ -81,21 +84,6 @@ export type PublicCompanyProfileResult =
   | PublicCompanyProfileSuccessResult
   | PublicCompanyProfileNotFoundResult
   | PublicCompanyProfileErrorResult;
-
-type PrimaryPublicCompanySuccessResult = {
-  ok: true;
-  slug: string;
-};
-
-type PrimaryPublicCompanyErrorResult = {
-  ok: false;
-  reason: "not_found" | "error";
-  message?: string;
-};
-
-export type PrimaryPublicCompanyResult =
-  | PrimaryPublicCompanySuccessResult
-  | PrimaryPublicCompanyErrorResult;
 
 const COMPANY_SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const COMPANY_SLUG_MAX_LENGTH = 80;
@@ -161,45 +149,6 @@ function normalizePublicCompanyProfile(
 
 function normalizeSlug(value: string) {
   return value.trim().toLowerCase();
-}
-
-export async function loadPrimaryPublicCompanySlug(): Promise<PrimaryPublicCompanyResult> {
-  try {
-    const supabase = await createServerSupabaseClient();
-    const { data, error } = await supabase
-      .from("organizations")
-      .select("slug")
-      .eq("status", "active")
-      .order("created_at", { ascending: true })
-      .limit(1)
-      .maybeSingle();
-
-    if (error) {
-      return {
-        ok: false,
-        reason: "error",
-        message: "Company website could not be loaded right now.",
-      };
-    }
-
-    if (!data?.slug) {
-      return {
-        ok: false,
-        reason: "not_found",
-      };
-    }
-
-    return {
-      ok: true,
-      slug: data.slug,
-    };
-  } catch {
-    return {
-      ok: false,
-      reason: "error",
-      message: "Company website is unavailable because core configuration is incomplete.",
-    };
-  }
 }
 
 export async function loadPublicCompanyProfileBySlug(

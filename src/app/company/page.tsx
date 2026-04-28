@@ -1,39 +1,33 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Building2 } from "lucide-react";
 
-import { MainContainer } from "@/components/layout/main-container";
-import { buttonVariants } from "@/components/ui/button";
-import { EmptyState } from "@/components/ui/empty-state";
-import { loadPrimaryPublicCompanySlug } from "@/lib/company/public-profile";
+import { getCurrentUserProfile } from "@/lib/auth/profile";
+import { getCurrentUserCompanyContext } from "@/lib/company/context";
+import { getCompanyOperationalHomeForRole } from "@/lib/navigation/company-ia";
+import { createServerSupabaseClient } from "@/lib/supabase";
 
-export default async function PublicCompanyEntryPage() {
-  const companyResult = await loadPrimaryPublicCompanySlug();
+export default async function CompanyShortcutPage() {
+  const supabase = await createServerSupabaseClient();
+  const profileResult = await getCurrentUserProfile(supabase);
 
-  if (companyResult.ok) {
-    redirect(`/companies/${companyResult.slug}`);
+  if (!profileResult.ok) {
+    redirect("/profile/company");
   }
 
-  return (
-    <MainContainer size="content">
-      <EmptyState
-        icon={Building2}
-        title="Company website is not live yet"
-        description={
-          companyResult.message ??
-          "RoofHub will publish the company website here once the company profile is active."
-        }
-        action={
-          <div className="flex flex-wrap items-center justify-center gap-2">
-            <Link href="/explore" className={buttonVariants({ size: "sm" })}>
-              View listings
-            </Link>
-            <Link href="/map" className={buttonVariants({ variant: "outline", size: "sm" })}>
-              Open map
-            </Link>
-          </div>
-        }
-      />
-    </MainContainer>
-  );
+  if (
+    profileResult.profile.role !== "provider" ||
+    profileResult.profile.provider_account_type !== "company"
+  ) {
+    redirect("/profile/company");
+  }
+
+  const companyContextResult = await getCurrentUserCompanyContext(supabase);
+  if (!companyContextResult.ok) {
+    redirect("/profile/company");
+  }
+
+  if (companyContextResult.company.workspaceState !== "resolved") {
+    redirect("/profile/company");
+  }
+
+  redirect(getCompanyOperationalHomeForRole(companyContextResult.company.activeMembership?.role ?? null));
 }

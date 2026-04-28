@@ -23,7 +23,8 @@ export function isAppRole(value: unknown): value is AppRole {
 
 export function isProviderAccountType(value: unknown): value is ProviderAccountType {
   return (
-    typeof value === "string" && PROVIDER_ACCOUNT_TYPE_VALUES.includes(value as ProviderAccountType)
+    typeof value === "string" &&
+    PROVIDER_ACCOUNT_TYPE_VALUES.includes(value as ProviderAccountType)
   );
 }
 
@@ -66,12 +67,12 @@ export function getRoleLabel(role: AppRole) {
 export function getRoleDescription(role: AppRole) {
   switch (role) {
     case "provider":
-      return "Manage company listings, operational workflow, and inquiry response.";
+      return "Publish listings as an individual provider or company workspace and respond to inquiries.";
     case "admin":
       return "Admin access is managed securely and not editable from public profile settings.";
     case "seeker":
     default:
-      return "Browse RoofHub listings, save favorites, and message the company.";
+      return "Browse listings, save favorites, and message providers.";
   }
 }
 
