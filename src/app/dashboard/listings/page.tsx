@@ -256,14 +256,31 @@ export default async function DashboardListingsPage({ searchParams }: DashboardL
           description={introCopy.description}
           actions={
             isSecondaryMode ? (
-              <Link href="/dashboard" className={buttonVariants({ size: "sm" })}>
-                Back to review dashboard
-              </Link>
+              <>
+                <Link href="/dashboard" className={buttonVariants({ size: "sm" })}>
+                  Back to operations dashboard
+                </Link>
+                <Link
+                  href="/dashboard/listings/new"
+                  className={buttonVariants({ variant: "ghost", size: "sm" })}
+                >
+                  <PlusSquare className="size-4" aria-hidden="true" />
+                  Create listing draft
+                </Link>
+              </>
             ) : (
-              <Link href="/dashboard/listings/new" className={buttonVariants({ size: "sm" })}>
-                <PlusSquare className="size-4" aria-hidden="true" />
-                Create listing draft
-              </Link>
+              <>
+                <Link href="/dashboard/listings/new" className={buttonVariants({ size: "sm" })}>
+                  <PlusSquare className="size-4" aria-hidden="true" />
+                  Create listing draft
+                </Link>
+                <Link
+                  href="/dashboard"
+                  className={buttonVariants({ variant: "outline", size: "sm" })}
+                >
+                  Back to dashboard
+                </Link>
+              </>
             )
           }
           meta={

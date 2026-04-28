@@ -62,24 +62,6 @@ const PROVIDER_OPERATIONS_NAV: NavItem[] = [
 
 const APP_ADMIN_NAV: NavItem[] = [{ title: "Moderation", href: "/admin/moderation" }];
 
-function getCompanyInboxNavItem(role: OrganizationMemberRole | null): NavItem {
-  if (role === "agent") {
-    return {
-      title: "Assigned inbox",
-      href: `${COMPANY_CANONICAL_PATHS.inbox}?section=outer_company&lane=assigned`,
-    };
-  }
-
-  if (role === "manager" || role === "owner" || role === "admin") {
-    return {
-      title: role === "manager" ? "Queue inbox" : "Inbox routing",
-      href: `${COMPANY_CANONICAL_PATHS.inbox}?section=outer_company&lane=queue`,
-    };
-  }
-
-  return { title: "Messages", href: COMPANY_CANONICAL_PATHS.inbox };
-}
-
 function buildCompanyPrimaryNav(viewer: NavViewer): NavItem[] {
   const nav: NavItem[] = [];
 
@@ -97,7 +79,7 @@ function buildCompanyPrimaryNav(viewer: NavViewer): NavItem[] {
     nav.push(...PROVIDER_OPERATIONS_NAV);
   }
 
-  nav.push(getCompanyInboxNavItem(viewer.companyMembershipRole));
+  nav.push(...AUTH_COMMUNICATION_PRIMARY_NAV);
   nav.push({ title: "Public site", href: COMPANY_CANONICAL_PATHS.publicCompanyHome });
 
   return nav;

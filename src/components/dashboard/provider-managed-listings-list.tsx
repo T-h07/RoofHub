@@ -6,10 +6,7 @@ import { ProviderListingLifecycleActions } from "@/components/dashboard/provider
 import { ProviderListingStatusBadge } from "@/components/dashboard/provider-listing-status-badge";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
-import type {
-  ProviderManagedListing,
-  ProviderListingType,
-} from "@/lib/listings/provider-dashboard/types";
+import type { ProviderManagedListing, ProviderListingType } from "@/lib/listings/provider-dashboard/types";
 import { isPublicDiscoveryListing } from "@/lib/listings/visibility";
 
 type ListingsRoleMode =
@@ -128,7 +125,7 @@ function buildCompanyListingActionModel(input: {
     case "draft":
       return {
         primary: { label: "Continue editing", href: editHref },
-        secondary: null,
+        secondary: { label: "Workflow state", href: workflowHref },
       };
     case "needs_changes":
       return {
@@ -138,7 +135,7 @@ function buildCompanyListingActionModel(input: {
     case "submitted_for_review":
       return {
         primary: { label: "Track review", href: workflowHref },
-        secondary: null,
+        secondary: { label: "Open listing", href: editHref },
       };
     default:
       return {
@@ -220,9 +217,9 @@ export function ProviderManagedListingsList({
 }: ProviderManagedListingsListProps) {
   return (
     <>
-      <div className="border-border/75 hidden overflow-hidden rounded-xl border lg:block">
+      <div className="hidden overflow-hidden rounded-xl border border-border/75 lg:block">
         <table className="w-full border-collapse text-sm">
-          <thead className="bg-muted/28 text-muted-foreground text-left text-xs tracking-wide uppercase">
+          <thead className="bg-muted/28 text-left text-xs uppercase tracking-wide text-muted-foreground">
             <tr>
               <th className="px-4 py-3.5 font-semibold">Listing</th>
               <th className="px-4 py-3.5 font-semibold">Status</th>
@@ -239,84 +236,83 @@ export function ProviderManagedListingsList({
                   : null;
 
               return (
-                <tr key={listing.id} className="border-border/70 border-t align-top">
-                  <td className="px-4 py-3.5">
-                    <div className="flex items-start gap-3">
-                      <div className="border-border/70 bg-muted/35 relative h-16 w-24 shrink-0 overflow-hidden rounded-lg border">
-                        {renderPreviewImage(listing)}
-                      </div>
-                      <div className="min-w-0 space-y-1">
-                        <p className="truncate font-semibold tracking-tight">{listing.title}</p>
-                        <div className="flex flex-wrap items-center gap-2">
-                          {renderOwnershipBadge(listing)}
-                          <p className="text-muted-foreground flex items-center gap-2 text-xs">
-                            <span className="inline-flex items-center gap-1">
-                              <Building2 className="size-3.5" aria-hidden="true" />
-                              {LISTING_TYPE_LABELS[listing.listing_type]} •{" "}
-                              {formatPropertyType(listing.property_type)}
-                            </span>
-                            <span>{formatPriceLabel(listing)}</span>
-                          </p>
-                        </div>
-                        <p className="text-muted-foreground inline-flex items-center gap-1 text-xs">
-                          <MapPin className="size-3.5" aria-hidden="true" />
-                          {formatLocationLabel(listing)}
-                        </p>
-                        {listing.slug && isPublicDiscoveryListing(listing) ? (
-                          <Link
-                            href={`/listing/${listing.slug}`}
-                            className="text-primary inline-flex items-center gap-1 text-xs hover:underline"
-                          >
-                            View public listing
-                            <SquareArrowOutUpRight className="size-3" aria-hidden="true" />
-                          </Link>
-                        ) : listing.listing_status === "hidden_by_admin" ? (
-                          <p className="text-destructive text-xs">
-                            Hidden by admin moderation from public discovery.
-                          </p>
-                        ) : null}
-                      </div>
+              <tr key={listing.id} className="border-t border-border/70 align-top">
+                <td className="px-4 py-3.5">
+                  <div className="flex items-start gap-3">
+                    <div className="border-border/70 bg-muted/35 relative h-16 w-24 shrink-0 overflow-hidden rounded-lg border">
+                      {renderPreviewImage(listing)}
                     </div>
-                  </td>
-                  <td className="px-4 py-3.5">
-                    <ProviderListingStatusBadge status={listing.listing_status} />
-                    <p className="text-muted-foreground mt-1 text-xs">{statusGuidance}</p>
-                  </td>
-                  <td className="px-4 py-3.5">
-                    <p className="text-muted-foreground inline-flex items-center gap-1 text-xs">
-                      <Clock3 className="size-3.5" aria-hidden="true" />
-                      {formatTimestamp(listing.updated_at)}
-                    </p>
-                  </td>
-                  <td className="px-4 py-3.5">
-                    {companyActionModel ? (
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <Link
-                          href={companyActionModel.primary.href}
-                          className={buttonVariants({ size: "sm" })}
-                        >
-                          {companyActionModel.primary.label}
-                        </Link>
-                        {companyActionModel.secondary ? (
-                          <Link
-                            href={companyActionModel.secondary.href}
-                            className={buttonVariants({ variant: "outline", size: "sm" })}
-                          >
-                            {companyActionModel.secondary.label}
-                          </Link>
-                        ) : null}
+                    <div className="min-w-0 space-y-1">
+                      <p className="truncate font-semibold tracking-tight">{listing.title}</p>
+                      <div className="flex flex-wrap items-center gap-2">
+                        {renderOwnershipBadge(listing)}
+                        <p className="text-muted-foreground flex items-center gap-2 text-xs">
+                          <span className="inline-flex items-center gap-1">
+                            <Building2 className="size-3.5" aria-hidden="true" />
+                            {LISTING_TYPE_LABELS[listing.listing_type]} • {formatPropertyType(listing.property_type)}
+                          </span>
+                          <span>{formatPriceLabel(listing)}</span>
+                        </p>
                       </div>
-                    ) : (
-                      <ProviderListingLifecycleActions
-                        listingId={listing.id}
-                        listingType={listing.listing_type}
-                        currentStatus={listing.listing_status}
-                        editHref={buildEditHref(listing.id)}
-                      />
-                    )}
-                  </td>
-                </tr>
-              );
+                      <p className="text-muted-foreground inline-flex items-center gap-1 text-xs">
+                        <MapPin className="size-3.5" aria-hidden="true" />
+                        {formatLocationLabel(listing)}
+                      </p>
+                      {listing.slug && isPublicDiscoveryListing(listing) ? (
+                        <Link
+                          href={`/listing/${listing.slug}`}
+                          className="text-primary inline-flex items-center gap-1 text-xs hover:underline"
+                        >
+                          View public listing
+                          <SquareArrowOutUpRight className="size-3" aria-hidden="true" />
+                        </Link>
+                      ) : listing.listing_status === "hidden_by_admin" ? (
+                        <p className="text-destructive text-xs">
+                          Hidden by admin moderation from public discovery.
+                        </p>
+                      ) : null}
+                    </div>
+                  </div>
+                </td>
+                <td className="px-4 py-3.5">
+                  <ProviderListingStatusBadge status={listing.listing_status} />
+                  <p className="text-muted-foreground mt-1 text-xs">
+                    {statusGuidance}
+                  </p>
+                </td>
+                <td className="px-4 py-3.5">
+                  <p className="text-muted-foreground inline-flex items-center gap-1 text-xs">
+                    <Clock3 className="size-3.5" aria-hidden="true" />
+                    {formatTimestamp(listing.updated_at)}
+                  </p>
+                </td>
+                <td className="px-4 py-3.5">
+                  {companyActionModel ? (
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <Link
+                        href={companyActionModel.primary.href}
+                        className={buttonVariants({ size: "sm" })}
+                      >
+                        {companyActionModel.primary.label}
+                      </Link>
+                      <Link
+                        href={companyActionModel.secondary.href}
+                        className={buttonVariants({ variant: "outline", size: "sm" })}
+                      >
+                        {companyActionModel.secondary.label}
+                      </Link>
+                    </div>
+                  ) : (
+                    <ProviderListingLifecycleActions
+                      listingId={listing.id}
+                      listingType={listing.listing_type}
+                      currentStatus={listing.listing_status}
+                      editHref={buildEditHref(listing.id)}
+                    />
+                  )}
+                </td>
+              </tr>
+            );
             })}
           </tbody>
         </table>
@@ -331,79 +327,78 @@ export function ProviderManagedListingsList({
               : null;
 
           return (
-            <article
-              key={listing.id}
-              className="border-border/75 bg-card/58 space-y-3 rounded-xl border p-4"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0 space-y-1">
-                  <p className="truncate text-sm font-semibold tracking-tight">{listing.title}</p>
-                  <p className="text-muted-foreground text-xs">
-                    {LISTING_TYPE_LABELS[listing.listing_type]} •{" "}
-                    {formatPropertyType(listing.property_type)}
-                  </p>
-                  <p className="text-muted-foreground text-[11px]">{statusGuidance}</p>
-                </div>
-                <ProviderListingStatusBadge status={listing.listing_status} />
-              </div>
-
-              <div className="flex items-center justify-between gap-2">
-                {renderOwnershipBadge(listing)}
+          <article
+            key={listing.id}
+            className="border-border/75 bg-card/58 space-y-3 rounded-xl border p-4"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0 space-y-1">
+                <p className="truncate text-sm font-semibold tracking-tight">{listing.title}</p>
+                <p className="text-muted-foreground text-xs">
+                  {LISTING_TYPE_LABELS[listing.listing_type]} • {formatPropertyType(listing.property_type)}
+                </p>
                 <p className="text-muted-foreground text-[11px]">
-                  {listing.ownershipMode === "company"
-                    ? "Managed through company workspace"
-                    : "Managed as individual profile"}
+                  {statusGuidance}
                 </p>
               </div>
+              <ProviderListingStatusBadge status={listing.listing_status} />
+            </div>
 
-              <div className="border-border/70 bg-muted/25 relative h-40 overflow-hidden rounded-lg border">
-                {renderPreviewImage(listing)}
+            <div className="flex items-center justify-between gap-2">
+              {renderOwnershipBadge(listing)}
+              <p className="text-muted-foreground text-[11px]">
+                {listing.ownershipMode === "company"
+                  ? "Managed through company workspace"
+                  : "Managed as individual profile"}
+              </p>
+            </div>
+
+            <div className="border-border/70 bg-muted/25 relative h-40 overflow-hidden rounded-lg border">
+              {renderPreviewImage(listing)}
+            </div>
+
+            <div className="text-muted-foreground space-y-1 text-xs">
+              <p>{formatPriceLabel(listing)}</p>
+              <p>{formatLocationLabel(listing)}</p>
+              <p>Updated {formatTimestamp(listing.updated_at)}</p>
+              {listing.slug && isPublicDiscoveryListing(listing) ? (
+                <Link
+                  href={`/listing/${listing.slug}`}
+                  className="text-primary inline-flex items-center gap-1 hover:underline"
+                >
+                  View public listing
+                  <SquareArrowOutUpRight className="size-3.5" aria-hidden="true" />
+                </Link>
+              ) : listing.listing_status === "hidden_by_admin" ? (
+                <p className="text-destructive">Hidden by admin moderation.</p>
+              ) : null}
+            </div>
+
+            {companyActionModel ? (
+              <div className="flex flex-wrap gap-2">
+                <Link
+                  href={companyActionModel.primary.href}
+                  className={buttonVariants({ size: "sm" })}
+                >
+                  {companyActionModel.primary.label}
+                </Link>
+                <Link
+                  href={companyActionModel.secondary.href}
+                  className={buttonVariants({ variant: "outline", size: "sm" })}
+                >
+                  {companyActionModel.secondary.label}
+                </Link>
               </div>
-
-              <div className="text-muted-foreground space-y-1 text-xs">
-                <p>{formatPriceLabel(listing)}</p>
-                <p>{formatLocationLabel(listing)}</p>
-                <p>Updated {formatTimestamp(listing.updated_at)}</p>
-                {listing.slug && isPublicDiscoveryListing(listing) ? (
-                  <Link
-                    href={`/listing/${listing.slug}`}
-                    className="text-primary inline-flex items-center gap-1 hover:underline"
-                  >
-                    View public listing
-                    <SquareArrowOutUpRight className="size-3.5" aria-hidden="true" />
-                  </Link>
-                ) : listing.listing_status === "hidden_by_admin" ? (
-                  <p className="text-destructive">Hidden by admin moderation.</p>
-                ) : null}
-              </div>
-
-              {companyActionModel ? (
-                <div className="flex flex-wrap gap-2">
-                  <Link
-                    href={companyActionModel.primary.href}
-                    className={buttonVariants({ size: "sm" })}
-                  >
-                    {companyActionModel.primary.label}
-                  </Link>
-                  {companyActionModel.secondary ? (
-                    <Link
-                      href={companyActionModel.secondary.href}
-                      className={buttonVariants({ variant: "outline", size: "sm" })}
-                    >
-                      {companyActionModel.secondary.label}
-                    </Link>
-                  ) : null}
-                </div>
-              ) : (
-                <ProviderListingLifecycleActions
-                  listingId={listing.id}
-                  listingType={listing.listing_type}
-                  currentStatus={listing.listing_status}
-                  editHref={buildEditHref(listing.id)}
-                />
-              )}
-            </article>
-          );
+            ) : (
+              <ProviderListingLifecycleActions
+                listingId={listing.id}
+                listingType={listing.listing_type}
+                currentStatus={listing.listing_status}
+                editHref={buildEditHref(listing.id)}
+              />
+            )}
+          </article>
+        );
         })}
       </div>
     </>
