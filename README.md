@@ -35,9 +35,6 @@ Theme direction:
 Create `.env.local` in the project root:
 
 ```bash
-NEXT_PUBLIC_SUPABASE_URL=your-project-url
-NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
-NEXT_PUBLIC_MAP_STYLE_URL=your-map-style-url
 ```
 
 Rules:
