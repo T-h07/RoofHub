@@ -113,7 +113,7 @@ Audit and observability execution details are defined in `docs/audit-observabili
 ### 8) Environment and secrets
 
 - `.env.local` and any real `.env*` values are never committed.
-- `.env.example` contains placeholders only.
+- Any committed environment template must contain placeholders only.
 - `NEXT_PUBLIC_*` variables are public-by-definition and must not contain secrets.
 - Supabase service-role key is server-only and must never appear in client bundles.
 - Keep Vercel envs separated per environment (Development, Preview, Production).
