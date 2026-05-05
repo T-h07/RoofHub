@@ -78,7 +78,7 @@ export function SiteHeader({ authState }: SiteHeaderProps) {
   return (
     <header className="border-nav-active/20 bg-nav-background/96 text-nav-foreground sticky top-0 z-40 border-b backdrop-blur-md">
       <MainContainer>
-        <div className="flex h-[4.5rem] items-center justify-between gap-3">
+        <div className="flex h-16 items-center justify-between gap-3 sm:h-[4.25rem]">
           <Link href="/" className="group inline-flex min-w-0 items-center gap-2.5">
             <span className="border-nav-active/45 bg-nav-active/22 text-nav-foreground group-hover:bg-nav-active/32 inline-flex size-8.5 shrink-0 items-center justify-center rounded-lg border transition-colors">
               <MapPinned className="size-4.5" aria-hidden="true" />
@@ -93,7 +93,7 @@ export function SiteHeader({ authState }: SiteHeaderProps) {
             </span>
           </Link>
 
-          <nav className="hidden min-w-0 items-center gap-1 lg:flex" aria-label="Primary navigation">
+          <nav className="hidden min-w-0 items-center gap-1 xl:flex" aria-label="Primary navigation">
             {navigation.primary.map((item) => (
               <HeaderLink
                 key={item.href}
@@ -117,7 +117,7 @@ export function SiteHeader({ authState }: SiteHeaderProps) {
             ) : null}
           </nav>
 
-          <div className="hidden items-center gap-2 lg:flex">
+          <div className="hidden items-center gap-2 xl:flex">
             {isAuthenticated ? (
               <>
                 <NotificationBell
@@ -164,7 +164,7 @@ export function SiteHeader({ authState }: SiteHeaderProps) {
             )}
           </div>
 
-          <div className="flex items-center gap-2 lg:hidden">
+          <div className="flex items-center gap-2 xl:hidden">
             {isAuthenticated ? (
               <NotificationBell
                 initialUnreadCount={authState.unreadNotificationCount}

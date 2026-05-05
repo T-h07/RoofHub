@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useState } from "react";
 import { Compass, LayoutGrid, Menu, Sparkles } from "lucide-react";
 
 import { SignOutButton } from "@/components/auth/sign-out-button";
@@ -25,14 +27,17 @@ function MobileNavLink({
   href,
   label,
   active,
+  onSelect,
 }: {
   href: string;
   label: string;
   active: boolean;
+  onSelect?: () => void;
 }) {
   return (
     <Link
       href={href}
+      onClick={onSelect}
       className={cn(
         "flex items-center justify-between rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
         active
@@ -60,6 +65,8 @@ type MobileNavSheetProps = {
 
 export function MobileNavSheet({ authState }: MobileNavSheetProps) {
   const { isActive } = useActiveRoute();
+  const pathname = usePathname();
+  const [open, setOpen] = useState(false);
   const isAuthenticated = authState.isAuthenticated;
   const navigation = getNavigationForViewer({
     isAuthenticated,
@@ -74,8 +81,12 @@ export function MobileNavSheet({ authState }: MobileNavSheetProps) {
     companyMembershipRole: authState.companyMembershipRole,
   });
 
+  function handleSelectNavigationItem() {
+    setOpen(false);
+  }
+
   return (
-    <Sheet>
+    <Sheet key={pathname} open={open} onOpenChange={setOpen}>
       <SheetTrigger
         className={cn(
           buttonVariants({ variant: "outline", size: "icon" }),
@@ -113,6 +124,7 @@ export function MobileNavSheet({ authState }: MobileNavSheetProps) {
                   href={item.href}
                   label={item.title}
                   active={isActive(item.href)}
+                  onSelect={handleSelectNavigationItem}
                 />
               ))}
             </nav>
@@ -128,6 +140,7 @@ export function MobileNavSheet({ authState }: MobileNavSheetProps) {
                     href={item.href}
                     label={item.title}
                     active={isActive(item.href)}
+                    onSelect={handleSelectNavigationItem}
                   />
                 ))}
               </nav>
@@ -144,6 +157,7 @@ export function MobileNavSheet({ authState }: MobileNavSheetProps) {
                     href={item.href}
                     label={item.title}
                     active={isActive(item.href)}
+                    onSelect={handleSelectNavigationItem}
                   />
                 ))}
               </nav>
@@ -172,12 +186,19 @@ export function MobileNavSheet({ authState }: MobileNavSheetProps) {
                 ) : null}
                 <Link
                   href={cta.href}
+                  onClick={handleSelectNavigationItem}
                   className={cn(buttonVariants({ size: "sm" }), "w-full justify-center shadow-none")}
                 >
                   {cta.label}
                   <Sparkles className="size-4" aria-hidden="true" />
                 </Link>
-                <form action={signOutAction} className="w-full">
+                <form
+                  action={signOutAction}
+                  className="w-full"
+                  onSubmit={() => {
+                    setOpen(false);
+                  }}
+                >
                   <SignOutButton className="w-full" />
                 </form>
               </div>
@@ -185,6 +206,7 @@ export function MobileNavSheet({ authState }: MobileNavSheetProps) {
               <div className="space-y-2">
                 <Link
                   href="/auth/sign-in"
+                  onClick={handleSelectNavigationItem}
                   className={cn(
                     buttonVariants({ variant: "outline", size: "sm" }),
                     "w-full justify-center border-nav-muted/45 bg-transparent text-nav-foreground hover:bg-nav-active/24 hover:text-nav-foreground"
@@ -194,6 +216,7 @@ export function MobileNavSheet({ authState }: MobileNavSheetProps) {
                 </Link>
                 <Link
                   href="/auth/sign-up"
+                  onClick={handleSelectNavigationItem}
                   className={cn(buttonVariants({ size: "sm" }), "w-full justify-center shadow-none")}
                 >
                   Create account

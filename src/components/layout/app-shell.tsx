@@ -106,7 +106,7 @@ export async function AppShell({ children }: AppShellProps) {
   return (
     <div className="relative flex min-h-screen flex-col overflow-x-clip">
       <SiteHeader authState={authState} />
-      <main className="flex-1 py-8 sm:py-10">{children}</main>
+      <main className="flex-1 py-6 sm:py-8 lg:py-10">{children}</main>
       <SiteFooter />
     </div>
   );
