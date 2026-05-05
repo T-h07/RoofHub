@@ -82,7 +82,7 @@ Commit:
 - documentation
 - lockfiles
 - static assets used by the app
-- template/example env files (for example `.env.example`)
+- sanitized environment templates (only when intentionally maintained)
 - CI/workflow files (when added)
 
 ## What Not to Commit
