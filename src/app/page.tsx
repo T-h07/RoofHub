@@ -6,6 +6,8 @@ import { MainContainer } from "@/components/layout/main-container";
 import { EXPLORE_DEFAULT_STATE } from "@/lib/listings/explore-search-params";
 import { loadPublicExploreListings } from "@/lib/listings/public-explore";
 
+export const dynamic = "force-dynamic";
+
 export default async function Home() {
   const featuredResult = await loadPublicExploreListings({
     ...EXPLORE_DEFAULT_STATE,
