@@ -121,30 +121,24 @@ Theme direction:
 Create `.env.local` in the project root:
 
 ```bash
-NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
-NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<supabase-publishable-key>
-NEXT_PUBLIC_MAP_STYLE_URL=https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json
-NEXT_PUBLIC_SITE_URL=http://localhost:3000
-AUTH_ALLOWED_ORIGINS=http://localhost:3000
 ```
 
 Quick local setup (Windows PowerShell):
 
 ```powershell
 cd C:\Users\taulanth\Desktop\nestmap
-Copy-Item .env.example .env.local
+New-Item -Path .env.local -ItemType File
 ```
 
 Hosted project reference:
 
-- Project ref: `<project-ref>`
-- Project URL: `https://<project-ref>.supabase.co`
-- Publishable key: `<supabase-publishable-key>`
+- Project ref: configured privately in the provider dashboard
+- Project URL: configured privately in the provider dashboard
+- Publishable key: configured privately in the provider dashboard
 
 Optional server-only connection string pattern (for CLI tooling only, never commit):
 
 ```bash
-DATABASE_URL=postgresql://postgres:<db-password>@db.<project-ref>.supabase.co:5432/postgres
 ```
 
 Where to get the Supabase values:
@@ -180,7 +174,7 @@ Link local CLI to hosted project:
 
 ```bash
 npx supabase login
-npx supabase link --project-ref <project-ref>
+npx supabase link --project-ref <your-project-ref>
 ```
 
 Check local vs hosted migration state and push:
