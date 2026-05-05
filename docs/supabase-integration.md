@@ -5,11 +5,10 @@
 - `@supabase/supabase-js`
 - `@supabase/ssr`
 
-## Hosted project wiring (current target)
+## Hosted project wiring
 
-- Project ref: `<project-ref>`
-- Project URL: `https://<project-ref>.supabase.co`
-- Publishable key: `<supabase-publishable-key>`
+Provider-specific values are intentionally omitted from repository docs.
+Use your own project values in local and hosted runtime environments.
 
 ## Environment variables
 
@@ -22,21 +21,8 @@ Optional app variable already present:
 
 - `NEXT_PUBLIC_MAP_STYLE_URL`
 
-Local `.env.local` (not committed):
-
-```bash
-NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
-NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<supabase-publishable-key>
-NEXT_PUBLIC_MAP_STYLE_URL=https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json
-NEXT_PUBLIC_SITE_URL=http://localhost:3000
-AUTH_ALLOWED_ORIGINS=http://localhost:3000
-```
-
-Optional server-only connection string pattern for CLI tooling:
-
-```bash
-DATABASE_URL=postgresql://postgres:<db-password>@db.<project-ref>.supabase.co:5432/postgres
-```
+For local runtime setup, create `.env.local` and add your own values from your provider dashboards.
+Do not commit populated environment files.
 
 Rules:
 
@@ -55,7 +41,7 @@ This repository already includes:
 To connect local CLI to the hosted project:
 
 1. `npx supabase login`
-2. `npx supabase link --project-ref <project-ref>`
+2. `npx supabase link --project-ref <your-project-ref>`
 3. `npx supabase migration list --local`
 4. `npx supabase migration list --linked`
 5. `npx supabase db push`

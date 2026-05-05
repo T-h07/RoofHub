@@ -25,7 +25,7 @@ Reviewed code/config/docs in this pass:
 - `src/app/auth/callback/route.ts`
 - `src/lib/supabase/{env.ts,server.ts,client.ts,proxy.ts}`
 - `proxy.ts`
-- `.env.example`
+- local environment templates (if maintained in repo)
 - `supabase/config.toml`
 - `.github/workflows/security-*.yml`
 - `.github/dependabot.yml`
@@ -141,7 +141,7 @@ This keeps canonical metadata host behavior aligned with environment/domain setu
 
 ### 4) Environment contract update
 
-`.env.example` now includes:
+Local environment setup now includes:
 
 - `AUTH_ALLOWED_ORIGINS` guidance for local/preview/production callback safety.
 
@@ -179,7 +179,7 @@ Supabase Auth dashboard must keep:
 
 ### Separation rules confirmed
 
-- `.env.example` contains placeholders only.
+- any committed environment template must contain placeholders only.
 - no service-role key in client code paths.
 - SSR/browser Supabase client split remains preserved.
 
