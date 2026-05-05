@@ -87,26 +87,18 @@ Theme direction:
 Create `.env.local` in the project root:
 
 ```bash
-NEXT_PUBLIC_SUPABASE_URL=your-project-url
-NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-publishable-key
-NEXT_PUBLIC_MAP_STYLE_URL=your-map-style-url
-NEXT_PUBLIC_SITE_URL=your-base-url
 ```
 
 Quick local setup (Windows PowerShell):
 
 ```powershell
 cd C:\Users\taulanth\Desktop\nestmap
-Copy-Item .env.example .env.local
+New-Item -Path .env.local -ItemType File
 ```
 
 Then set `.env.local` to:
 
 ```bash
-NEXT_PUBLIC_SUPABASE_URL=https://<your-project-ref>.supabase.co
-NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<your-supabase-anon-publishable-key>
-NEXT_PUBLIC_MAP_STYLE_URL=https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json
-NEXT_PUBLIC_SITE_URL=http://localhost:3000
 ```
 
 Where to get the Supabase values:
